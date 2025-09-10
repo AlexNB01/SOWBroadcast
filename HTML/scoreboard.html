@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>SOW Scoreboard</title>
+<style>
+  /* --------- Perusasetukset --------- */
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+  html,body{margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+
+	:root{
+	  --primary:#0f1114;   /* kortin tausta */
+	  --text:#ffffff;      /* tekstin väri */
+	  --t1:#27AAE1;        /* tiimiväri 1 */
+	  --t2:#C80013;        /* tiimiväri 2 */
+	  --quaternary:#3A3A90;/* SCORE-tausta (General/quaternary) */
+	}
+
+  /* --------- Map-bar (yhtenäinen elementti) --------- */
+  .mapbar{
+    position:fixed; top:0px; left:50%; transform:translateX(-50%);
+    height:30px; display:flex; align-items:center;
+    box-shadow:0 6px 18px rgba(0,0,0,.25);
+    pointer-events:none;
+  }
+.seg{
+  height:30px; min-width:118px; padding:0 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;      /* <-- keskitys vaakasuunnassa */
+  gap:8px;
+  color:#000;                  /* korjaus: #00000 -> #000 */
+  font:800 26px/1 Rajdhani;
+  letter-spacing:.5px;         /* korjaus: .px -> .5px (tai poista) */
+  text-align:center;           /* varmistus tekstille */
+}
+  .seg.empty{ background:#3f4a53; color:#ffffff; align-items:center;}
+  .seg.current{ background:#ffffff; color:#3f4a53; align-items:center;}
+  .seg.done{ background:#3f4a53; color:#ffffff; align-items:center;}
+  .seg .ico{ width:26px; height:26px; background-size:contain; background-repeat:no-repeat; background-position:center;}
+
+:root{
+  --primary:#0f1114;   /* kortin tausta */
+  --text:#ffffff;      /* tekstin väri */
+  --t1:#27AAE1;        /* tiimiväri 1 */
+  --t2:#C80013;        /* tiimiväri 2 */
+  --quaternary:#3A3A90;/* SCORE-tausta (General/quaternary) */
+}
+/* --------- Joukkuekortit (name–logo–score / peilattuna) --------- */
+.card{
+  position:fixed; top:10px; width:468px; height:55px;
+  background:var(--primary); color:var(--text);
+  border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,.28);
+  display:block;
+}
+.card.left  { left:43px;  /* ei väriraitaa */  padding-left:56px;  }
+.card.right { right:43px; /* ei väriraitaa */  padding-right:56px; }
+
+/* sisäinen sisältö flexillä, jotta järjestys on vakaa */
+.card .inner{
+  position:relative;
+  height:100%;
+  display:flex; align-items:center; gap:12px;
+}
+.card .inner.left  { justify-content:flex-start; text-align:right; }
+.card .inner.left .name { text-align:right; }
+
+.card .inner.right { justify-content:flex-end; }
+
+/* elementit */
+
+
+/* ... (muut tyylit voivat jäädä entisiksi) ... */
+
+/* elementit */
+.card .name{
+  flex:1 1 auto;
+  font-size:40px; font-weight:800;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-transform: uppercase;
+}
+/* Tiimiväri logon taustalle */
+.card .logo{
+  flex:0 0 56px; width:56px; height:100%;
+  background-size:contain; background-repeat:no-repeat; background-position:center; 
+}
+.card.left  .logo{  background-color: var(--t1); }  /* T1-väri */
+.card.right .logo{  background-color: var(--t2); }  /* T2-väri */
+
+/* SCORE: läpinäkyvä tausta, ei pyöristyksiä, koko kortin korkeus */
+.card .score{
+  width:30px;               /* kiinteä leveys */
+  height:100%;              /* koko kortin korkeus */
+  padding:0;                /* ei sisä-tyhjää */
+  display:flex;
+  align-items:center;       /* pysty-keskitys */
+  justify-content:center;   /* vaaka-keskitys */
+  font-size:40px;
+  font-weight:900;
+  border-radius:0;          /* ei pyöristystä */
+  background:transparent;   /* ei taustaväriä */
+  color:#00000;            
+  text-align:center;
+}
+
+.card.left  .inner{ padding-right:12px; }
+.card.right .inner{ padding-left:12px;  }
+
+
+/* Bannatut hahmot kortin SISÄLLÄ, kiinni ulkolaidassa — ei erillistä boksia/varjoa/labelia */
+.ban{
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:56px; height:100%;
+  background-size:cover; background-position:center; background-repeat:no-repeat;
+  display:none;           /* näytetään JS:ssä kun kuva löytyy */
+  box-shadow:none; outline:none; border:none;
+}
+.card.left  .ban{ left:4px;}
+.card.right .ban{ right:4px;}
+
+/* BAN-teksti ban-kuvan viereen (pystysuora) */
+.ban.has-ban::after{
+  content:"BAN";
+  position:absolute;
+  top:4px; bottom:4px;
+  display:flex; align-items:center; justify-content:center;
+  writing-mode:vertical-rl; text-orientation:upright;
+  font:900 17px/1 'Rajdhani', sans-serif;
+  letter-spacing:-5px;
+}
+
+/* Sijoitus & väri tiimin mukaan */
+.card.left  .ban.has-ban::after{  right:-18px; color:var(--t1); }
+.card.right .ban.has-ban::after{  left:-18px;  color:var(--t2); }
+
+/* ===== Reveal / Hide animations ===== */
+.card, .mapbar { 
+  will-change: transform, opacity; 
+  transition: transform 2080ms cubic-bezier(.2,.8,.2,1), opacity 2000ms ease;
+}
+
+/* alkutila & ulos-tila */
+body:not(.visible) .mapbar,
+body.leaving      .mapbar { transform: translate(-50%,-24px); opacity:0; }
+
+body:not(.visible) #t1card, body:not(.visible) .card.left,
+body.leaving      #t1card, body.leaving      .card.left { transform: translateX(-40px); opacity:0; }
+
+body:not(.visible) #t2card, body:not(.visible) .card.right,
+body.leaving      #t2card, body.leaving      .card.right{ transform: translateX(40px);  opacity:0; }
+
+/* ban-kuville pieni fade */
+.ban{ transition: transform 2000ms ease, opacity 2000ms ease; }
+body:not(.visible) .ban,
+body.leaving      .ban { opacity:0; transform: translateY(-50%) scale(.9); }
+</style>
+</head>
+<body>
+  <!-- Map-bar -->
+  <div class="mapbar" id="mapbar"></div>
+	<!-- T1: nimi, logo, score -->
+	<div class="card left" id="t1card">
+	  <div class="ban" id="t1ban"></div>
+	  <div class="inner left">
+		<div class="name"  id="t1name">TEAM 1</div>
+		<div class="logo"  id="t1logo"></div>
+		<div class="score" id="t1score">0</div>
+	  </div>
+	</div>
+
+	<!-- T2: score, logo, nimi -->
+	<div class="card right" id="t2card">
+	  <div class="ban" id="t2ban"></div>
+	  <div class="inner right">
+		<div class="score" id="t2score">0</div>
+		<div class="logo"  id="t2logo"></div>
+		<div class="name"  id="t2name">TEAM 2</div>
+	  </div>
+	</div>
+<script>
+  /* ---------- Polut ---------- */
+  const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
+
+  /* ---------- Apurit ---------- */
+  async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
+  async function headOK(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  const hex = (s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
+  const slug = s=>(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"item";
+  const setBg = (el,url)=>el.style.backgroundImage=`url('${url}?_=${Date.now()}')`;
+
+  let T1_LOGO = MATCH+"/T1Logo.png";
+  let T2_LOGO = MATCH+"/T2Logo.png";
+  
+  let T1_ABBR = "", T2_ABBR = "";
+
+async function upT1Abbr(){
+  T1_ABBR = (await read(MATCH + "/T1Abbr.txt")).trim();
+}
+async function upT2Abbr(){
+  T2_ABBR = (await read(MATCH + "/T2Abbr.txt")).trim();
+}
+
+
+  /* ---------- Colors ---------- */
+async function applyColors(){
+  const kv={}; (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
+    const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim()]=m[2].trim();
+  });
+  document.documentElement.style.setProperty("--primary",    hex(kv.primary,"#0f1114"));
+  document.documentElement.style.setProperty("--text",       hex(kv.secondary,"#ffffff"));
+  document.documentElement.style.setProperty("--quaternary", hex(kv.quaternary,"#3A3A90")); // UUSI
+}
+
+
+  /* ---------- Team 1 ---------- */
+  async function upT1Name(){ document.getElementById("t1name").textContent=(await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1"; }
+  async function upT1Score(){ document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0"; }
+  async function upT1Color(){ const c=hex((await read(MATCH+"/T1Color.txt")).trim(),"#27AAE1"); document.documentElement.style.setProperty("--t1", c); document.getElementById("t1card").style.borderRightColor=c; }
+  async function upT1Logo(){
+    T1_LOGO = MATCH+"/T1Logo.png";
+    if(await headOK(T1_LOGO)){ setBg(document.getElementById("t1logo"), T1_LOGO); }
+    else{ document.getElementById("t1logo").style.backgroundImage="none"; }
+  }
+	async function upT1Ban(){
+	  const txt = (await read(MATCH+"/T1BannedHero.txt")).trim();
+	  const el  = document.getElementById("t1ban");
+	  let shown = false;
+
+	  if (txt){
+		const p = HEROES + "/" + slug(txt) + ".png";
+		if (await headOK(p)){ setBg(el, p); el.style.display = "block"; shown = true; }
+	  }
+	  if (!shown){
+		el.style.display = "none";
+		el.style.backgroundImage = "none";
+	  }
+	  el.classList.toggle("has-ban", shown);
+	}
+
+  /* ---------- Team 2 ---------- */
+  async function upT2Name(){ document.getElementById("t2name").textContent=(await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2"; }
+  async function upT2Score(){ document.getElementById("t2score").textContent=(await read(MATCH+"/T2Score.txt")).trim()||"0"; }
+  async function upT2Color(){ const c=hex((await read(MATCH+"/T2Color.txt")).trim(),"#C80013"); document.documentElement.style.setProperty("--t2", c); document.getElementById("t2card").style.borderLeftColor=c; }
+  async function upT2Logo(){
+    T2_LOGO = MATCH+"/T2Logo.png";
+    if(await headOK(T2_LOGO)){ setBg(document.getElementById("t2logo"), T2_LOGO); }
+    else{ document.getElementById("t2logo").style.backgroundImage="none"; }
+  }
+	async function upT2Ban(){
+	  const txt = (await read(MATCH+"/T2BannedHero.txt")).trim();
+	  const el  = document.getElementById("t2ban");
+	  let shown = false;
+
+	  if (txt){
+		const p = HEROES + "/" + slug(txt) + ".png";
+		if (await headOK(p)){ setBg(el, p); el.style.display = "block"; shown = true; }
+	  }
+	  if (!shown){
+		el.style.display = "none";
+		el.style.backgroundImage = "none";
+	  }
+	  el.classList.toggle("has-ban", shown);
+	}
+
+  /* ---------- Map-bar ---------- */
+async function upMaps(){
+  const bar = document.getElementById("mapbar");
+  const ft = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 2;
+  const count = 2 * ft - 1;  // Ft1=1, Ft2=3, Ft3=5
+  const current = parseInt((await read(MATCH + "/CurrentMap.txt")).trim(), 10) || 0;
+
+  const items = [];
+  for (let i = 1; i <= count; i++) {
+    const path = `${MATCH}/Map${i}.txt`;
+    if (!(await headOK(path))) { items.push({ idx:i, done:false, win:0, pick:"" }); continue; }
+
+    const kv = {};
+    (await read(path)).split(/\r?\n/).forEach(line => {
+      const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+      if (m) kv[m[1].trim()] = m[2].trim();
+    });
+
+    const t1 = +kv.T1 || 0, t2 = +kv.T2 || 0;
+    const done = (kv.Completed == "1");
+
+    const pickRaw = (kv.Pick || "").trim().toUpperCase();
+    const pick = (pickRaw === "T1" || pickRaw === "TEAM 1") ? "T1"
+               : (pickRaw === "T2" || pickRaw === "TEAM 2") ? "T2" : "";
+
+    let win = 0;
+    if (done) { if (t1 > t2) win = 1; else if (t2 > t1) win = 2; }
+
+    items.push({ idx:i, done, win, pick });
+  }
+
+  // Renderöi – ei kartan nimeä: aina ABBR PICK/WIN tai MAP X
+  bar.innerHTML = "";
+  for (const it of items) {
+    const seg = document.createElement("div");
+    seg.className = "seg";
+    if (it.idx === current) seg.classList.add("current");
+    if (it.done) seg.classList.add("done");
+    if (!it.done && it.idx !== current) seg.classList.add("empty");
+
+    const ico = document.createElement("div"); ico.className = "ico";
+    const txt = document.createElement("span");
+
+    if (it.done && it.win) {
+      ico.style.backgroundImage = `url('${(it.win === 1 ? T1_LOGO : T2_LOGO)}?_=${Date.now()}')`;
+      const ab = (it.win === 1 ? (T1_ABBR || "T1") : (T2_ABBR || "T2"));
+      txt.textContent = `${ab.toUpperCase()} WIN`;
+      seg.append(ico, txt);
+    } else if (it.idx === current) {
+      if (it.pick) {
+        ico.style.backgroundImage = `url('${(it.pick === "T1" ? T1_LOGO : T2_LOGO)}?_=${Date.now()}')`;
+        const ab = (it.pick === "T1" ? (T1_ABBR || "T1") : (T2_ABBR || "T2"));
+        txt.textContent = `${ab.toUpperCase()} PICK`;
+        seg.append(ico, txt);
+      } else {
+        txt.textContent = `MAP ${it.idx}`;   // <-- ennen: "TBD"
+        seg.append(txt);
+      }
+    } else {
+      txt.textContent = `MAP ${it.idx}`;     // <-- ennen: "TBD"
+      seg.append(txt);
+    }
+
+    bar.appendChild(seg);
+  }
+}
+
+  /* ---------- Ensilataus + SSE ---------- */
+async function initial(){
+  await applyColors();
+  await Promise.all([
+    upT1Name(), upT1Score(), upT1Color(), upT1Logo(), upT1Ban(),
+    upT2Name(), upT2Score(), upT2Color(), upT2Logo(), upT2Ban(),
+    upT1Abbr(), upT2Abbr()               // <-- UUSI
+  ]);
+  await upMaps();                         // varmista, että abbr on ladattu ennen renderöintiä
+}
+
+
+  function startSSE(){
+    const es=new EventSource("/events");
+    es.onmessage=async ev=>{
+      try{
+        const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+        for(const k of ch){
+          if(k==="general.colors") await applyColors();
+          else if(k==="general.first_to") await upMaps();
+          else if(k==="maps") await upMaps();
+          else if(k==="t1.name") await upT1Name();
+          else if(k==="t1.score") await upT1Score();
+          else if(k==="t1.color") await upT1Color();
+          else if(k==="t1.logo"){ await upT1Logo(); await upMaps(); }
+          else if(k==="t1.ban") await upT1Ban();
+          else if(k==="t2.name") await upT2Name();
+          else if(k==="t2.score") await upT2Score();
+          else if(k==="t2.color") await upT2Color();
+          else if(k==="t2.logo"){ await upT2Logo(); await upMaps(); }
+          else if(k==="t2.ban") await upT2Ban();
+		  else if(k==="t1.abbr"){ await upT1Abbr(); await upMaps(); }
+		  else if(k==="t2.abbr"){ await upT2Abbr(); await upMaps(); }
+		  else handleOverlayKey(k);
+        }
+      }catch{}
+    };
+  }
+
+  (async()=>{ await initial(); startSSE(); })();
+/* ===== Overlay visible helper (scene in/out) ===== */
+function setOverlayVisible(v){
+  document.body.classList.toggle('visible', !!v);
+  document.body.classList.toggle('leaving', !v);
+}
+
+/* Transition-viive scoreboardille (ms).
+   Yliaja URL:lla ?stinger=2000 tai ?delay=2000 */
+function getStingerStartMs(){
+  const qs = new URLSearchParams(location.search);
+  const q  = parseInt(qs.get("stinger") || qs.get("delay") || "", 10);
+  if(!isNaN(q) && q >= 0) return q;
+  return 1800; // oletus: sama kuin transition.html
+}
+
+/* Sisään vasta transitionin jälkeen */
+document.addEventListener("DOMContentLoaded", ()=>{
+  const delay = getStingerStartMs();
+  setTimeout(()=> setOverlayVisible(true), delay);
+});
+
+/* Ulos kun selain ei ole näkyvissä (OBS: poista 'Unload when not visible', jos haluat nähdä ulos-animin) */
+document.addEventListener("visibilitychange", ()=>{
+  setOverlayVisible(!document.hidden);
+});
+
+/* (valinn.) jos lähetät SSE:llä show/hide -komentoja */
+function handleOverlayKey(k){
+  if(k==="overlay.scoreboard.show") setOverlayVisible(true);
+  if(k==="overlay.scoreboard.hide") setOverlayVisible(false);
+}
+// lisää startSSE-looppiin:
+// else handleOverlayKey(k);
+
+
+</script>
+</body>
+</html>

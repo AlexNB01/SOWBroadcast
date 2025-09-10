@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Duo Cam Row</title>
+<style>
+  /* ===== Fonts ===== */
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+  @font-face{font-family:'FontAwesome';src:url("fonts/Font Awesome/Font Awesome 5 Brands-Regular-400.otf") format('OpenType')}
+
+  /* ===== Base ===== */
+  html,body{
+    margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden;
+    font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    font-weight:800;text-transform:uppercase;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+
+  :root{
+    /* Värit (luetaan JS:llä General/colors.txt:stä) */
+    --primary:#0f1114;        /* korttien tausta */
+    --secondary:#ffffff;      /* tekstit */
+    --tertiary:#3a3a90;       /* korostus */
+    --quaternary:#2f3a43;     /* score-tausta */
+    --t1:#27AAE1;             /* tiimivärit */
+    --t2:#C80013;
+
+    /* Mitat & tyyli */
+    --radius:12px;
+    --radius-sm:10px;
+    --shadow:0 8px 22px rgba(0,0,0,.25);
+
+    /* Scoreboard-mitat */
+    --sb-w:1620px;
+    --sb-h:100px;
+  }
+
+  /* ===== Scoreboard (sama kuin singlecam) ===== */
+  .scoreboardwrapper{
+    position:absolute; left:0; top:40px; width:1920px; height:calc(var(--sb-h) + 10px);
+    display:flex; align-items:center; justify-content:center; pointer-events:none;
+  }
+  .scorebar{
+    width:var(--sb-w); height:var(--sb-h);
+    background:var(--primary); color:var(--tertiary);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+    position:relative; display:grid; grid-template-columns:1fr auto 1fr;
+    align-items:center; padding:0 16px;
+  }
+  .scorebar::before, .scorebar::after{
+    content:""; position:absolute; top:0; bottom:0; width:8px;
+  }
+  .scorebar::before{ left:0;  background:var(--t1); border-radius:var(--radius) 0 0 var(--radius); }
+  .scorebar::after { right:0; background:var(--t2); border-radius:0 var(--radius) var(--radius) 0; }
+
+  .team{ height:100%; display:flex; align-items:center; gap:16px; background:transparent; }
+  .team2{ flex-direction:row-reverse; }
+  .teamlogo{ width:90px; height:90%; border-radius:var(--radius-sm);
+             background-size:contain; background-position:center; background-repeat:no-repeat; }
+  .teamname{ flex:1 1 auto; font-weight:900; font-size:68px; letter-spacing:.5px; color:var(--secondary);
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
+  .scorebox{ flex:0 0 105px; height:100%; display:flex; align-items:center; justify-content:center; background:var(--quaternary); }
+  .teamscore{ font-size:68px; font-weight:900; line-height:1; color:#fff; }
+  .vs{ height:100%; display:flex; align-items:center; justify-content:center;
+       padding:0 30px; background:var(--tertiary); color:var(--primary); font-size:68px; font-weight:900; }
+
+  /* ===== Duo Cam Row ===== */
+  .duo {
+    position:absolute; left:0; top:220px; width:1920px; height:750px;
+    display:flex; align-items:center; justify-content:center; gap:48px; pointer-events:none;
+  }
+	.frame{
+	  position:relative; width:848px; height:549px; /* 16:9 */
+	  border-radius:18px;
+	  background:transparent;                      /* kamera näkyy OBS:sta läpi */
+	  box-sizing:border-box;
+	  /* korostus: vasen + oikea + ala – yhdellä inset box-shadowilla */
+	  box-shadow:
+		inset 6px 0 0 var(--tertiary),             /* vasen */
+		inset -6px 0 0 var(--tertiary),            /* oikea */
+		inset 0 -6px 0 var(--tertiary),            /* ala */
+		0 12px 28px rgba(0,0,0,.35);               /* ulkoinen varjo */
+	  outline: none;                                /* ei erillistä outlinea */
+	}
+
+	/* ei tarvita enää pseudo-elementtejä */
+	.frame::before, .frame::after{ content:none; }
+
+  .frame.left::before{ left:0;  background:var(--tertiary); border-radius:18px 0 0 18px; }
+  .frame.right::after{ right:0; background:var(--tertiary); border-radius:0 18px 18px 0; }
+
+  /* Nimiplanssi kiinni kehyksen alareunaan */
+	.plate{
+	  position:absolute; left:0; right:0; bottom:0; height:72px; /* koko leveys */
+	  background:var(--primary);
+	  border:0;                       /* ei omia reunoja */
+	  border-radius:0;                /* ei pyöristyksiä */
+	  box-shadow:none;                /* ei erillistä varjoa */
+	  display:flex; align-items:center; justify-content:center; gap:16px;
+	  padding:0 18px;
+	}
+  .staffname{ font-size:40px; letter-spacing:.6px; color:var(--secondary); }
+
+  /* ===== Footer (sama API kuin singlecamissa, piilotettuna toistaiseksi) ===== */
+  .footer{ display:none; }
+</style>
+</head>
+<body>
+
+  <!-- Scoreboard -->
+  <div class="scoreboardwrapper">
+    <div class="scorebar">
+      <div class="team team1">
+        <div class="teamlogo" id="t1logo"></div>
+        <div class="teamname" id="t1name">TEAM 1</div>
+        <div class="scorebox" id="t1scorebox"><span class="teamscore" id="t1score">0</span></div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="team team2">
+        <div class="teamlogo" id="t2logo"></div>
+        <div class="teamname" id="t2name">TEAM 2</div>
+        <div class="scorebox" id="t2scorebox"><span class="teamscore" id="t2score">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Duo cam frames -->
+  <div class="duo">
+    <div class="frame left">
+      <div class="plate">
+        <span class="staffname" id="caster1name">CASTER 1</span>
+      </div>
+    </div>
+    <div class="frame right">
+      <div class="plate">
+        <span class="staffname" id="caster2name">CASTER 2</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---------- Polut ----------
+  const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
+  async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
+  async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
+  const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
+
+  // ---------- Värit ----------
+  async function applyColors(){
+    const kv={};
+    (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
+      const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim().toLowerCase()]=m[2].trim();
+    });
+    const p=hex(kv.primary)||"#0f1114", s=hex(kv.secondary)||"#ffffff", t=hex(kv.tertiary)||"#3a3a90", q=hex(kv.quaternary)||"#2f3a43";
+    document.documentElement.style.setProperty("--primary",p);
+    document.documentElement.style.setProperty("--secondary",s);
+    document.documentElement.style.setProperty("--tertiary",t);
+    document.documentElement.style.setProperty("--quaternary",q);
+  }
+
+  // ---------- Tiimit ----------
+  async function upT1(){
+    document.getElementById("t1name").textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
+    document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0";
+    const c = hex((await read(MATCH+"/T1Color.txt")).trim()) || "#27AAE1";
+    document.documentElement.style.setProperty("--t1", c);
+    if(await ok(MATCH+"/T1Logo.png")) setBg(document.getElementById("t1logo"), MATCH+"/T1Logo.png");
+    else document.getElementById("t1logo").style.backgroundImage="none";
+  }
+  async function upT2(){
+    document.getElementById("t2name").textContent=((await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2").toUpperCase();
+    document.getElementById("t2score").textContent=(await read(MATCH+"/T2Score.txt")).trim()||"0";
+    const c = hex((await read(MATCH+"/T2Color.txt")).trim()) || "#C80013";
+    document.documentElement.style.setProperty("--t2", c);
+    if(await ok(MATCH+"/T2Logo.png")) setBg(document.getElementById("t2logo"), MATCH+"/T2Logo.png");
+    else document.getElementById("t2logo").style.backgroundImage="none";
+  }
+  function toggleScoreBoxes(){
+    const a=(document.getElementById("t1score").textContent||"0").trim();
+    const b=(document.getElementById("t2score").textContent||"0").trim();
+    const show=(parseInt(a,10)||0)!==0 || (parseInt(b,10)||0)!==0;
+    document.getElementById("t1scorebox").style.display=show?"flex":"none";
+    document.getElementById("t2scorebox").style.display=show?"flex":"none";
+  }
+
+  // ---------- Casters ----------
+  function parseHandle(line){
+    const n=(line||"").trim(); if(!n) return {name:"",handle:""};
+    const m=n.match(/\s+@([A-Za-z0-9_]+)/);
+    return { name:n.replace(/\s+@\w+/, ""), handle:m?("@"+m[1]):"" };
+  }
+  async function upCasters(){
+    const c1=parseHandle(await read(GENERAL+"/caster1.txt"));
+    const c2=parseHandle(await read(GENERAL+"/caster2.txt"));
+    document.getElementById("caster1name").textContent=c1.name.toUpperCase();
+    document.getElementById("caster2name").textContent=c2.name.toUpperCase();
+  }
+
+  // ---------- Init + SSE ----------
+  async function renderAll(){
+    await applyColors();
+    await Promise.all([upT1(), upT2(), upCasters()]);
+    toggleScoreBoxes();
+  }
+
+  function startSSE(){
+    try{
+      const es=new EventSource("/events");
+      es.onmessage=async ev=>{
+        try{
+          const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+          if(ch.some(k=>k==="general.colors")) await applyColors();
+          if(ch.some(k=>k.startsWith("t1."))) await upT1();
+          if(ch.some(k=>k.startsWith("t2."))) await upT2();
+          if(ch.some(k=>k.startsWith("general."))) await upCasters();
+          toggleScoreBoxes();
+        }catch{}
+      };
+    }catch{}
+  }
+
+  (async()=>{
+    await renderAll();
+    startSSE();
+    setTimeout(()=>setOverlayVisible(true), getStingerStartMs());
+  })();
+</script>
+</body>
+</html>

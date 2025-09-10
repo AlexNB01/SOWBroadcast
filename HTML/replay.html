@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Instant Replay</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+
+  html,body{margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden}
+  :root{
+    --primary:#0f1114;    /* General: primary */
+    --secondary:#ffffff;  /* General: secondary */
+    --tertiary:#3a3a90;   /* General: tertiary */
+    --quaternary:#2f3a43; /* General: quaternary */
+  }
+
+  video{position:absolute; inset:0; width:1920px; height:1080px; object-fit:cover; background:#000}
+  .hidden{display:none}
+
+  /* Replay badge vas. yläreunassa */
+  .replaytext{
+    position:absolute; top:210px; left:30px; display:flex; flex-direction:column; align-items:flex-start;
+    font-family:'Rajdhani',sans-serif; text-transform:uppercase; pointer-events:none;
+  }
+  .logo{
+    width:150px; height:150px; object-fit:contain; filter:drop-shadow(0 8px 20px rgba(0,0,0,.35)); margin:0 0 16px 10px;
+  }
+  .badge{
+    background:var(--primary);
+    color:var(--secondary);
+    border-left:7px solid var(--tertiary);
+    padding:6px 12px;
+    font-weight:900; font-size:48px; letter-spacing:.5px;
+    box-shadow:0 8px 22px rgba(0,0,0,.25);
+    animation: slidein 900ms cubic-bezier(0,0,0,1) 1200ms both; /* pieni viive */
+  }
+
+  @keyframes slidein{
+    from{ transform:translateX(60px); clip-path:polygon(0 0,0 0,0 100%,0 100%); opacity:0; }
+    to  { transform:none;             clip-path:polygon(0 0,100% 0,100% 100%,0 100%); opacity:1; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Kaksoisbufferointi ettei vilku -->
+  <video id="v1" class=""  autoplay loop playsinline></video>
+  <video id="v2" class="hidden" autoplay loop playsinline></video>
+
+  <div class="replaytext">
+    <img id="brand" class="logo" alt="logo"/>
+    <div class="badge"><span>REPLAY</span></div>
+  </div>
+
+<script>
+  const ROOT="..", SB=ROOT+"/Scoreboard", GENERAL=SB+"/General", REPLAY=SB+"/Replay", PLAYLIST=REPLAY+"/Playlist";
+
+  async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
+  async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
+
+  async function applyColors(){
+    const kv={};
+    (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{ const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim().toLowerCase()]=m[2].trim(); });
+    const p=hex(kv.primary)||"#0f1114", s=hex(kv.secondary)||"#fff", t=hex(kv.tertiary)||"#3a3a90", q=hex(kv.quaternary)||"#2f3a43";
+    document.documentElement.style.setProperty("--primary",p);
+    document.documentElement.style.setProperty("--secondary",s);
+    document.documentElement.style.setProperty("--tertiary",t);
+    document.documentElement.style.setProperty("--quaternary",q);
+  }
+
+  async function setLogo(){
+    const cands=[GENERAL+"/OverlayLogo.png", GENERAL+"/ChannelLogo.png", GENERAL+"/image2.png", GENERAL+"/image1.png"];
+    const img=document.getElementById("brand");
+    for(const p of cands){ if(await ok(p)){ img.src=p+"?_="+Date.now(); return; } }
+    img.classList.add("hidden");
+  }
+
+  let flip = 1;
+  let lastName = "";
+
+  function swapTo(src){
+    const v1=document.getElementById("v1");
+    const v2=document.getElementById("v2");
+    if(flip===1){
+      if(v2.getAttribute("src")!==src){
+        v1.setAttribute("src", src);
+        setTimeout(()=>{ v1.classList.remove("hidden"); v2.classList.add("hidden"); }, 200);
+        flip=2;
+      }
+    }else{
+      if(v1.getAttribute("src")!==src){
+        v2.setAttribute("src", src);
+        setTimeout(()=>{ v2.classList.remove("hidden"); v1.classList.add("hidden"); }, 200);
+        flip=1;
+      }
+    }
+  }
+
+  async function tick(){
+    // värit voidaan hakea harvakseltaan, mutta se on kevyt -> annat olla
+    // hae viimeisin polku
+    const name = (await read(REPLAY+"/replaypath.txt")).trim();
+    if(!name){ return; }
+    if(name !== lastName){
+      // OBS/Windows: vaihdetaan mahdolliset "ö"/"ä" yms. jos tallentaa erikoismerkkejä – me kopioimme nimen sellaisenaan,
+      // joten ei tehdään aggressiivista korjausta. Rakennetaan polku Playlistiin:
+      const src = `${PLAYLIST}/${encodeURIComponent(name)}`; // välilyönnit toimii
+      swapTo(src);
+      lastName = name;
+    }
+  }
+
+  async function init(){
+    await applyColors();
+    await setLogo();
+    await tick();
+    setInterval(tick, 1000);
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

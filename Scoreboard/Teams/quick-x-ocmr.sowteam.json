@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "name": "Quick X OCMR",
+  "abbr": "QXO",
+  "logo_png": "quick-x-ocmr.png",
+  "players": [
+    {
+      "name": "Kerfli",
+      "hero": "Junker Queen",
+      "role": "Tank"
+    },
+    {
+      "name": "Xross",
+      "hero": "Widowmaker",
+      "role": "Damage"
+    },
+    {
+      "name": "Chlicard",
+      "hero": "Tracer",
+      "role": "Damage"
+    },
+    {
+      "name": "Elkku",
+      "hero": "Kiriko",
+      "role": "Support"
+    },
+    {
+      "name": "Nikkechu",
+      "hero": "Wuyang",
+      "role": "Support"
+    },
+    {
+      "name": "Machu",
+      "hero": "Reinhardt",
+      "role": "Tank"
+    },
+    {
+      "name": "Rouniz",
+      "hero": "Echo",
+      "role": "Damage"
+    },
+    {
+      "name": "Aaro40",
+      "hero": "Baptiste",
+      "role": "Support"
+    }
+  ]
+}

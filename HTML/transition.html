@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>SOWBroadcast Transition</title>
+<style>
+  html,body{margin:0;height:1080px;width:1920px;overflow:hidden;background:transparent}
+
+  :root{
+    --stinger:#202224;       /* ensisijainen pyyhkäisyväri (General: septenary) */
+    --stinger-alt:#ffffff;   /* jälkiväri (General: octonary) */
+	--start-delay: .35s;  /* säädä viive tästä */
+  }
+
+  /* Logo sisään liukuen */
+  @keyframes slideease{
+    0%   { transform: translateX(1000px) skewX(15deg); }
+    50%  { transform: translateX(20px)    skewX(15deg); }
+    100% { transform: translateX(0px)     skewX(15deg); }
+  }
+
+  /* Viiston laatan pyyhkäisy vasemmalle */
+  @keyframes stingerwipe{
+    0%{
+      clip-path: polygon(0 0,100% 0,100% 100%,0 100%);
+      transform: translateX(0) skewX(-15deg);
+    }
+    100%{
+      clip-path: polygon(0 0,50% 0,50% 100%,0 100%);
+      transform: translateX(-50%) skewX(-15deg);
+    }
+  }
+
+  .stingerlogo,
+  .altcolor{
+    position:absolute; top:0; left:-150px;
+    width:2220px; height:1080px; transform:skewX(-15deg);
+    will-change:transform, clip-path;
+  }
+  .stingerlogo{
+    background:var(--stinger);
+    animation: stingerwipe .30s ease-out calc(1s + var(--start-delay)) forwards;
+  }
+  .stingerlogo .logo{
+    width:1120px; height:680px; position:absolute; top:200px; left:550px;
+    background-position:center; background-size:contain; background-repeat:no-repeat;
+    transform:skewX(15deg);
+    animation: slideease 1.3s cubic-bezier(0,0,0,1) var(--start-delay) forwards; 
+    filter: drop-shadow(0 10px 22px rgba(0,0,0,.35));
+  }
+  .altcolor{
+    background:var(--stinger-alt);
+    animation: stingerwipe .35s ease-out calc(1.05s + var(--start-delay)) forwards;
+  }
+</style>
+<script>
+  const ROOT="..", SB=ROOT+"/Scoreboard", GENERAL=SB+"/General";
+
+  async function fetchText(p){
+    try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }
+    catch{ return ""; }
+  }
+  async function ok(p){
+    try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }
+    catch{ return false; }
+  }
+  const hex=(s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||null);
+
+  async function applyColors(){
+    const kv={};
+    (await fetchText(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
+      const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim().toLowerCase()]=m[2].trim();
+    });
+    const c7 = hex(kv.septenary,    null) || hex(kv.tertiary,   "#202224");
+    const c8 = hex(kv.octonary,     null) || hex(kv.quaternary, "#ffffff");
+    document.documentElement.style.setProperty("--stinger",     c7);
+    document.documentElement.style.setProperty("--stinger-alt", c8);
+  }
+
+  async function setLogo(){
+    const candidates = [
+      GENERAL+"/TransitionLogo.png",
+      GENERAL+"/OverlayLogo.png",
+      GENERAL+"/ChannelLogo.png"
+    ];
+    for(const p of candidates){
+      if(await ok(p)){
+        document.getElementById("team1logobig").style.backgroundImage = `url('${p}?_=${Date.now()}')`;
+        return;
+      }
+    }
+    // jos ei mitään löytynyt
+    document.getElementById("team1logobig").style.backgroundImage = "none";
+  }
+
+  async function init(){
+    await applyColors();
+    await setLogo();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+</script>
+</head>
+<body>
+  <div class="altcolor"></div>
+  <div class="stingerlogo">
+    <span class="logo" id="team1logobig"></span>
+  </div>
+</body>
+</html>

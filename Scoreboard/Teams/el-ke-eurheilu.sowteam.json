@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "name": "eläke eUrheilu",
+  "abbr": "EE",
+  "logo_png": "el-ke-eurheilu.png",
+  "players": [
+    {
+      "name": "KirahWi",
+      "hero": "Winston",
+      "role": "Tank"
+    },
+    {
+      "name": "Sauna",
+      "hero": "Tracer",
+      "role": "Damage"
+    },
+    {
+      "name": "Clowd",
+      "hero": "Junkrat",
+      "role": "Damage"
+    },
+    {
+      "name": "Dolla",
+      "hero": "Lúcio",
+      "role": "Support"
+    },
+    {
+      "name": "Gucci",
+      "hero": "Kiriko",
+      "role": "Support"
+    },
+    {
+      "name": "ariel2",
+      "hero": "Reinhardt",
+      "role": "Tank"
+    },
+    {
+      "name": "Olli",
+      "hero": "Baptiste",
+      "role": "Support"
+    },
+    {
+      "name": "",
+      "hero": "",
+      "role": ""
+    }
+  ]
+}

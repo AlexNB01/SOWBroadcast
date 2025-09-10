@@ -1,0 +1,8 @@
+1	Gazu	Wrecking Ball	Tank
+2	Henkka	Widowmaker	Damage
+3	M4sseboy	Venture	Damage
+4	Eliju	Kiriko	Support
+5	Javi	Illari	Support
+6	Kaiuzzz	Reinhardt	Tank
+7	Cloak	Genji	Damage
+8	Kase	Tracer	Support

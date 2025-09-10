@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Team 2 Lineup</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+
+  html,body{
+    margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);
+    overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif
+  }
+
+  :root{
+    --primary:#0f1114;     /* korttien tausta (General/primary) */
+    --text:#ffffff;        /* teksti (General/secondary)        */
+    --muted:#00000;
+    --tcolor:#C80013;      /* tiimin väri T2Color.txt           */
+  }
+
+  .wrap{position:relative;width:1920px;height:1080px;color:var(--text)}
+
+  /* Header */
+  .header{
+    position:absolute;top:24px;left:64px;right:64px;height:110px;
+    display:flex;align-items:center;gap:18px;
+    background:var(--primary);border-left:10px solid var(--tcolor);
+    border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.28);padding:0 22px
+  }
+  .hdr-logo{
+    width:92px;height:92px;border-radius:10px;
+    background-size:contain;background-position:center;background-repeat:no-repeat
+  }
+  .hdr-name{
+    font-size:56px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+  }
+
+  /* Starters (max 5) */
+  .starters{
+    position:absolute;left:64px;right:64px;top:160px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:22px
+  }
+  .card{
+    display:flex;align-items:center;gap:16px;min-height:210px;
+    background:var(--primary);border-left:8px solid var(--tcolor);
+    border-radius:12px;padding:16px;box-shadow:0 8px 22px rgba(0,0,0,.25)
+  }
+  .hero{
+    width:300px;height:178px;border-radius:10px;overflow:hidden;background:#ffffff;
+    display:flex;align-items:center;justify-content:center
+  }
+  .hero img{width:100%;height:100%;object-fit:cover;display:block}
+  .meta{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .p-name{
+    font-size:40px;font-weight:900;text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+  }
+  .p-row{display:flex;align-items:center;gap:10px}
+  .muted{color:var(--muted); font-weight:700; font-size:28px;letter-spacing:.3px}
+
+  /* Rooli-ikoni */
+	.roleimg{
+	  width:28px; height:28px;
+	  object-fit:contain; display:block;
+	  filter: brightness(0) saturate(100%) drop-shadow(0 1px 1px rgba(0,0,0,.35));
+	  border-radius:4px;
+	}
+
+  /* Subs (loput pelaajat) */
+  .subs{
+    position:absolute;left:64px;right:64px;bottom:64px;display:none;
+    gap:22px;align-items:stretch
+  }
+  .sub{
+    flex:1 1 0;display:flex;gap:14px;align-items:center;min-height:150px;
+    background:var(--primary);border-left:6px solid var(--tcolor);
+    border-radius:12px;padding:12px 14px;max-width:450px;box-shadow:0 6px 18px rgba(0,0,0,.2)
+  }
+  .sub .hero{width:170px;height:126px;border-radius:10px}
+  .sub .p-name{font-size:32px}
+  .sub .roleimg{width:24px;height:24px}
+  
+  /* ==== Staggered fade-in for player cards ==== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* lähtötilassa piilossa */
+.card, .sub { opacity: 0; }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="hdr-logo" id="tlogo"></div>
+    <div class="hdr-name" id="tname">TEAM 2</div>
+  </div>
+
+  <div class="starters" id="starters"></div>
+  <div class="subs" id="subs"></div>
+</div>
+
+<script>
+  /* ---------- Polut & apurit ---------- */
+  const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
+  const ROLES = SB + "/Roles";
+  const TEAM="T2";
+
+  async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
+  async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  const hex=(s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
+  const slug=s=>(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"item";
+  function setBg(el,url){ el.style.backgroundImage=`url('${url}?_=${Date.now()}')`; }
+
+  function parseRole(raw){
+    const r=(raw||"").trim().toLowerCase();
+    if(r.startsWith("tank"))                             return {label:"TANK",    file:"Tank"};
+    if(r.startsWith("dps") || r.startsWith("damage"))    return {label:"DAMAGE",  file:"Damage"};
+    if(r.startsWith("supp") || r.startsWith("support") ||
+       r.startsWith("heal"))                             return {label:"SUPPORT", file:"Support"};
+    if(r.startsWith("flex"))                             return {label:"FLEX",    file:"Flex"};
+    return {label:"ROLE", file:""};
+  }
+  async function setRoleIcon(imgEl, raw){
+    const info=parseRole(raw);
+    imgEl.alt = info.label;
+    if(info.file){
+      const p = `${ROLES}/${info.file}.png`;
+      if(await ok(p)){ imgEl.src = p + "?_=" + Date.now(); return; }
+    }
+    imgEl.removeAttribute("src");
+  }
+
+  async function applyColors(){
+    const kv={}; (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
+      const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim()]=m[2].trim();
+    });
+    document.documentElement.style.setProperty("--primary", hex(kv.primary,"#0f1114"));
+    document.documentElement.style.setProperty("--text",    hex(kv.secondary,"#ffffff"));
+    const tcol=hex(await read(MATCH+"/"+TEAM+"Color.txt"), "#C80013");
+    document.documentElement.style.setProperty("--tcolor", tcol);
+  }
+
+  async function upTeamHead(){
+    const name=(await read(MATCH+"/"+TEAM+"Name.txt")).trim() || "TEAM 2";
+    document.getElementById("tname").textContent = name.toUpperCase();
+    const logo=MATCH+"/"+TEAM+"Logo.png";
+    if(await ok(logo)) setBg(document.getElementById("tlogo"), logo);
+    else document.getElementById("tlogo").style.backgroundImage="none";
+  }
+
+  async function fetchPlayers(){
+    const arr=[];
+    for(let i=1;i<=8;i++){
+      const name=(await read(`${MATCH}/${TEAM}P${i}Name.txt`)).trim();
+      const role=(await read(`${MATCH}/${TEAM}P${i}Role.txt`)).trim();
+      const hero=(await read(`${MATCH}/${TEAM}P${i}Hero.txt`)).trim();
+      if(!name) continue;            // näytä vain nimetyt pelaajat
+      arr.push({i,name,role,hero});
+    }
+    return arr;
+  }
+
+  function createStarter(p){
+    const card=document.createElement("div"); card.className="card";
+
+    const heroBox=document.createElement("div"); heroBox.className="hero";
+    const img=document.createElement("img"); img.alt="";
+    heroBox.appendChild(img);
+    if(p.hero){
+      const path=`${HEROES}/${slug(p.hero)}.png`;
+      ok(path).then(exists=>{ if(exists) img.src=path+"?_="+Date.now(); });
+    }
+
+    const meta=document.createElement("div"); meta.className="meta";
+    const name=document.createElement("div"); name.className="p-name"; name.textContent=p.name.toUpperCase();
+
+    const row=document.createElement("div"); row.className="p-row";
+    const rIcon=document.createElement("img"); rIcon.className="roleimg";
+    setRoleIcon(rIcon, p.role);
+    const rLabel=document.createElement("div"); rLabel.className="muted";
+    rLabel.textContent=parseRole(p.role).label;
+
+    row.append(rIcon, rLabel);
+    meta.append(name, row);
+    card.append(heroBox, meta);
+    return card;
+  }
+
+  function createSub(p){
+    const card=document.createElement("div"); card.className="sub";
+
+    const heroBox=document.createElement("div"); heroBox.className="hero";
+    const img=document.createElement("img"); img.alt="";
+    heroBox.appendChild(img);
+    if(p.hero){
+      const path=`${HEROES}/${slug(p.hero)}.png`;
+      ok(path).then(exists=>{ if(exists) img.src=path+"?_="+Date.now(); });
+    }
+
+    const meta=document.createElement("div"); meta.className="meta";
+    const name=document.createElement("div"); name.className="p-name"; name.textContent=p.name.toUpperCase();
+
+    const row=document.createElement("div"); row.className="p-row";
+    const rIcon=document.createElement("img"); rIcon.className="roleimg";
+    setRoleIcon(rIcon, p.role);
+    const rLabel=document.createElement("div"); rLabel.className="muted";
+    rLabel.textContent=parseRole(p.role).label;
+
+    row.append(rIcon, rLabel);
+    meta.append(name, row);
+    card.append(heroBox, meta);
+    return card;
+  }
+
+
+function getStingerStartMs(){
+  const qs = new URLSearchParams(location.search);
+  const q = parseInt(qs.get("stinger") || qs.get("delay") || "", 10);
+  if (!isNaN(q) && q >= 0) return q;
+  return 1800;
+}
+
+// Aja korttien "yksi kerrallaan" -animaatio
+function applyStagger(){
+  const base = getStingerStartMs();     // startti transitionin jälkeen
+  const step = 150;                     // väli pelaajien välillä (ms)
+  const nodes = [
+    ...document.querySelectorAll("#starters .card"),
+    ...document.querySelectorAll("#subs .sub"),
+  ];
+  nodes.forEach((el, i) => {
+    const delay = base + i * step;
+    // resetoi mahdollinen aiempi anim
+    el.style.animation = "none";
+    // force reflow
+    void el.offsetWidth;
+    el.style.animation = `fadeIn 680ms ease-out ${delay}ms both`;
+  });
+}
+
+
+  async function render(){
+    await applyColors();
+    await upTeamHead();
+    const players=await fetchPlayers();
+
+    const starters = players.slice(0,5);
+    const subs     = players.slice(5);
+
+    const startersEl=document.getElementById("starters");
+    startersEl.innerHTML=""; starters.forEach(p=>startersEl.appendChild(createStarter(p)));
+
+    const subsEl=document.getElementById("subs");
+    subsEl.innerHTML="";
+    if(subs.length){
+      subsEl.style.display="flex";
+      subs.forEach(p=>subsEl.appendChild(createSub(p)));
+    }else{
+      subsEl.style.display="none";
+    }
+	applyStagger();
+  }
+
+
+  function startSSE(){
+    try{
+      const es=new EventSource("/events");
+      es.onmessage=async ev=>{
+        try{
+          const d=JSON.parse(ev.data||"{}");
+          const ch=Array.isArray(d.changed)?d.changed:[];
+          if(ch.some(k=>k.startsWith("t2.") || k==="general.colors")) await render();
+        }catch{}
+      };
+    }catch{}
+    // fallback-poll
+  }
+
+  (async()=>{ await render(); startSSE(); })();
+</script>
+</body>
+</html>
