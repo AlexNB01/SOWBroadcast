@@ -1196,11 +1196,32 @@ class TournamentApp(QMainWindow):
 
 
     def _scoreboard_root(self) -> str:
-        # Luo/hakee kansion "Scoreboard" nykyisen ohjelman hakemiston alle
+        """
+        Ensisijaisesti käytä ohjelman polun alla olevaa 'Scoreboard'-kansiota
+        (esim. C:\SOWBroadcast\Scoreboard). Jos se ei ole kirjoitettava
+        (tai puuttuu eikä sitä voi luoda), fallback käyttäjän Dokumentteihin.
+        """
+        import tempfile
+
         base = os.path.abspath(os.path.dirname(__file__))
-        root = os.path.join(base, "Scoreboard")
+        app_sb = os.path.join(base, "Scoreboard")
+        doc_sb = os.path.join(os.path.expanduser("~"), "Documents", "SOWBroadcast", "Scoreboard")
+
+        def _ensure_writable(path: str) -> bool:
+            try:
+                os.makedirs(path, exist_ok=True)
+                # pikakoe: pystymmekö luomaan väliaikaistiedoston?
+                fd, tmp = tempfile.mkstemp(prefix="sbtest_", dir=path)
+                os.close(fd)
+                os.unlink(tmp)
+                return True
+            except Exception:
+                return False
+
+        root = app_sb if _ensure_writable(app_sb) else doc_sb
         os.makedirs(root, exist_ok=True)
         return root
+
 
 
     @staticmethod
