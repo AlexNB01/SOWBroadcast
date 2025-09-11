@@ -1,5 +1,19 @@
 # server.py  — Static + SSE push + /notify
-import os, sys, json, time, argparse, http.server, threading
+import os, sys, json, time, argparse, http.server, threading, socketserver
+
+def _default_base():
+    """
+    Kun paketoituna (--onefile), sys.executable voi osoittaa _MEI-temp-kansioon.
+    Käytä silloin prosessin CWD:tä (launcher.bat tekee pushd {app})
+    tai, varalla, alkuperäisen EXE:n kansiota sys.argv[0]:sta.
+    """
+    if getattr(sys, "frozen", False):
+        try:
+            return os.getcwd()
+        except Exception:
+            pass
+        return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return os.path.dirname(os.path.abspath(__file__))
 
 # ---- SSE -tila ----
 _event_id = 0
@@ -15,7 +29,7 @@ class PushHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def log_message(self, fmt, *args):
-        sys.stdout.write("[HTTP] " + (fmt % args) + "\n")
+        return
 
     # SSE-virta
     def _handle_events(self):
@@ -87,20 +101,22 @@ class PushHandler(http.server.SimpleHTTPRequestHandler):
         return super().do_POST()
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=8324)
-    ap.add_argument("--bind", default="127.0.0.1")
-    args = ap.parse_args()
+    p = argparse.ArgumentParser()
+    p.add_argument("--bind", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8324)
+    p.add_argument("--root", default=None, help="Serve files from this directory")
+    args = p.parse_args()
 
-    base = os.path.abspath(os.path.dirname(__file__))
+    # *** TÄSSÄ MUUTOS: käytä --root tai _default_base()a ***
+    base = os.path.abspath(args.root.strip('"')) if args.root else _default_base()
     os.chdir(base)
 
-    server = http.server.ThreadingHTTPServer((args.bind, args.port), PushHandler)
-    print(f"[HTTP] Serving {base} at http://{args.bind}:{args.port}/")
+    httpd = http.server.ThreadingHTTPServer((args.bind, args.port), PushHandler)
+    print("PLEASE KEEP THIS WINDOW OPEN")
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[HTTP] Stopped.")
+        httpd.serve_forever()
+    finally:
+        httpd.server_close()
 
 if __name__ == "__main__":
     main()

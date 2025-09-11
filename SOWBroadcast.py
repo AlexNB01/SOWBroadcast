@@ -1,4 +1,6 @@
 import sys, os, json, re, shutil, time, threading
+# varmista, että PyInstaller pakkaa server.py:n mukaan
+import server as _sb__force_include  # noqa: F401
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 
@@ -650,6 +652,19 @@ class GeneralTab(QWidget):
             f"QPushButton{{border:1px solid #CCC; padding:6px; background:{hexv};}}"
         )
 
+# --- module-level helpers ---
+def _app_base():
+    # EXE:n kansio paketoituna, muuten .py-tiedoston kansio
+    return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
+
+def _ensure_scoreboard_tree(root):
+    subdirs = [
+        "General", "Match", "Heroes", "Maps", "Gametypes",
+        "Replay", "Replay\\Playlist", "Roles", "Teams", "Temp"
+    ]
+    os.makedirs(root, exist_ok=True)
+    for d in subdirs:
+        os.makedirs(os.path.join(root, d), exist_ok=True)
 
 
 # -----------------------------
@@ -1194,35 +1209,18 @@ class TournamentApp(QMainWindow):
             # ei kaadeta GUI:ta vaikka palvelin ei olisi käynnissä
             pass
 
-
-    def _scoreboard_root(self) -> str:
-        """
-        Ensisijaisesti käytä ohjelman polun alla olevaa 'Scoreboard'-kansiota
-        (esim. C:\SOWBroadcast\Scoreboard). Jos se ei ole kirjoitettava
-        (tai puuttuu eikä sitä voi luoda), fallback käyttäjän Dokumentteihin.
-        """
-        import tempfile
-
-        base = os.path.abspath(os.path.dirname(__file__))
-        app_sb = os.path.join(base, "Scoreboard")
-        doc_sb = os.path.join(os.path.expanduser("~"), "Documents", "SOWBroadcast", "Scoreboard")
-
-        def _ensure_writable(path: str) -> bool:
-            try:
-                os.makedirs(path, exist_ok=True)
-                # pikakoe: pystymmekö luomaan väliaikaistiedoston?
-                fd, tmp = tempfile.mkstemp(prefix="sbtest_", dir=path)
-                os.close(fd)
-                os.unlink(tmp)
-                return True
-            except Exception:
-                return False
-
-        root = app_sb if _ensure_writable(app_sb) else doc_sb
-        os.makedirs(root, exist_ok=True)
+    def _scoreboard_root(self):
+        # jos launcher asetti SOWB_ROOT, käytä sitä; muuten EXE:n kansio
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        root = os.path.join(base, "Scoreboard")
+        _ensure_scoreboard_tree(root)
+        # (valinnainen debug-jälki; turvallisesti try/except)
+        try:
+            with open(os.path.join(root, "__last_gui_touch.txt"), "w", encoding="utf-8") as f:
+                f.write("ok")
+        except Exception:
+            pass
         return root
-
-
 
     @staticmethod
     def _slugify(name: str) -> str:
@@ -1247,8 +1245,6 @@ class TournamentApp(QMainWindow):
         pix = QPixmap(src_path)
         if not pix.isNull():
             pix.save(dst_path, "PNG")
-
-
 
     def _export_assets_category(self, category_name: str, assets: Dict[str, Asset]):
         """
@@ -1664,7 +1660,12 @@ class TournamentApp(QMainWindow):
         self._save()
 
     def _load_from_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Load", self.app_dir, "JSON Files (*.json)")
+        start = self.export_dir if os.path.isdir(self.export_dir) else self.app_dir
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load state",
+            start,
+            "SOW Broadcast (*.sowbroadcast.json);;JSON (*.json);;All files (*.*)"
+        )
         if not path:
             return
         try:
@@ -1672,15 +1673,30 @@ class TournamentApp(QMainWindow):
                 state = json.load(f)
             self._apply_state(state)
             self.current_save_path = path
-            # autosave copy of loaded state
             self._autosave(state)
         except Exception as e:
-            QMessageBox.warning(self, "Load failed", str(e))
+            QMessageBox.critical(self, "Load failed", str(e))
+
 
     def closeEvent(self, event):
         # autosave on close
         self._autosave()
         super().closeEvent(event)
+        
+    # --- embedattu HTTP-palvelin GUI:n sisään ---
+def _start_http_server(bind="127.0.0.1", port=8324):
+    import http.server, threading, atexit
+    from server import PushHandler
+
+    # palvele EXE:n hakemistosta (jossa HTML/Scoreboard ovat)
+    base = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
+    os.chdir(base)
+
+    httpd = http.server.ThreadingHTTPServer((bind, port), PushHandler)
+    t = threading.Thread(target=httpd.serve_forever, daemon=True)
+    t.start()
+    atexit.register(httpd.shutdown)
+    return httpd
 
 # -----------------------------
 # Entrypoint
@@ -1692,6 +1708,8 @@ if __name__ == "__main__":
     # jotta QStandardPaths.AppDataLocation osoittaa pysyvään kansioon.
     QCoreApplication.setOrganizationName("SOWBroadcast")
     QCoreApplication.setApplicationName("SOWBroadcast")
+    
+    _start_http_server()
 
     app = QApplication(sys.argv)
     win = TournamentApp()
