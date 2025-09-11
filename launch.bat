@@ -1,37 +1,27 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 
-rem Asennuskansio (päättyy aina \). Poista lopun \, jotta --root toimii.
+REM --- Asennuskansion juuri ---
 set "DIR=%~dp0"
 if "%DIR:~-1%"=="\" (set "ROOT=%DIR:~0,-1%") else (set "ROOT=%DIR%")
 
-rem Sama juuri GUI:lle (jos SOWBroadcast.py lukee SOWB_ROOTin)
-set "SOWB_ROOT=%ROOT%"
-
-pushd "%ROOT%"
-
-rem Etsi serveri (onefile tai one-folder)
+REM --- Server EXE (onefile tai alikansio) ---
 set "SERVER_EXE=%ROOT%\SOWServer.exe"
 if not exist "%SERVER_EXE%" set "SERVER_EXE=%ROOT%\SOWServer\SOWServer.exe"
 
 if not exist "%SERVER_EXE%" (
   echo [ERROR] SOWServer.exe not found in "%ROOT%" or "%ROOT%\SOWServer"
-  pause
-  popd & endlocal & exit /b 1
+  exit /b 1
 )
 
-rem >>> Käynnistä serveri SUORAAN exe:nä (ei pythonilla)
-tasklist /FI "IMAGENAME eq SOWServer.exe" | find /I "SOWServer.exe" >nul
-if errorlevel 1 (
-  start "" /min "%SERVER_EXE%" --bind 127.0.0.1 --port 8324 --root "%ROOT%"
-  timeout /t 1 >nul
-)
+REM --- Käynnistä serveri minimissä oikealla juuressa ---
+start "" /min "%SERVER_EXE%" --bind 127.0.0.1 --port 8324 --root "%ROOT%"
 
-rem Käynnistä GUI ja odota sen sulkeutumista
-"%ROOT%\SOWBroadcast.exe"
+REM --- Käynnistä GUI piilossa taustaprosessin kautta, joka odottaa ja tappaa serverin ---
+REM Huom: asetamme SOWB_ROOTin GUI:lle PowerShellissä, jotta GUI kirjoittaa samaan juureen.
+start "" powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command ^
+ "$env:SOWB_ROOT='%ROOT%'; $p = Start-Process -FilePath '%ROOT%\SOWBroadcast.exe' -PassThru; ^
+  $p.WaitForExit(); Start-Process -WindowStyle Hidden cmd -ArgumentList '/c taskkill /IM SOWServer.exe /F >nul 2>&1'"
 
-rem Sulje serveri
-taskkill /IM SOWServer.exe /F >nul 2>&1
-
-popd
-endlocal
+REM --- Batch päättyy nyt heti; ikkuna sulkeutuu ---
+exit /b
