@@ -1,6 +1,11 @@
 {
   "maps": [
     {
+      "name": "Aatlis",
+      "slug": "aatlis",
+      "mode": "Flashpoint"
+    },
+    {
       "name": "Antartic Peninsula",
       "slug": "antartic-peninsula",
       "mode": "Control"
@@ -29,6 +34,11 @@
       "name": "Dorado",
       "slug": "dorado",
       "mode": "Escort"
+    },
+    {
+      "name": "Eichenwalde",
+      "slug": "eichenwalde",
+      "mode": "Hybrid"
     },
     {
       "name": "Esperança",
@@ -81,6 +91,11 @@
       "mode": "Flashpoint"
     },
     {
+      "name": "New Queen Street",
+      "slug": "new-queen-street",
+      "mode": "Push"
+    },
+    {
       "name": "Numbani",
       "slug": "numbani",
       "mode": "Hybrid"
@@ -111,6 +126,11 @@
       "mode": "Push"
     },
     {
+      "name": "Samoa",
+      "slug": "samoa",
+      "mode": "Control"
+    },
+    {
       "name": "Shambali Monastery",
       "slug": "shambali-monastery",
       "mode": "Escort"
@@ -121,29 +141,9 @@
       "mode": "Flashpoint"
     },
     {
-      "name": "New Queen Street",
-      "slug": "new-queen-street",
-      "mode": "Push"
-    },
-    {
       "name": "Watchpoint: Gibraltar",
       "slug": "watchpoint-gibraltar",
       "mode": "Escort"
-    },
-    {
-      "name": "Aatlis",
-      "slug": "aatlis",
-      "mode": "Flashpoint"
-    },
-    {
-      "name": "Samoa",
-      "slug": "samoa",
-      "mode": "Control"
-    },
-    {
-      "name": "Eichenwalde",
-      "slug": "eichenwalde",
-      "mode": "Hybrid"
     }
   ]
 }

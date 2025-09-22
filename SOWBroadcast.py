@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QComboBox, QSpinBox, QCheckBox,
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
-    QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem
+    QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea
 )
 
 # -----------------------------
@@ -816,6 +816,88 @@ class DraftTab(QWidget):
         self.updated.emit()
 
 
+class BulkImportRow(QWidget):
+    """Yksi rivi import-listassa."""
+    def __init__(self, kind: str, file_path: str, name_guess: str, mode_names=None):
+        super().__init__()
+        self.kind = kind  # "Hero" tai "Map"
+        self.file_path = file_path
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+
+        self.chk = QCheckBox()
+        self.chk.setChecked(True)
+        self.fn_label = QLabel(os.path.basename(file_path))
+        self.name_edit = QLineEdit(name_guess)
+
+        row.addWidget(self.chk)
+        row.addWidget(QLabel(kind), 0)
+        row.addWidget(self.fn_label, 2)
+        row.addWidget(QLabel("Name:"), 0)
+        row.addWidget(self.name_edit, 2)
+
+        self.mode_combo = None
+        if kind == "Map":
+            self.mode_combo = QComboBox()
+            self.mode_combo.addItem("")  # tyhjä mahdollinen
+            for m in sorted(mode_names or []):
+                self.mode_combo.addItem(m)
+            row.addWidget(QLabel("Mode:"))
+            row.addWidget(self.mode_combo, 1)
+
+    def to_result(self):
+        return {
+            "enabled": self.chk.isChecked(),
+            "kind": self.kind,
+            "file_path": self.file_path,
+            "name": self.name_edit.text().strip(),
+            "mode": self.mode_combo.currentText().strip() if self.mode_combo else None,
+        }
+
+
+class BulkImportDialog(QDialog):
+    """Listaa kansioista löytyneet kuvat. Nimet ja (karttojen) moodit voi muokata ennen tallennusta."""
+    def __init__(self, parent, heroes_files: list, maps_files: list, mode_names: list):
+        super().__init__(parent)
+        self.setWindowTitle("Bulk Import from Folders")
+        self.resize(820, 520)
+
+        root = QVBoxLayout(self)
+
+        info = QLabel("Review detected assets. Edit names (and modes for maps) before importing.")
+        root.addWidget(info)
+
+        self.container = QVBoxLayout()
+        scroll_root = QWidget(); scroll_root.setLayout(self.container)
+        scroll_area = QScrollArea(); scroll_area.setWidgetResizable(True); scroll_area.setWidget(scroll_root)
+        root.addWidget(scroll_area, 1)
+
+        self.rows: list[BulkImportRow] = []
+
+        # Herot
+        if heroes_files:
+            self.container.addWidget(QLabel("Heroes"))
+            for p, name_guess in heroes_files:
+                r = BulkImportRow("Hero", p, name_guess)
+                self.rows.append(r); self.container.addWidget(r)
+
+        # Kartat
+        if maps_files:
+            self.container.addWidget(QLabel("Maps"))
+            for p, name_guess in maps_files:
+                r = BulkImportRow("Map", p, name_guess, mode_names=mode_names)
+                self.rows.append(r); self.container.addWidget(r)
+
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        ok = QPushButton("Import"); cancel = QPushButton("Cancel")
+        ok.clicked.connect(self.accept); cancel.clicked.connect(self.reject)
+        btns.addWidget(cancel); btns.addWidget(ok)
+        root.addLayout(btns)
+
+    def results(self):
+        return [r.to_result() for r in self.rows]
 
 # -----------------------------
 # Main Window
@@ -925,6 +1007,82 @@ class TournamentApp(QMainWindow):
     # ---------------------
     # Menubar and handlers
     # ---------------------
+    def _name_from_filename(self, path: str) -> str:
+        """Ei kovakoodattuja korjauksia: vain väliviivat/alikulkevat -> välilyönti, ja title case."""
+        stem = os.path.splitext(os.path.basename(path))[0]
+        raw = re.sub(r"[-_]+", " ", stem).strip()
+        # Title case; käyttäjä voi muuttaa dialogissa
+        return raw.title()
+
+    def _scan_image_files(self, folder: str) -> list[tuple[str, str]]:
+        """Palauttaa [(abspath, name_guess)] folderista, ilman mitään poikkeuslistoja."""
+        out = []
+        if not os.path.isdir(folder):
+            return out
+        for fn in os.listdir(folder):
+            ext = os.path.splitext(fn)[1].lower()
+            if ext in {".png", ".jpg", ".jpeg", ".webp"}:
+                p = os.path.join(folder, fn)
+                out.append((p, self._name_from_filename(p)))
+        return out
+
+    def _bulk_import_wizard(self):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        heroes_dir = os.path.join(base, "Scoreboard", "Heroes")
+        maps_dir   = os.path.join(base, "Scoreboard", "Maps")
+
+        heroes_files = self._scan_image_files(heroes_dir)
+        maps_files   = self._scan_image_files(maps_dir)
+
+        # Suodata jo olemassa olevat nimet pois ehdotuksista (voit silti muuttaa nimen dialogissa)
+        existing_hero_names = set(self.heroes.keys())
+        heroes_files = [(p, n if n not in existing_hero_names else n) for (p, n) in heroes_files]
+
+        existing_map_names = set(self.maps.keys())
+        maps_files = [(p, n if n not in existing_map_names else n) for (p, n) in maps_files]
+
+        mode_names = list(self.modes.keys())
+
+        dlg = BulkImportDialog(self, heroes_files, maps_files, mode_names)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        results = dlg.results()
+        added_h = added_m = 0
+        for r in results:
+            if not r["enabled"]:
+                continue
+            name = r["name"]
+            if not name:
+                continue
+            if r["kind"] == "Hero":
+                # Älä ylikirjoita olemassa olevaa sama­nimistä
+                if name in self.heroes:
+                    continue
+                self.heroes[name] = Asset(
+                    name=name,
+                    image_path=os.path.join("Scoreboard", "Heroes", f"{self._slugify(name)}.png"),
+                    source_path=r["file_path"]
+                )
+                added_h += 1
+            else:  # Map
+                if name in self.maps:
+                    continue
+                mode = (r.get("mode") or "").strip() or None
+                self.maps[name] = Asset(
+                    name=name,
+                    image_path=os.path.join("Scoreboard", "Maps", f"{self._slugify(name)}.png"),
+                    mode=mode,
+                    source_path=r["file_path"]
+                )
+                added_m += 1
+
+        self._on_assets_changed()
+        QMessageBox.information(self, "Bulk Import",
+                                f"Imported {added_h} heroes and {added_m} maps.\n"
+                                "You can still edit them anytime in the Managers.")
+
+
     def _build_menubar(self):
         mb = self.menuBar()
         filem = mb.addMenu("File")
@@ -938,9 +1096,15 @@ class TournamentApp(QMainWindow):
         act_map.triggered.connect(lambda: self._open_asset_manager("Maps", self.maps, self._on_assets_changed))
         act_mode = QAction("Manage Game Modes…", self)
         act_mode.triggered.connect(lambda: self._open_asset_manager("Game Modes", self.modes, self._on_assets_changed))
+        
+        act_bulk_import = QAction("Bulk Import from Folders…", self)
+        act_bulk_import.triggered.connect(self._bulk_import_wizard)
+
         customm.addAction(act_hero)
         customm.addAction(act_map)
         customm.addAction(act_mode)
+        customm.addSeparator()
+        customm.addAction(act_bulk_import)        
 
         # File actions: Load / Save / Save As
         act_load = QAction("Load…", self); act_load.triggered.connect(self._load_from_file)

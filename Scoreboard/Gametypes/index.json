@@ -9,16 +9,16 @@
       "slug": "escort"
     },
     {
+      "name": "Flashpoint",
+      "slug": "flashpoint"
+    },
+    {
       "name": "Hybrid",
       "slug": "hybrid"
     },
     {
       "name": "Push",
       "slug": "push"
-    },
-    {
-      "name": "Flashpoint",
-      "slug": "flashpoint"
     }
   ]
 }

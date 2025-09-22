@@ -1,5 +1,5 @@
-Name=Aatlis
-T1=2
+Name=— Map —
+T1=0
 T2=0
-Completed=1
-Pick=Team 2
+Completed=0
+Pick=— Pick —

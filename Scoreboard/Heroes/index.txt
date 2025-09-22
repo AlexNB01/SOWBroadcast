@@ -30,7 +30,7 @@ Reinhardt
 Roadhog
 Sigma
 Sojourn
-Soldier: 76
+Soldier
 Sombra
 Symmetra
 Torbjörn

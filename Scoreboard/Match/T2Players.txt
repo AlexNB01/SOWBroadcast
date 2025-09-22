@@ -1,8 +1,8 @@
-1	KirahWi	Winston	Tank
-2	Sauna	Tracer	Damage
-3	Clowd	Junkrat	Damage
-4	Dolla	Lúcio	Support
-5	Gucci	Kiriko	Support
-6	ariel2	Reinhardt	Tank
-7	Olli	Baptiste	Support
+1			
+2			
+3			
+4			
+5			
+6			
+7			
 8			
