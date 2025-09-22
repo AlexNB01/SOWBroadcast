@@ -1,0 +1,24 @@
+{
+  "modes": [
+    {
+      "name": "Control",
+      "slug": "control"
+    },
+    {
+      "name": "Escort",
+      "slug": "escort"
+    },
+    {
+      "name": "Hybrid",
+      "slug": "hybrid"
+    },
+    {
+      "name": "Push",
+      "slug": "push"
+    },
+    {
+      "name": "Flashpoint",
+      "slug": "flashpoint"
+    }
+  ]
+}

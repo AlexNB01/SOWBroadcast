@@ -31,7 +31,7 @@
     },
     {
       "name": "Kaiuzzz",
-      "hero": "Reinhardt",
+      "hero": "Doomfist",
       "role": "Tank"
     },
     {
@@ -42,7 +42,7 @@
     {
       "name": "Kase",
       "hero": "Tracer",
-      "role": "Support"
+      "role": "Damage"
     }
   ]
 }

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "name": "SrPeakCheck",
+  "abbr": "SRPC",
+  "logo_png": "srpeakcheck.png",
+  "players": [
+    {
+      "name": "LhCloudy",
+      "hero": "Reinhardt",
+      "role": "Tank"
+    },
+    {
+      "name": "Depsi",
+      "hero": "Freja",
+      "role": "Damage"
+    },
+    {
+      "name": "Snipu",
+      "hero": "Widowmaker",
+      "role": "Damage"
+    },
+    {
+      "name": "Mickji",
+      "hero": "Zenyatta",
+      "role": "Support"
+    },
+    {
+      "name": "Ghost91",
+      "hero": "Baptiste",
+      "role": "Support"
+    },
+    {
+      "name": "Vestola",
+      "hero": "Hanzo",
+      "role": "Flex"
+    },
+    {
+      "name": "unto",
+      "hero": "Cassidy",
+      "role": "Damage"
+    },
+    {
+      "name": "",
+      "hero": "",
+      "role": ""
+    }
+  ]
+}

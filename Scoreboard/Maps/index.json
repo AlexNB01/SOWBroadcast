@@ -1,0 +1,149 @@
+{
+  "maps": [
+    {
+      "name": "Antartic Peninsula",
+      "slug": "antartic-peninsula",
+      "mode": "Control"
+    },
+    {
+      "name": "Blizzard World",
+      "slug": "blizzard-world",
+      "mode": "Hybrid"
+    },
+    {
+      "name": "Busan",
+      "slug": "busan",
+      "mode": "Control"
+    },
+    {
+      "name": "Circuit Royal",
+      "slug": "circuit-royal",
+      "mode": "Escort"
+    },
+    {
+      "name": "Colosseo",
+      "slug": "colosseo",
+      "mode": "Push"
+    },
+    {
+      "name": "Dorado",
+      "slug": "dorado",
+      "mode": "Escort"
+    },
+    {
+      "name": "Esperança",
+      "slug": "esperanca",
+      "mode": "Push"
+    },
+    {
+      "name": "Havana",
+      "slug": "havana",
+      "mode": "Escort"
+    },
+    {
+      "name": "Hollywood",
+      "slug": "hollywood",
+      "mode": "Hybrid"
+    },
+    {
+      "name": "Ilios",
+      "slug": "ilios",
+      "mode": "Control"
+    },
+    {
+      "name": "Junkertown",
+      "slug": "junkertown",
+      "mode": "Escort"
+    },
+    {
+      "name": "King's Row",
+      "slug": "king-s-row",
+      "mode": "Hybrid"
+    },
+    {
+      "name": "Lijiang Tower",
+      "slug": "lijiang-tower",
+      "mode": "Control"
+    },
+    {
+      "name": "Midtown",
+      "slug": "midtown",
+      "mode": "Hybrid"
+    },
+    {
+      "name": "Nepal",
+      "slug": "nepal",
+      "mode": "Control"
+    },
+    {
+      "name": "New Junk City",
+      "slug": "new-junk-city",
+      "mode": "Flashpoint"
+    },
+    {
+      "name": "Numbani",
+      "slug": "numbani",
+      "mode": "Hybrid"
+    },
+    {
+      "name": "Oasis",
+      "slug": "oasis",
+      "mode": "Control"
+    },
+    {
+      "name": "Paraíso",
+      "slug": "paraiso",
+      "mode": "Hybrid"
+    },
+    {
+      "name": "Rialto",
+      "slug": "rialto",
+      "mode": "Escort"
+    },
+    {
+      "name": "Route 66",
+      "slug": "route-66",
+      "mode": "Escort"
+    },
+    {
+      "name": "Runasapi",
+      "slug": "runasapi",
+      "mode": "Push"
+    },
+    {
+      "name": "Shambali Monastery",
+      "slug": "shambali-monastery",
+      "mode": "Escort"
+    },
+    {
+      "name": "Suravasa",
+      "slug": "suravasa",
+      "mode": "Flashpoint"
+    },
+    {
+      "name": "New Queen Street",
+      "slug": "new-queen-street",
+      "mode": "Push"
+    },
+    {
+      "name": "Watchpoint: Gibraltar",
+      "slug": "watchpoint-gibraltar",
+      "mode": "Escort"
+    },
+    {
+      "name": "Aatlis",
+      "slug": "aatlis",
+      "mode": "Flashpoint"
+    },
+    {
+      "name": "Samoa",
+      "slug": "samoa",
+      "mode": "Control"
+    },
+    {
+      "name": "Eichenwalde",
+      "slug": "eichenwalde",
+      "mode": "Hybrid"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
-Name=
+Name=— Map —
 T1=0
 T2=0
 Completed=0
-Pick=
+Pick=— Pick —

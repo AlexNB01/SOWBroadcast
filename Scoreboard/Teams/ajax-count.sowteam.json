@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "name": "Ajax count?",
+  "abbr": "AC",
+  "logo_png": "ajax-count.png",
+  "players": [
+    {
+      "name": "Ossi",
+      "hero": "Wrecking Ball",
+      "role": "Tank"
+    },
+    {
+      "name": "Sudden",
+      "hero": "Tracer",
+      "role": "Damage"
+    },
+    {
+      "name": "ItsOzzy",
+      "hero": "Cassidy",
+      "role": "Damage"
+    },
+    {
+      "name": "Karhu",
+      "hero": "Kiriko",
+      "role": "Support"
+    },
+    {
+      "name": "notLexa",
+      "hero": "Lúcio",
+      "role": "Support"
+    },
+    {
+      "name": "Mudkipboii",
+      "hero": "Roadhog",
+      "role": "Flex"
+    },
+    {
+      "name": "",
+      "hero": "",
+      "role": ""
+    },
+    {
+      "name": "",
+      "hero": "",
+      "role": ""
+    }
+  ]
+}

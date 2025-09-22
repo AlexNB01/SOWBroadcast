@@ -1,0 +1,204 @@
+{
+  "team1": {
+    "name": "Quick X OCMR",
+    "abbr": "QXO",
+    "logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Teams\\quick-x-ocmr.png",
+    "score": 0,
+    "color_hex": "#55aaff",
+    "players": [
+      {
+        "name": "Kerfli",
+        "hero": "Junker Queen",
+        "role": "Tank"
+      },
+      {
+        "name": "Xross",
+        "hero": "Widowmaker",
+        "role": "Damage"
+      },
+      {
+        "name": "Chlicard",
+        "hero": "Tracer",
+        "role": "Damage"
+      },
+      {
+        "name": "Elkku",
+        "hero": "Kiriko",
+        "role": "Support"
+      },
+      {
+        "name": "Nikkechu",
+        "hero": "Wuyang",
+        "role": "Support"
+      },
+      {
+        "name": "Machu",
+        "hero": "Reinhardt",
+        "role": "Tank"
+      },
+      {
+        "name": "Rouniz",
+        "hero": "Echo",
+        "role": "Damage"
+      },
+      {
+        "name": "Aaro40",
+        "hero": "Baptiste",
+        "role": "Support"
+      }
+    ],
+    "banned_hero": "Brigitte"
+  },
+  "team2": {
+    "name": "eläke eUrheilu",
+    "abbr": "EE",
+    "logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Teams\\el-ke-eurheilu.png",
+    "score": 0,
+    "color_hex": "#ff557f",
+    "players": [
+      {
+        "name": "KirahWi",
+        "hero": "Winston",
+        "role": "Tank"
+      },
+      {
+        "name": "Sauna",
+        "hero": "Tracer",
+        "role": "Damage"
+      },
+      {
+        "name": "Clowd",
+        "hero": "Junkrat",
+        "role": "Damage"
+      },
+      {
+        "name": "Dolla",
+        "hero": "Lúcio",
+        "role": "Support"
+      },
+      {
+        "name": "Gucci",
+        "hero": "Kiriko",
+        "role": "Support"
+      },
+      {
+        "name": "ariel2",
+        "hero": "Reinhardt",
+        "role": "Tank"
+      },
+      {
+        "name": "Olli",
+        "hero": "Baptiste",
+        "role": "Support"
+      },
+      {
+        "name": "",
+        "hero": "",
+        "role": ""
+      }
+    ],
+    "banned_hero": "Ashe"
+  },
+  "maps": [
+    {
+      "index": 1,
+      "map": "Antartic Peninsula",
+      "t1": 2,
+      "t2": 0,
+      "completed": true,
+      "pick": "Team 1",
+      "winner": "t1"
+    },
+    {
+      "index": 2,
+      "map": "Aatlis",
+      "t1": 2,
+      "t2": 0,
+      "completed": true,
+      "pick": "Team 2",
+      "winner": "t1"
+    },
+    {
+      "index": 3,
+      "map": "— Map —",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "— Pick —",
+      "winner": ""
+    },
+    {
+      "index": 4,
+      "map": "— Map —",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "— Pick —",
+      "winner": ""
+    },
+    {
+      "index": 5,
+      "map": "— Map —",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "— Pick —",
+      "winner": ""
+    },
+    {
+      "index": 6,
+      "map": "— Map —",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "— Pick —",
+      "winner": ""
+    },
+    {
+      "index": 7,
+      "map": "— Map —",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "— Pick —",
+      "winner": ""
+    }
+  ],
+  "current_map": 1,
+  "map_pool": [
+    "Antartic Peninsula",
+    "Lijiang Tower",
+    "Nepal",
+    "Samoa",
+    "Circuit Royal",
+    "Rialto",
+    "Route 66",
+    "Hollywood",
+    "King's Row",
+    "Esperança",
+    "New Queen Street",
+    "Runasapi",
+    "Aatlis",
+    "New Junk City",
+    "Suravasa"
+  ],
+  "general": {
+    "first_to": 2,
+    "host": "dwasx",
+    "caster1": "das",
+    "caster2": "dwaasd",
+    "status_text": "ESM 2025 by Suomi OW",
+    "overlay_logo_path": null,
+    "transition_logo_path": null,
+    "colors": {
+      "primary": "#FFFFFF",
+      "secondary": "#000000",
+      "tertiary": "#55aaff",
+      "quaternary": "#006ea1",
+      "quinary": "#FFFFFF",
+      "senary": "#FFFFFF",
+      "septenary": "#FFFFFF",
+      "octonary": "#006ea1"
+    }
+  }
+}
