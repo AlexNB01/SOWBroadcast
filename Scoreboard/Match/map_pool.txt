@@ -1,29 +1,10 @@
-Aatlis
-Antartic Peninsula
-Blizzard World
-Busan
-Circuit Royal
-Colosseo
-Dorado
-Eichenwalde
-Esperança
-Havana
-Hollywood
-Ilios
-Junkertown
-King's Row
-Lijiang Tower
-Midtown
 Nepal
-New Junk City
-New Queen Street
-Numbani
 Oasis
-Paraíso
-Rialto
-Route 66
-Runasapi
-Samoa
-Shambali Monastery
-Suravasa
-Watchpoint: Gibraltar
+Dorado
+Havana
+Junkertown
+Aatlis
+New Junk City
+Hollywood
+Midtown
+Colosseo

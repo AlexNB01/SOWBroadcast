@@ -1,5 +1,7 @@
-Name=— Map —
+Name=Dorado
 T1=0
 T2=0
 Completed=0
-Pick=— Pick —
+Pick=T1
+T1Ban=
+T2Ban=

@@ -337,6 +337,25 @@ const heroSlug = (name) =>
   (name||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
     .toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
 
+async function readMapBansByIndex(n){
+  if(!n || n < 1) return {t1_ban:"", t2_ban:""};
+  const path = `${MATCH}/Map${n}.txt`;
+  try{
+    const r = await fetch(path + "?_=" + Date.now());
+    if(!r.ok) return {t1_ban:"", t2_ban:""};
+    const kv = {};
+    (await r.text()).split(/\r?\n/).forEach(line=>{
+      const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+      if(m) kv[m[1].trim()] = m[2].trim();
+    });
+    return {
+      t1_ban: (kv.T1Ban || "").trim(),
+      t2_ban: (kv.T2Ban || "").trim(),
+    };
+  }catch{ return {t1_ban:"", t2_ban:""}; }
+}
+
+
 function cornerBanHTML(side, hero){
   if(!hero) return "";
   const slug = heroSlug(hero);
@@ -365,23 +384,40 @@ async function upStatusText(){
   }
 }
 
+async function renderCornerBans(state){
+  // 1) Current map index: match.json -> fallback CurrentMap.txt
+  let ci = Number(state.current || 0);
+  if(!ci){
+    const ctxt = (await read(MATCH + "/CurrentMap.txt")).trim();
+    ci = parseInt(ctxt, 10) || 0;
+  }
+  const idx = ci > 0 ? (ci - 1) : -1;
 
+  // 2) Lähde 1: match.json → t1_ban/t2_ban
+  let b1 = "", b2 = "";
+  const cur = (idx >= 0 && (state.maps||[])[idx]) ? state.maps[idx] : null;
+  if(cur){
+    b1 = (cur.t1_ban || "").trim();
+    b2 = (cur.t2_ban || "").trim();
+  }
 
-function renderCornerBans(state){
-  const t1 = state.team1 || {}, t2 = state.team2 || {};
-  const b1 = (t1.banned_hero || "").trim();
-  const b2 = (t2.banned_hero || "").trim();
+  // 3) Fallback: MapN.txt, jos match.json ei vielä sisällä ban-kenttiä
+  if(!b1 && !b2 && ci > 0){
+    const fb = await readMapBansByIndex(ci);
+    b1 = fb.t1_ban || "";
+    b2 = fb.t2_ban || "";
+  }
 
-  // Päivitä vain jos muuttui -> ei turhaa uudelleenlatausta
-  if (b1 !== _prevCorner.b1){
+  // 4) Päivitä DOM vain jos muuttui (välttää vilkkumisen)
+  if(b1 !== _prevCorner.b1){
     const el = document.getElementById("banLeft");
-    el.innerHTML = b1 ? cornerBanHTML("t1", b1) : "";
+    el.innerHTML   = b1 ? cornerBanHTML("t1", b1) : "";
     el.style.display = b1 ? "block" : "none";
     _prevCorner.b1 = b1;
   }
-  if (b2 !== _prevCorner.b2){
+  if(b2 !== _prevCorner.b2){
     const el = document.getElementById("banRight");
-    el.innerHTML = b2 ? cornerBanHTML("t2", b2) : "";
+    el.innerHTML   = b2 ? cornerBanHTML("t2", b2) : "";
     el.style.display = b2 ? "block" : "none";
     _prevCorner.b2 = b2;
   }
@@ -604,7 +640,9 @@ async function tick(){
     const mapsSig = JSON.stringify((state.maps||[]).map(m=>({
       map:m.map, completed:!!m.completed, winner:(m.winner||""), pick:(m.pick||""), mode:(m.mode||"")
     })));
-    const sig = [pool,t1n,t2n,t1s,t2s,t1c,t2c,mapsSig,b1,b2].join("|");
+    const bansSig = JSON.stringify((state.maps||[]).map(m=>[m.t1_ban||"", m.t2_ban||""]));
+	const sig = [pool,t1n,t2n,t1s,t2s,t1c,t2c,mapsSig,bansSig].join("|");
+
 
     if(sig!==_prevSig){
       _prevSig=sig;
@@ -615,7 +653,7 @@ async function tick(){
     }
 	upStatusText().catch(()=>{});
     // Päivitä bannit joka kierroksella
-    renderCornerBans(state);
+    await renderCornerBans(state);
 
   }finally{
     setTimeout(tick, 1000);

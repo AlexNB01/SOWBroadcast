@@ -1,5 +1,7 @@
-Name=— Map —
-T1=0
+Name=Nepal
+T1=2
 T2=0
-Completed=0
-Pick=— Pick —
+Completed=1
+Pick=T2
+T1Ban=Mercy
+T2Ban=Ashe

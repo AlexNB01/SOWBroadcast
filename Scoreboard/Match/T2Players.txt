@@ -1,8 +1,8 @@
-1			
-2			
-3			
-4			
-5			
-6			
-7			
-8			
+1	Kerfli	Junker Queen	Tank
+2	Xross	Widowmaker	Damage
+3	Chlicard	Tracer	Damage
+4	Elkku	Kiriko	Support
+5	Nikkechu	Wuyang	Support
+6	Machu	Reinhardt	Tank
+7	Rouniz	Echo	Damage
+8	Aaro40	Baptiste	Support

@@ -203,6 +203,21 @@ async function upT2Abbr(){
   T2_ABBR = (await read(MATCH + "/T2Abbr.txt")).trim();
 }
 
+async function readCurrentMapKV(){
+  const cur = parseInt((await read(MATCH + "/CurrentMap.txt")).trim(), 10) || 0;
+  if (!cur) return null;
+  const path = `${MATCH}/Map${cur}.txt`;
+  if (!(await headOK(path))) return null;
+
+  const kv = {};
+  (await read(path)).split(/\r?\n/).forEach(line=>{
+    const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+    if(m) kv[m[1].trim()] = m[2].trim();
+  });
+  return kv; // esim. { Name:"…", T1:"0", T2:"0", Completed:"0", Pick:"T1", T1Ban:"Zarya", T2Ban:"Lucio" }
+}
+
+
 
   /* ---------- Colors ---------- */
 async function applyColors(){
@@ -224,13 +239,16 @@ async function applyColors(){
     if(await headOK(T1_LOGO)){ setBg(document.getElementById("t1logo"), T1_LOGO); }
     else{ document.getElementById("t1logo").style.backgroundImage="none"; }
   }
+  
 	async function upT1Ban(){
-	  const txt = (await read(MATCH+"/T1BannedHero.txt")).trim();
 	  const el  = document.getElementById("t1ban");
 	  let shown = false;
 
-	  if (txt){
-		const p = HEROES + "/" + slug(txt) + ".png";
+	  const kv = await readCurrentMapKV();
+	  const hero = (kv?.T1Ban || "").trim();
+
+	  if (hero){
+		const p = HEROES + "/" + slug(hero) + ".png";
 		if (await headOK(p)){ setBg(el, p); el.style.display = "block"; shown = true; }
 	  }
 	  if (!shown){
@@ -239,6 +257,7 @@ async function applyColors(){
 	  }
 	  el.classList.toggle("has-ban", shown);
 	}
+
 
   /* ---------- Team 2 ---------- */
   async function upT2Name(){ document.getElementById("t2name").textContent=(await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2"; }
@@ -250,12 +269,14 @@ async function applyColors(){
     else{ document.getElementById("t2logo").style.backgroundImage="none"; }
   }
 	async function upT2Ban(){
-	  const txt = (await read(MATCH+"/T2BannedHero.txt")).trim();
 	  const el  = document.getElementById("t2ban");
 	  let shown = false;
 
-	  if (txt){
-		const p = HEROES + "/" + slug(txt) + ".png";
+	  const kv = await readCurrentMapKV();
+	  const hero = (kv?.T2Ban || "").trim();
+
+	  if (hero){
+		const p = HEROES + "/" + slug(hero) + ".png";
 		if (await headOK(p)){ setBg(el, p); el.style.display = "block"; shown = true; }
 	  }
 	  if (!shown){
@@ -264,6 +285,7 @@ async function applyColors(){
 	  }
 	  el.classList.toggle("has-ban", shown);
 	}
+
 
   /* ---------- Map-bar ---------- */
 async function upMaps(){
@@ -335,12 +357,14 @@ async function upMaps(){
   /* ---------- Ensilataus + SSE ---------- */
 async function initial(){
   await applyColors();
-  await Promise.all([
-    upT1Name(), upT1Score(), upT1Color(), upT1Logo(), upT1Ban(),
-    upT2Name(), upT2Score(), upT2Color(), upT2Logo(), upT2Ban(),
-    upT1Abbr(), upT2Abbr()               // <-- UUSI
-  ]);
-  await upMaps();                         // varmista, että abbr on ladattu ennen renderöintiä
+	await Promise.all([
+	  upT1Name(), upT1Score(), upT1Color(), upT1Logo(),
+	  upT2Name(), upT2Score(), upT2Color(), upT2Logo(),
+	  upT1Abbr(), upT2Abbr()
+	]);
+	await upMaps();
+	await upT1Ban();
+	await upT2Ban();			   
 }
 
 
@@ -351,18 +375,16 @@ async function initial(){
         const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
         for(const k of ch){
           if(k==="general.colors") await applyColors();
-          else if(k==="general.first_to") await upMaps();
-          else if(k==="maps") await upMaps();
+			else if(k==="general.first_to"){ await upMaps(); await upT1Ban(); await upT2Ban(); }
+			else if(k==="maps"){ await upMaps(); await upT1Ban(); await upT2Ban(); }
           else if(k==="t1.name") await upT1Name();
           else if(k==="t1.score") await upT1Score();
           else if(k==="t1.color") await upT1Color();
           else if(k==="t1.logo"){ await upT1Logo(); await upMaps(); }
-          else if(k==="t1.ban") await upT1Ban();
           else if(k==="t2.name") await upT2Name();
           else if(k==="t2.score") await upT2Score();
           else if(k==="t2.color") await upT2Color();
           else if(k==="t2.logo"){ await upT2Logo(); await upMaps(); }
-          else if(k==="t2.ban") await upT2Ban();
 		  else if(k==="t1.abbr"){ await upT1Abbr(); await upMaps(); }
 		  else if(k==="t2.abbr"){ await upT2Abbr(); await upMaps(); }
 		  else handleOverlayKey(k);

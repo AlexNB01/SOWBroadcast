@@ -1,5 +1,7 @@
-Name=— Map —
+Name=New Junk City
 T1=0
-T2=0
-Completed=0
-Pick=— Pick —
+T2=1
+Completed=1
+Pick=T1
+T1Ban=Baptiste
+T2Ban=Junkrat

@@ -1,45 +1,45 @@
 {
   "team1": {
-    "name": "",
-    "abbr": "",
-    "logo_path": null,
-    "score": 0,
-    "color_hex": "#55aaff",
+    "name": "SrPeakCheck",
+    "abbr": "SRPC",
+    "logo_path": "C:/Users/alexl/Downloads/619px-SrPeakCheck_allmode.png",
+    "score": 1,
+    "color_hex": "#00aaff",
     "players": [
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "LhCloudy",
+        "hero": "Reinhardt",
+        "role": "Tank"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Depsi",
+        "hero": "Freja",
+        "role": "Damage"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Snipu",
+        "hero": "Widowmaker",
+        "role": "Damage"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Mickji",
+        "hero": "Zenyatta",
+        "role": "Support"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Ghost91",
+        "hero": "Baptiste",
+        "role": "Support"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Vestola",
+        "hero": "Hanzo",
+        "role": "Flex"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "unto",
+        "hero": "Cassidy",
+        "role": "Damage"
       },
       {
         "name": "",
@@ -50,51 +50,51 @@
     "banned_hero": ""
   },
   "team2": {
-    "name": "",
-    "abbr": "",
-    "logo_path": null,
-    "score": 0,
-    "color_hex": "#ff557f",
+    "name": "Quick X OCMR",
+    "abbr": "QXO",
+    "logo_path": "C:/Users/alexl/Downloads/image.png",
+    "score": 1,
+    "color_hex": "#aaaa7f",
     "players": [
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Kerfli",
+        "hero": "Junker Queen",
+        "role": "Tank"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Xross",
+        "hero": "Widowmaker",
+        "role": "Damage"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Chlicard",
+        "hero": "Tracer",
+        "role": "Damage"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Elkku",
+        "hero": "Kiriko",
+        "role": "Support"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Nikkechu",
+        "hero": "Wuyang",
+        "role": "Support"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Machu",
+        "hero": "Reinhardt",
+        "role": "Tank"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Rouniz",
+        "hero": "Echo",
+        "role": "Damage"
       },
       {
-        "name": "",
-        "hero": "",
-        "role": ""
+        "name": "Aaro40",
+        "hero": "Baptiste",
+        "role": "Support"
       }
     ],
     "banned_hero": ""
@@ -102,77 +102,102 @@
   "maps": [
     {
       "index": 1,
-      "map": "— Map —",
-      "t1": 0,
+      "map": "Nepal",
+      "t1": 2,
       "t2": 0,
-      "completed": false,
-      "pick": "— Pick —",
-      "winner": ""
+      "completed": true,
+      "pick": "T2",
+      "t1_ban": "Mercy",
+      "t2_ban": "Ashe",
+      "winner": "t1"
     },
     {
       "index": 2,
-      "map": "— Map —",
+      "map": "New Junk City",
       "t1": 0,
-      "t2": 0,
-      "completed": false,
-      "pick": "— Pick —",
-      "winner": ""
+      "t2": 1,
+      "completed": true,
+      "pick": "T1",
+      "t1_ban": "Baptiste",
+      "t2_ban": "Junkrat",
+      "winner": "t2"
     },
     {
       "index": 3,
-      "map": "— Map —",
+      "map": "Dorado",
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "— Pick —",
+      "pick": "T1",
+      "t1_ban": "",
+      "t2_ban": "",
       "winner": ""
     },
     {
       "index": 4,
-      "map": "— Map —",
+      "map": "",
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "— Pick —",
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
       "winner": ""
     },
     {
       "index": 5,
-      "map": "— Map —",
+      "map": "",
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "— Pick —",
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
       "winner": ""
     },
     {
       "index": 6,
-      "map": "— Map —",
+      "map": "",
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "— Pick —",
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
       "winner": ""
     },
     {
       "index": 7,
-      "map": "— Map —",
+      "map": "",
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "— Pick —",
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
       "winner": ""
     }
   ],
-  "current_map": 1,
-  "map_pool": [],
+  "current_map": 2,
+  "map_pool": [
+    "Nepal",
+    "Oasis",
+    "Dorado",
+    "Havana",
+    "Junkertown",
+    "Aatlis",
+    "New Junk City",
+    "Hollywood",
+    "Midtown",
+    "Colosseo"
+  ],
   "general": {
     "first_to": 2,
-    "host": "dwasx",
-    "caster1": "das",
-    "caster2": "dwaasd",
+    "host": "",
+    "caster1": "",
+    "caster2": "",
     "status_text": "ESM 2025 by Suomi OW",
-    "overlay_logo_path": null,
+    "overlay_logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Temp/Broadcast Logos/suomiow_rintakuva_liquipedia.png",
     "transition_logo_path": null,
     "colors": {
       "primary": "#FFFFFF",

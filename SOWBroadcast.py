@@ -260,12 +260,7 @@ class TeamPanel(QGroupBox):
         self.default_color = default_color
         self.color_hex = default_color
         self.color_btn = QPushButton("Color")
-        # Ban:
-        self.ban_label = QLabel("Banned Hero")
-        self.ban_combo = QComboBox()
-        self._refresh_ban_combo()  # täytä listaus herojen nimillä + placeholder
         self.color_btn.clicked.connect(self._pick_color)
-        self._apply_color_style()
 
         left = QVBoxLayout()
         left.addWidget(QLabel("Name"))
@@ -275,10 +270,6 @@ class TeamPanel(QGroupBox):
 
         score_row = QHBoxLayout(); score_row.addWidget(QLabel("Score")); score_row.addWidget(self.score)
         color_row = QHBoxLayout(); color_row.addWidget(QLabel("Team Color")); color_row.addWidget(self.color_btn)
-        ban_row = QHBoxLayout()
-        ban_row.addWidget(self.ban_label)
-        ban_row.addWidget(self.ban_combo)
-        left.addLayout(ban_row)
         left.addLayout(score_row)
         left.addLayout(color_row)
         left.addWidget(self.logo_btn)
@@ -304,16 +295,6 @@ class TeamPanel(QGroupBox):
 
     def _apply_color_style(self):
         self.color_btn.setStyleSheet(f"QPushButton{{border:1px solid #CCC; border-radius:6px; padding:6px; background:{self.color_hex};}}")
-
-    def _refresh_ban_combo(self):
-        current = self.ban_combo.currentText() if hasattr(self, "ban_combo") else ""
-        self.ban_combo.clear()
-        self.ban_combo.addItem("— Hero —")          # placeholder
-        self.ban_combo.addItems(self.get_hero_names())
-        if current:
-            ix = self.ban_combo.findText(current)
-            if ix >= 0:
-                self.ban_combo.setCurrentIndex(ix)
 
     def _pick_color(self):
         color = QColorDialog.getColor(QColor(self.color_hex), self, "Pick Team Color")
@@ -350,10 +331,6 @@ class TeamPanel(QGroupBox):
         t.logo_path = self.logo_path
         t.score = self.score.value()
         t.color_hex = self.color_hex
-        # banned hero
-        t.banned_hero = self.ban_combo.currentText()
-        if t.banned_hero == "— Hero —":
-            t.banned_hero = ""
 
         t.players = []
         for pr in self.player_rows:
@@ -395,21 +372,11 @@ class TeamPanel(QGroupBox):
                 pr.role.setCurrentIndex(ixr if ixr >= 0 else 0)
             else:
                 pr.role.setCurrentIndex(0)
-        # banned hero
-        self._refresh_ban_combo()  # varmista että lista on ajan tasalla
-        if getattr(t, "banned_hero", ""):
-            ix = self.ban_combo.findText(t.banned_hero)
-            self.ban_combo.setCurrentIndex(ix if ix >= 0 else 0)
-        else:
-            self.ban_combo.setCurrentIndex(0)
 
     def refresh_hero_lists(self):
         # Päivitä pelaajien hero-dropdownit
         for pr in self.player_rows:
             pr.refresh_heroes()
-        # Päivitä myös bännähahmon lista
-        self._refresh_ban_combo()
-
     
     def reset(self):
         self.team_name.clear()
@@ -417,7 +384,6 @@ class TeamPanel(QGroupBox):
         self.score.setValue(0)
         self.logo_path = None
         self.logo_preview.clear()
-        self.ban_combo.setCurrentIndex(0)
         for pr in self.player_rows:
             pr.name.clear(); pr.hero.setCurrentIndex(0); pr.role.setCurrentIndex(0)
         # keep color as-is; caller may override
@@ -426,50 +392,81 @@ class TeamPanel(QGroupBox):
 # -----------------------------
 # Map rows
 # -----------------------------
+# -----------------------------
+# Map rows
+# -----------------------------
 class MapRow(QWidget):
-    def __init__(self, index: int, get_map_names):
+    def __init__(self, index: int, get_map_names, get_hero_names):
         super().__init__()
         self.get_map_names = get_map_names
+        self.get_hero_names = get_hero_names
         self.index = index
+
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
+
         self.label = QLabel(f"Map {index}")
+
+        # Map + scores
         self.map_combo = QComboBox(); self.refresh_maps()
-        self.t1score = QSpinBox(); self.t1score.setRange(0, 9)
-        self.t2score = QSpinBox(); self.t2score.setRange(0, 9)
-        # PICK (kuka valitsi kartan)
+        self.t1score = QSpinBox(); self.t1score.setRange(0, 10)
+        self.t2score = QSpinBox(); self.t2score.setRange(0, 10)
+
+        # Pick (None/T1/T2)
         self.pick = QComboBox()
-        self.pick.addItems(["— Pick —", "Team 1", "Team 2"])
-        self.pick.setFixedWidth(110)
-        # lisää layoutiin: esim. karttanimen jälkeen
-        row.addWidget(QLabel("Pick:"))
-        row.addWidget(self.pick)
+        self.pick.addItems(["—", "T1", "T2"])
+
+        # Completed
         self.completed = QCheckBox("Completed")
 
+        # NEW: per-map bans
+        self.t1ban = QComboBox(); self.refresh_hero_list(self.t1ban)
+        self.t2ban = QComboBox(); self.refresh_hero_list(self.t2ban)
+
+        # Layout
         row.addWidget(self.label)
-        row.addWidget(self.map_combo, 3)
-        row.addWidget(QLabel("T1"))
+        row.addWidget(self.map_combo, 2)
         row.addWidget(self.t1score)
-        row.addWidget(QLabel("T2"))
+        row.addWidget(QLabel("-"))
         row.addWidget(self.t2score)
+        row.addWidget(QLabel("Pick"))
+        row.addWidget(self.pick)
+        row.addWidget(QLabel("T1 Ban"))
+        row.addWidget(self.t1ban, 2)
+        row.addWidget(QLabel("T2 Ban"))
+        row.addWidget(self.t2ban, 2)
         row.addWidget(self.completed)
 
     def refresh_maps(self):
-        current = self.map_combo.currentText() if hasattr(self, 'map_combo') else ""
+        current = self.map_combo.currentText() if hasattr(self, "map_combo") else ""
         self.map_combo.clear()
-        self.map_combo.addItem("— Map —")
-        self.map_combo.addItems(self.get_map_names())
+        self.map_combo.addItem("")  # tyhjä = ei valintaa
+        for name in sorted(self.get_map_names() or []):
+            self.map_combo.addItem(name)
         if current:
             ix = self.map_combo.findText(current)
-            if ix >= 0:
-                self.map_combo.setCurrentIndex(ix)
-                
+            self.map_combo.setCurrentIndex(ix if ix >= 0 else 0)
+
+    def refresh_hero_list(self, combo: QComboBox):
+        current = combo.currentText() if combo.count() > 0 else ""
+        combo.clear()
+        combo.addItem("— Hero —")
+        for h in sorted(self.get_hero_names() or []):
+            combo.addItem(h)
+        if current:
+            ix = combo.findText(current)
+            combo.setCurrentIndex(ix if ix >= 0 else 0)
+
+
     def reset(self):
         self.map_combo.setCurrentIndex(0)
         self.t1score.setValue(0)
         self.t2score.setValue(0)
         self.completed.setChecked(False)
         self.pick.setCurrentIndex(0)
+        self.t1ban.setCurrentIndex(0)
+        self.t2ban.setCurrentIndex(0)
+
         
 class GeneralTab(QWidget):
     updated = pyqtSignal()
@@ -953,7 +950,7 @@ class TournamentApp(QMainWindow):
 
         self.map_rows: List[MapRow] = []
         for i in range(1, 8):
-            mr = MapRow(i, self._map_names)
+            mr = MapRow(i, self._map_names, self._hero_names)
             self.map_rows.append(mr)
             maps_layout.addWidget(mr)
 
@@ -1172,6 +1169,8 @@ class TournamentApp(QMainWindow):
         self.team2_panel.refresh_hero_lists()
         for mr in self.map_rows:
             mr.refresh_maps()
+            mr.refresh_hero_list(mr.t1ban)
+            mr.refresh_hero_list(mr.t2ban)
         if hasattr(self, "draft_tab"):
             self.draft_tab.reload()
 
@@ -1312,9 +1311,7 @@ class TournamentApp(QMainWindow):
 
         # säilytä nykyinen score + ban
         keep_score = panel.score.value()
-        keep_ban   = panel.ban_combo.currentText()
-        if keep_ban == "— Hero —":
-            keep_ban = ""
+
 
         # rakenna Team-olio
         players = []
@@ -1330,7 +1327,7 @@ class TournamentApp(QMainWindow):
             logo_path=None,   # asetetaan alla
             score=keep_score,             # säilytä
             players=players,
-            banned_hero=keep_ban          # säilytä
+            banned_hero=""        # säilytä
         )
 
         # logo polku suhteessa JSON-tiedoston kansioon
@@ -1535,9 +1532,12 @@ class TournamentApp(QMainWindow):
             keys.append("maps")
         else:
             for a, b in zip(om, nm):
-                if (a.get("map"), a.get("t1"), a.get("t2"), a.get("completed"), a.get("pick")) != \
-                   (b.get("map"), b.get("t1"), b.get("t2"), b.get("completed"), b.get("pick")):
+                if (a.get("map"), a.get("t1"), a.get("t2"), a.get("completed"), a.get("pick"),
+                    a.get("t1_ban"), a.get("t2_ban")) != \
+                   (b.get("map"), b.get("t1"), b.get("t2"), b.get("completed"), b.get("pick"),
+                    b.get("t1_ban"), b.get("t2_ban")):
                     keys.append("maps"); break
+
 
         return keys
 
@@ -1750,7 +1750,6 @@ class TournamentApp(QMainWindow):
             self._write_txt(os.path.join(match_dir, f"{prefix}Name.txt"),  team.get("name", "") or "")
             self._write_txt(os.path.join(match_dir, f"{prefix}Score.txt"), str(team.get("score", 0)))
             self._write_txt(os.path.join(match_dir, f"{prefix}Color.txt"), team.get("color_hex", "") or "")
-            self._write_txt(os.path.join(match_dir, f"{prefix}BannedHero.txt"), team.get("banned_hero", "") or "")
             self._write_txt(os.path.join(match_dir, f"{prefix}Abbr.txt"),  team.get("abbr", "") or "")
 
             # Pelaajat: index\tname\thero\trole per rivi
@@ -1787,11 +1786,13 @@ class TournamentApp(QMainWindow):
             t2s = int(m.get("t2", 0)) if str(m.get("t2", "")).isdigit() else 0
             comp = 1 if m.get("completed", False) else 0
             body = (
-                f"Name={name}\n"
+                f"Name={(m.get('map') or '').replace('\n', ' ').strip()}\n"
                 f"T1={t1s}\n"
                 f"T2={t2s}\n"
                 f"Completed={comp}\n"
                 f"Pick={(m.get('pick') or '')}\n"
+                f"T1Ban={(m.get('t1_ban') or '')}\n"   # NEW
+                f"T2Ban={(m.get('t2_ban') or '')}\n"   # NEW
             )
             self._write_txt(os.path.join(match_dir, f"Map{idx}.txt"), body)
             
@@ -1875,6 +1876,12 @@ class TournamentApp(QMainWindow):
                 mr.pick.setCurrentIndex(2)
             elif idx == 2:
                 mr.pick.setCurrentIndex(1)
+                # Vaihda myös per-map banit
+            t1b_ix = mr.t1ban.currentIndex()
+            t2b_ix = mr.t2ban.currentIndex()
+            mr.t1ban.setCurrentIndex(t2b_ix)
+            mr.t2ban.setCurrentIndex(t1b_ix)
+
 
         # Tallenna autosaveen
         self._autosave()
@@ -1900,15 +1907,16 @@ class TournamentApp(QMainWindow):
         for idx, mr in enumerate(self.map_rows, start=1):
             maps.append({
                 "index": idx,
-                    "map": mr.map_combo.currentText(),
-                    "t1": mr.t1score.value(),
-                    "t2": mr.t2score.value(),
-                    "completed": mr.completed.isChecked(),
-                    "pick": mr.pick.currentText(),
-                    "winner": (
-                        "t1" if mr.t1score.value() > mr.t2score.value()
-                        else "t2" if mr.t2score.value() > mr.t1score.value()
-                        else "")
+                "map": mr.map_combo.currentText(),
+                "t1": mr.t1score.value(),
+                "t2": mr.t2score.value(),
+                "completed": mr.completed.isChecked(),
+                "pick": mr.pick.currentText(),
+                "t1_ban": ("" if mr.t1ban.currentText() == "— Hero —" else mr.t1ban.currentText()),
+                "t2_ban": ("" if mr.t2ban.currentText() == "— Hero —" else mr.t2ban.currentText()),
+                "winner": ("t1" if mr.t1score.value() > mr.t2score.value()
+                           else "t2" if mr.t2score.value() > mr.t1score.value()
+                           else "")
             })
 
         state = {
@@ -1958,16 +1966,29 @@ class TournamentApp(QMainWindow):
                     mr.map_combo.setCurrentIndex(ix if ix >= 0 else 0)
                 mr.t1score.setValue(int(item.get("t1", 0)))
                 mr.t2score.setValue(int(item.get("t2", 0)))
+                # ... map fields ...
                 mr.completed.setChecked(bool(item.get("completed", False)))
 
-                # pick takaisin combolle
+                # pick back
                 txt = (item.get("pick") or "")
-                if txt == "T1":
-                    mr.pick.setCurrentIndex(1)
-                elif txt == "T2":
-                    mr.pick.setCurrentIndex(2)
+                if txt == "T1": mr.pick.setCurrentIndex(1)
+                elif txt == "T2": mr.pick.setCurrentIndex(2)
+                else: mr.pick.setCurrentIndex(0)
+
+                # NEW: per-map bans back to combos
+                t1b = (item.get("t1_ban") or "")
+                t2b = (item.get("t2_ban") or "")
+                if t1b:
+                    ix = mr.t1ban.findText(t1b)
+                    mr.t1ban.setCurrentIndex(ix if ix >= 0 else 0)
                 else:
-                    mr.pick.setCurrentIndex(0)
+                    mr.t1ban.setCurrentIndex(0)
+                if t2b:
+                    ix = mr.t2ban.findText(t2b)
+                    mr.t2ban.setCurrentIndex(ix if ix >= 0 else 0)
+                else:
+                    mr.t2ban.setCurrentIndex(0)
+
 
         # Current map
         cur = state.get("current_map")
