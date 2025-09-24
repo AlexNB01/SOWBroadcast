@@ -1,6 +1,6 @@
 {
   "team1": {
-    "name": "",
+    "name": "rwerew",
     "abbr": "",
     "logo_path": null,
     "score": 0,
@@ -50,7 +50,7 @@
     "banned_hero": ""
   },
   "team2": {
-    "name": "",
+    "name": "rwer3w4er",
     "abbr": "",
     "logo_path": null,
     "score": 0,
@@ -102,7 +102,7 @@
   "maps": [
     {
       "index": 1,
-      "map": "Antarctic Peninsula",
+      "map": "",
       "t1": 0,
       "t2": 0,
       "completed": false,
@@ -196,7 +196,7 @@
     "host": "",
     "caster1": "dsadds",
     "caster2": "dsa",
-    "status_text": "ESM 2025 by Suomi OW",
+    "status_text": "",
     "overlay_logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Temp/Broadcast Logos/suomiow_rintakuva_liquipedia.png",
     "transition_logo_path": null,
     "colors": {
@@ -212,10 +212,10 @@
   },
   "waiting": {
     "videos_dir": "",
-    "timer_seconds": 180,
+    "timer_seconds": 0,
     "text_starting": "STARTING SOON!",
     "text_brb": "BE RIGHT BACK!",
-    "text_end": "THANK YOU FOR WATCHING!",
+    "text_end": "THANK YOU FOR WATCHING",
     "timer_running": false,
     "socials": {
       "twitch": "suomiow",

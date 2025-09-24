@@ -125,6 +125,8 @@ def main():
 
     httpd = SilentHTTPServer((args.bind, args.port), PushHandler)
     print("PLEASE KEEP THIS WINDOW OPEN")
+    print("GUI MIGHT TAKE 5-15 seconds to open")
+    print("This window is the required local server.")
     try:
         httpd.serve_forever()
     finally:

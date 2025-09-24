@@ -570,11 +570,11 @@ class GeneralTab(QWidget):
         root.addWidget(people_box)
 
         # --- Logot ---
-        logo_box = QGroupBox("Logot")
+        logo_box = QGroupBox("Logos")
         logo = QGridLayout(logo_box)
         # Overlay-logo
         self.overlay_logo_path = None
-        self.overlay_logo_preview = QLabel("Overlay-logo")
+        self.overlay_logo_preview = QLabel("Overlay logo")
         self.overlay_logo_preview.setAlignment(Qt.AlignCenter)
         self.overlay_logo_preview.setFixedSize(200, 80)
         self.overlay_logo_preview.setStyleSheet("QLabel{border:1px solid #CCC;background:#FAFAFA;}")
@@ -582,7 +582,7 @@ class GeneralTab(QWidget):
         btn_overlay.clicked.connect(self._pick_overlay_logo)
         # Transition-logo
         self.transition_logo_path = None
-        self.transition_logo_preview = QLabel("Transition-logo")
+        self.transition_logo_preview = QLabel("Transition logo")
         self.transition_logo_preview.setAlignment(Qt.AlignCenter)
         self.transition_logo_preview.setFixedSize(200, 80)
         self.transition_logo_preview.setStyleSheet("QLabel{border:1px solid #CCC;background:#FAFAFA;}")
@@ -594,7 +594,7 @@ class GeneralTab(QWidget):
         root.addWidget(logo_box)
 
         # --- Väriteema ---
-        color_box = QGroupBox("Overlay-värit")
+        color_box = QGroupBox("Overlay colours")
         colors = QVBoxLayout(color_box)
         self.color_btns: Dict[str, QPushButton] = {}
 
@@ -602,7 +602,7 @@ class GeneralTab(QWidget):
         status_box = QGroupBox("Status text")
         status_lay = QVBoxLayout(status_box)
         self.status_text = QLineEdit()
-        self.status_text.setPlaceholderText("Esim. 'Best of 5 – Map 4' tai 'Broadcast starting soon'")
+        self.status_text.setPlaceholderText("Tournament name here")
         status_lay.addWidget(self.status_text)
         root.addWidget(status_box)
 
@@ -613,7 +613,7 @@ class GeneralTab(QWidget):
         for key, label in self.COLOR_FIELDS:
             row = QHBoxLayout()
             row.addWidget(QLabel(label))
-            btn = QPushButton("Valitse väri")
+            btn = QPushButton("Select colour")
             btn.setFixedWidth(130)
             btn.clicked.connect(lambda _, k=key: self._pick_color(k))
             # alustus (päivitetään from_settingsissä)
@@ -868,12 +868,12 @@ class WaitingTab(QWidget):
         box_s = QGroupBox("Socials")
         form_s = QFormLayout(box_s)
 
-        self.s_twitch  = QLineEdit(); self.s_twitch.setPlaceholderText("twitch.tv/… tai @käyttäjä")
-        self.s_twitter = QLineEdit(); self.s_twitter.setPlaceholderText("@käyttäjä tai x.com/…")
-        self.s_youtube = QLineEdit(); self.s_youtube.setPlaceholderText("kanavan nimi / URL lyhyenä")
-        self.s_instagram = QLineEdit(); self.s_instagram.setPlaceholderText("@käyttäjä")
-        self.s_discord = QLineEdit(); self.s_discord.setPlaceholderText("kutsu / palvelin")
-        self.s_website = QLineEdit(); self.s_website.setPlaceholderText("domain.tld")
+        self.s_twitch  = QLineEdit(); self.s_twitch.setPlaceholderText("twitch.tv/")
+        self.s_twitter = QLineEdit(); self.s_twitter.setPlaceholderText("@user or x.com/…")
+        self.s_youtube = QLineEdit(); self.s_youtube.setPlaceholderText("@user")
+        self.s_instagram = QLineEdit(); self.s_instagram.setPlaceholderText("@user")
+        self.s_discord = QLineEdit(); self.s_discord.setPlaceholderText("/invite")
+        self.s_website = QLineEdit(); self.s_website.setPlaceholderText("domain.com")
 
         for w in (self.s_twitch, self.s_twitter, self.s_youtube, self.s_instagram, self.s_discord, self.s_website):
             w.textChanged.connect(self.updated.emit)
@@ -962,7 +962,7 @@ class WaitingTab(QWidget):
         self.min_spin.setValue(0); self.sec_spin.setValue(0)
         self.text_starting.setText("STARTING SOON!")
         self.text_brb.setText("BE RIGHT BACK!")
-        self.text_end.setText("THANK YOU FOR WATCHING")
+        self.text_end.setText("THANK YOU FOR WATCHING!")
         self._reset_timer_clicked()
 
     # ---- state I/O ----
