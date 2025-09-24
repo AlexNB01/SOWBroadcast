@@ -102,33 +102,33 @@
   "maps": [
     {
       "index": 1,
-      "map": "Nepal",
-      "t1": 2,
-      "t2": 0,
-      "completed": true,
-      "pick": "T2",
-      "t1_ban": "Mercy",
-      "t2_ban": "Ashe",
-      "winner": "t1"
-    },
-    {
-      "index": 2,
-      "map": "New Junk City",
-      "t1": 0,
-      "t2": 1,
-      "completed": true,
-      "pick": "T1",
-      "t1_ban": "Baptiste",
-      "t2_ban": "Junkrat",
-      "winner": "t2"
-    },
-    {
-      "index": 3,
-      "map": "Circuit Royal",
+      "map": "Aatlis",
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "T1",
+      "pick": "—",
+      "t1_ban": "Ashe",
+      "t2_ban": "Bastion",
+      "winner": ""
+    },
+    {
+      "index": 2,
+      "map": "",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
+      "winner": ""
+    },
+    {
+      "index": 3,
+      "map": "",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "—",
       "t1_ban": "",
       "t2_ban": "",
       "winner": ""
@@ -208,6 +208,19 @@
       "senary": "#FFFFFF",
       "septenary": "#FFFFFF",
       "octonary": "#006ea1"
+    }
+  },
+  "waiting": {
+    "videos_dir": "",
+    "timer_seconds": 210,
+    "text_starting": "STARTING SOON!",
+    "text_brb": "BE RIGHT BACK!",
+    "text_end": "THANK YOU FOR WATCHING!",
+    "timer_running": false,
+    "socials": {
+      "twitch": "suomiow",
+      "twitter": "SuomiOverwatch",
+      "discord": "suomiow"
     }
   }
 }

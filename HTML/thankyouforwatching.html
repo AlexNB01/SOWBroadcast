@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Thank You for Watching</title>
+<meta name="viewport" content="width=1920, height=1080, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#0f1114;      /* tausta */
+  --secondary:#ffffff;    /* perusfontti */
+  --tertiary:#3a3a90;     /* accent */
+  --quaternary:#2f3a43;   /* laatikoiden tausta */
+  --radius:16px;
+  --shadow:0 10px 28px rgba(0,0,0,.35);
+  --social-font-min:16px;
+  --social-font-max:40px;
+  --social-font:var(--social-font-max);
+  --social-extra-pad:0px; 
+}
+
+*{box-sizing:border-box}
+html,body{
+  margin:0; padding:0;
+  width:1920px; height:1080px;
+  font-family:'Rajdhani',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,sans-serif;
+  overflow:hidden;
+}
+.root{ position:relative; width:1920px; height:1080px; }
+
+/* ========== VASEN PALKKI ========== */
+.left-column{
+  position:absolute; left:20px; top:20px; bottom:20px; width:430px;
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:flex-start;   /* ennen: space-between */
+  gap:20px;
+}
+
+/* Ylälaatikko (on-screen text) */
+.bigtext{
+  width:100%;
+  min-height:120px;
+  background: color-mix(in srgb, var(--secondary) 50%, transparent);
+  color:var(--primary);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:22px 20px;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  position:relative;
+}
+.bigtext span{
+  font-size:68px; font-weight:900; text-transform:uppercase; letter-spacing:.8px;
+}
+.bigtext::before, .bigtext::after{
+  content:""; position:absolute; top:0; bottom:0; width:8px;
+  background:var(--tertiary);
+}
+.bigtext::before{ left:0; border-radius:var(--radius) 0 0 var(--radius); }
+.bigtext::after { right:0; border-radius:0 var(--radius) var(--radius) 0; }
+
+/* Kelluva overlay-logo (itsenäinen elementti) */
+.overlay-logo{
+  max-width:100%;
+  max-height:360px;   /* logo skaalautuu väliin – säädä halutessasi */
+  height:auto; width:auto;
+  object-fit:contain;
+  filter:
+    drop-shadow(0 8px 18px rgba(0,0,0,.45))
+    drop-shadow(0 2px 4px rgba(0,0,0,.25));
+  -webkit-user-drag:none; user-select:none;
+}
+
+/* ========== OIKEA PUOLI ========== */
+/* Video (top-right 1420x799) */
+.video-wrap{
+  position:absolute; right:20px; top:20px; width:1420px; height:799px;
+  background:#000; border-radius:var(--radius); box-shadow:var(--shadow);
+  overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+}
+video{ width:100%; height:100%; background:#000; object-fit:cover; }
+.novideo{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:28px; font-weight:700; letter-spacing:.5px; opacity:.8;
+}
+
+/* Ticker (videon alla) */
+.ticker{
+  position:absolute; right:20px; top:20px; width:1420px; height:100px;
+  transform:translateY(calc(799px + 12px));
+  background: color-mix(in srgb, var(--secondary) 50%, transparent); border-radius:12px; overflow:hidden;
+  display:flex; align-items:center;
+}
+.ticker-inner{
+  white-space:pre;               /* säilytä pitkät välistykset */
+  will-change:transform;
+  padding-left:100%;
+  display:inline-block;
+  font-weight:900; font-size:50px; color:#fff;
+  letter-spacing:.8px; line-height:100px;
+  text-shadow:0 2px 4px rgba(0,0,0,.45);
+  animation:slideLeft 70s linear infinite; /* hidas rullaus */
+}
+@keyframes slideLeft{ 0%{transform:translateX(0)} 100%{transform:translateX(-100%)} }
+
+/* --- Socials bottom bar --- */
+.socials{
+  position:absolute;
+  right:20px;                 
+  width:1420px;               
+  bottom:26px; height:80px;
+  display:flex; align-items:center;
+  gap:12px; padding:0;
+}
+
+.social-chip{
+  display:inline-flex; align-items:center; gap:0.2em;
+  padding:0.55em calc(0.9em + var(--social-extra-pad));
+  border-radius:999px;
+  background: color-mix(in srgb, var(--secondary) 50%, transparent);
+  color:#fff; font-weight:900; letter-spacing:.04em;
+  font-size: var(--social-font);
+  white-space:nowrap;
+  flex:0 0 auto; min-width:0;
+  line-height:1.2;
+}
+.social-icon{ width:1em; height:1em; flex:0 0 auto; filter: invert(1) brightness(1000%); }
+.social-chip span{ overflow:hidden; text-overflow:ellipsis; }
+</style>
+</head>
+<body>
+<div class="root">
+  <!-- Vasen palkki: teksti + (kelluva) logo-->
+  <div class="left-column">
+    <!-- Yläteksti -->
+    <div class="bigtext">
+      <span id="endText">Thank You for Watching!</span>
+    </div>
+
+    <!-- Logo keskellä palkkia (näkyy kun OverlayLogo.png löytyy) -->
+    <img id="overlayLogo" class="overlay-logo" alt="overlay logo" style="display:none;">
+</div>
+  <!-- Oikea: videoruutu (1420x799) -->
+  <div class="video-wrap">
+    <video id="player" autoplay muted playsinline></video>
+    <div id="noVideo" class="novideo" style="display:none;">NO VIDEOS CONFIGURED</div>
+  </div>
+
+  <!-- Liukuteksti (videon alla) -->
+  <div class="ticker">
+    <div id="tickerInner" class="ticker-inner"></div>
+  </div>
+    <!-- Socials (bottom bar) -->
+  <div id="socials" class="socials" style="display:none;"></div>
+
+</div>
+
+
+<script>
+// --- Paths & helpers ---
+const IS_UNDER_HTML = location.pathname.toLowerCase().includes("/html/");
+let ROOT = IS_UNDER_HTML ? ".." : ".";          // jos sivu asuu /HTML/, noustaan ylös
+let SB, GENERAL, MATCH, WAIT;
+
+function setRoots(){
+  SB = ROOT + "/Scoreboard";
+  GENERAL = SB + "/General";
+  MATCH = SB + "/Match";
+  WAIT = SB + "/Waiting";
+}
+setRoots();
+
+async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+// Jos mennäänkin eri rakenteessa, koita vielä varmistaa ROOT heuristiikalla:
+(async ()=>{
+  if (!(await ok(GENERAL + "/colors.txt"))) {
+    for (const cand of ["..","../..","." ]) {
+      const test = cand + "/Scoreboard/General/colors.txt";
+      if (await ok(test)) { ROOT = cand; setRoots(); break; }
+    }
+  }
+})();
+async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
+const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
+
+
+  async function applyColors(){
+    const kv={};
+    (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
+      const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim().toLowerCase()]=m[2].trim();
+    });
+    const p=hex(kv.primary)||"#0f1114", s=hex(kv.secondary)||"#ffffff",
+          t=hex(kv.tertiary)||"#3a3a90", q=hex(kv.quaternary)||"#2f3a43";
+    document.documentElement.style.setProperty("--primary",p);
+    document.documentElement.style.setProperty("--secondary",s);
+    document.documentElement.style.setProperty("--tertiary",t);
+    document.documentElement.style.setProperty("--quaternary",q);
+  }
+
+	// Etsi overlay-logo tyypillisestä polusta
+async function resolveOverlayLogo(){
+  const p = GENERAL + "/OverlayLogo.png";   // GUI exportoi tänne
+  try{
+    const r = await fetch(p + "?_=" + Date.now(), { method:"HEAD" });
+    if (r.ok) return p;
+  }catch{}
+  return null;
+}
+
+async function upOverlayLogo(){
+  const path = await resolveOverlayLogo();
+  const img  = document.getElementById("overlayLogo");
+  if (path){
+    img.src = path + "?_=" + Date.now();
+    img.style.display = "block";
+    // halutessasi lisää reunaviiva:
+    // img.classList.add("stroke");
+  }else{
+    img.removeAttribute("src");
+    img.style.display = "none";
+  }
+}
+
+function positionOverlayLogo(){
+  const img  = document.getElementById("overlayLogo");
+  const bt   = document.querySelector(".bigtext");
+  const col  = document.querySelector(".left-column");
+  if (!img || img.style.display === "none" || !bt || !col) return;
+
+  const btr = bt.getBoundingClientRect();
+  const cr  = col.getBoundingClientRect();
+
+  const gapHeight = Math.max(0, cr.bottom - btr.bottom);
+
+  const targetH = Math.min(360, gapHeight * 0.7);
+  img.style.height = `${targetH}px`;
+}
+
+
+// Aja keskitys aina kun logo päivittyy, teksti muuttuu tai ikkuna skaalautuu
+const _oldUpOverlayLogo = upOverlayLogo;
+upOverlayLogo = async function(){
+  await _oldUpOverlayLogo();
+  positionOverlayLogo();
+};
+
+const _oldUpendText = upendText;
+upendText = async function(){
+  await _oldUpendText();
+  positionOverlayLogo();
+};
+
+window.addEventListener("resize", positionOverlayLogo);
+document.fonts && document.fonts.ready && document.fonts.ready.then(positionOverlayLogo);
+
+  // --- Thank You for Watching text ---
+  async function upendText(){
+    const txt=(await read(WAIT+"/text_end.txt")).trim() || "Thank You for Watching!";
+    document.getElementById("endText").textContent = txt.toUpperCase();
+  }
+
+  // --- Ticker: reads matchtext.txt and scrolls ---
+async function upTicker(){
+  const raw = (await read(MATCH+"/matchtext.txt")).trim();
+  // ei tehdä replaceä, Python hoitaa jo karttaerottimen
+  document.getElementById("tickerInner").textContent = raw;
+}
+
+function labelFor(kind, handle){
+  if(!handle) return "";
+  if(kind === "discord") return "/" + handle;
+  if(kind === "twitch") return "/" + handle;
+  if(kind === "web")     return handle;
+  return "@" + handle;
+}
+
+// Yritä ladata brändi-SVG paikallisesta kansiosta; jos puuttuu, käytä fallback-ikonia
+async function iconNode(kind){
+  const path = GENERAL + "/Icons/" + kind + ".svg";
+  try{
+    const head = await fetch(path + "?_=" + Date.now(), {method:"HEAD"});
+    if (head && head.ok) {
+      const img = document.createElement("img");
+      img.src = path + "?_=" + Date.now();
+      img.alt = kind;
+      img.className = "social-icon";
+      return img;
+    }
+  }catch{}
+  // Fallback-ikoni (currentColor → valkoinen)
+  const wrap = document.createElement("span");
+  wrap.className = "social-icon";
+  wrap.innerHTML = ({
+    twitch:   '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h17v11l-4 4h-4l-2 2H9v-2H6V3zm14 9V5H6v10h4v2l2-2h4l2-2z"/></svg>',
+    twitter:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 5.8a7.6 7.6 0 0 1-2.2.6 3.8 3.8 0 0 0 1.7-2.1 7.6 7.6 0 0 1-2.4.9A3.8 3.8 0 0 0 12 8.5a10.8 10.8 0 0 1-7.8-4 3.8 3.8 0 0 0 1.2 5.1 3.7 3.7 0 0 1-1.7-.5v.1a3.8 3.8 0 0 0 3 3.7 3.8 3.8 0 0 1-1.7.1 3.8 3.8 0 0 0 3.5 2.6A7.6 7.6 0 0 1 2 17.5a10.7 10.7 0 0 0 5.8 1.7c7 0 10.8-5.8 10.8-10.8v-.5A7.7 7.7 0 0 0 22 5.8z"/></svg>',
+    youtube:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23 7.5a4 4 0 0 0-2.8-2.8C18 4 12 4 12 4s-6 0-8.2.7A4 4 0 0 0 1 7.5 41 41 0 0 0 1 12a41 41 0 0 0 .8 4.5 4 4 0 0 0 2.8 2.8C6 20 12 20 12 20s6 0 8.2-.7a4 4 0 0 0 2.8-2.8A41 41 0 0 0 23 12a41 41 0 0 0-.8-4.5zM10 15.5v-7l6 3.5-6 3.5z"/></svg>',
+    instagram:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm5 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm6.5-.8a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"/></svg>',
+    discord:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 5a16 16 0 0 0-3.6-1.1l-.3.6A13 13 0 0 1 12 4c-1 0-2 .1-3 .5l-.3-.6A16 16 0 0 0 5 5C3 8 2.6 11 2.7 14a15 15 0 0 0 4.7 2.3l.6-.9c-1-.3-1.9-.8-2.7-1.4.8.6 1.9 1.2 3.1 1.6a9 9 0 0 0 6.2 0c1.2-.4 2.3-1 3.1-1.6-.8.6-1.7 1-2.7 1.4l.6.9A15 15 0 0 0 21.3 14C21.4 11 21 8 19 5ZM9.6 13.4c-.7 0-1.3-.7-1.3-1.6s.6-1.6 1.3-1.6 1.3.7 1.3 1.6-.6 1.6-1.3 1.6Zm4.8 0c-.7 0-1.3-.7-1.3-1.6s.6-1.6 1.3-1.6 1.3.7 1.3 1.6-.6 1.6-1.3 1.6Z"/></svg>',
+    web:      '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2Zm0 2c1.7 0 3.2 3 3.6 7H8.4C8.8 7 10.3 4 12 4Zm-7 8c0-1 .1-2 .4-3h3c-.2 1-.4 2-.4 3s.2 2 .4 3h-3c-.3-1-.4-2-.4-3Zm7 8c-1.7 0-3.2-3-3.6-7h7.2C15.2 17 13.7 20 12 20Zm3.6-8c-.2-1-.4-2-.4-3h3c.3 1 .4 2 .4 3s-.1 2-.4 3h-3Z"/></svg>'
+  })[kind] || '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>';
+  return wrap.firstChild;
+}
+
+function onlyHandle(kind, val){
+  let s = (val||"").trim();
+  s = s.replace(/^https?:\/\//i, "");
+  const doms = {
+    twitch:/^([^\/]*twitch\.tv\/)/i,
+    twitter:/^([^\/]*twitter\.com\/|[^\/]*x\.com\/)/i,
+    youtube:/^([^\/]*youtube\.com\/|[^\/]*youtu\.be\/)/i,
+    instagram:/^([^\/]*instagram\.com\/)/i,
+    discord:/^([^\/]*discord\.gg\/|[^\/]*discord\.com\/invite\/)/i,
+    web:/^/
+  };
+  if(doms[kind]) s = s.replace(doms[kind], "");
+  s = s.replace(/^[@\/]+/, "");         // poista johtavat @ ja /
+  s = s.split(/[\/\?\#]/)[0];           // katkaise
+  return s;
+}
+
+// Rakenna rivin sisällöt
+async function upSocials(){
+  const el = document.getElementById("socials");
+  try{
+    const raw = await read(WAIT + "/socials.json");
+    const data = JSON.parse(raw || "null");
+    if(!data || Object.keys(data).length===0){ el.style.display="none"; el.innerHTML=""; return; }
+
+    el.innerHTML = "";
+    const order = ["twitch","twitter","youtube","instagram","discord","web"];
+    for (const key of order){
+      const value = data[key];
+      if(!value) continue;
+      const handle = onlyHandle(key, value);
+      if(!handle) continue;
+
+      const chip = document.createElement("div");
+      chip.className = "social-chip";
+
+      const icon = await iconNode(key);
+      chip.appendChild(icon);
+
+      const span = document.createElement("span");
+      span.textContent = labelFor(key, handle);
+      chip.appendChild(span);
+
+      el.appendChild(chip);
+    }
+
+    el.style.display = el.childElementCount ? "flex" : "none";
+    autoScaleSocials();  // skaalaa fontti jäljellä olevaan tilaan
+  }catch(e){
+    el.style.display="none"; el.innerHTML=""
+  }
+}
+
+function autoScaleSocials(){
+  const root = document.documentElement;
+  const wrap = document.getElementById("socials");
+  const chips = Array.from(wrap.querySelectorAll(".social-chip"));
+  if (!chips.length) return;
+
+  const cs = getComputedStyle(root);
+  const min = parseInt(cs.getPropertyValue("--social-font-min")) || 16;
+  const max = parseInt(cs.getPropertyValue("--social-font-max")) || 72;
+  const gapPx = parseFloat(getComputedStyle(wrap).gap) || 0;
+  const wrapWidth = wrap.clientWidth;
+
+  const totalWidth = () =>
+    chips.reduce((acc, ch) => acc + ch.scrollWidth, 0) +
+    gapPx * Math.max(0, chips.length - 1);
+
+  let lo = min, hi = max, best = min;
+  while (lo <= hi){
+    const mid = Math.floor((lo + hi) / 2);
+    root.style.setProperty("--social-font", mid + "px");
+    if (totalWidth() <= wrapWidth + 0.5){ best = mid; lo = mid + 1; }
+    else { hi = mid - 1; }
+  }
+  root.style.setProperty("--social-font", best + "px");
+
+  const remaining = Math.max(0, wrapWidth - totalWidth());
+  const perSide = remaining / (chips.length * 2);
+  root.style.setProperty("--social-extra-pad", perSide.toFixed(2) + "px");
+}
+
+window.addEventListener("resize", autoScaleSocials);
+document.fonts && document.fonts.ready && document.fonts.ready.then(autoScaleSocials);
+
+  // --- Video playlist ---
+  let playlist = []; let playIndex = 0;
+	function resolveUrl(_base, file){
+	  return WAIT + "/Playlist/" + file;  // videot HTTP:n yli Playlististä
+	}
+  async function loadPlaylist(){
+    const base = (await read(WAIT+"/videos_dir.txt")).trim();
+    const lines = (await read(WAIT+"/videos.txt")).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    playlist = lines.map(fn => resolveUrl(base, fn));
+    playIndex = 0;
+    const has = playlist.length>0;
+    document.getElementById("noVideo").style.display = has ? "none" : "flex";
+    if(has) await playCurrent();
+    else { const v=document.getElementById("player"); v.removeAttribute("src"); v.load(); }
+  }
+  async function playCurrent(){
+    const v = document.getElementById("player");
+    if(playlist.length===0) return;
+    if(playIndex<0 || playIndex>=playlist.length) playIndex = 0;
+    const src = playlist[playIndex];
+    v.src = src;
+    try{ await v.play(); }catch(e){ /* autoplay might be blocked if unmuted; we keep muted */ }
+  }
+  function nextVideo(){
+    if(playlist.length===0) return;
+    playIndex = (playIndex + 1) % playlist.length;
+    playCurrent();
+  }
+  (function attachVideoHandlers(){
+    const v=document.getElementById("player");
+    v.addEventListener("ended", nextVideo);
+    v.addEventListener("error", nextVideo);
+  })();
+
+  // --- SSE updates (hot reload on change) ---
+function startSSE(){
+  try{
+    const es=new EventSource("/events");
+    es.onmessage=async ev=>{
+      try{
+        const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+        if(ch.some(k=>k==="general.colors")) await applyColors();
+        if(ch.some(k=>k.startsWith("waiting."))){
+          await Promise.all([upendText(), loadPlaylist(), upSocials()]);
+          positionOverlayLogo();
+        }
+        if(ch.some(k=>k.startsWith("general."))){ await upOverlayLogo(); }
+        if(ch.some(k=>k==="matchtext")) await upTicker();
+        await upTicker();
+      }catch{}
+    };
+  }catch{}
+}
+
+(async ()=>{
+  await applyColors();
+  await Promise.all([upendText(), loadPlaylist(), upTicker(), upOverlayLogo(), upSocials()]);
+  positionOverlayLogo();
+  startSSE();
+
+  setInterval(upTicker, 15000);
+  setInterval(upendText, 1500);
+})();
+
+
+</script>
+</body>
+</html>

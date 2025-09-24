@@ -1,7 +1,7 @@
-Name=New Junk City
+Name=
 T1=0
-T2=1
-Completed=1
-Pick=T1
-T1Ban=Baptiste
-T2Ban=Junkrat
+T2=0
+Completed=0
+Pick=—
+T1Ban=
+T2Ban=

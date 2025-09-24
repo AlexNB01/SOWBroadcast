@@ -1,7 +1,7 @@
-Name=Nepal
-T1=2
+Name=Aatlis
+T1=0
 T2=0
-Completed=1
-Pick=T2
-T1Ban=Mercy
-T2Ban=Ashe
+Completed=0
+Pick=—
+T1Ban=Ashe
+T2Ban=Bastion

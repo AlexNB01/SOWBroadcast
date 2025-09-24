@@ -72,6 +72,15 @@ class GeneralSettings:
                     "octonary":  "#006ea1",  
                 }
 
+@dataclass
+class WaitingSettings:
+    videos_dir: str = ""          # kansio, josta videot luetaan
+    timer_seconds: int = 0        # countdownin pituus sekunteina
+    text_starting: str = "STARTING SOON!"
+    text_brb: str = "BE RIGHT BACK!"
+    text_end: str = "THANK YOU FOR WATCHING"
+    timer_running: bool = False
+    socials: Dict[str, str] = None
 
 # -----------------------------
 # Asset Manager Dialog
@@ -624,8 +633,6 @@ class GeneralTab(QWidget):
                 pix.scaled(self.transition_logo_preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
             )
 
-
-
     # ---- color picker ----
     def _pick_color(self, key: str):
         start = QColor(self._colors.get(key, "#FFFFFF"))
@@ -713,11 +720,272 @@ def _app_base():
 def _ensure_scoreboard_tree(root):
     subdirs = [
         "General", "Match", "Heroes", "Maps", "Gametypes",
-        "Replay", "Replay\\Playlist", "Roles", "Teams", "Temp"
+        "Replay", "Replay\\Playlist", "Roles", "Teams", "Temp", "Waiting"
     ]
     os.makedirs(root, exist_ok=True)
     for d in subdirs:
         os.makedirs(os.path.join(root, d), exist_ok=True)
+
+class WaitingTab(QWidget):
+    updated = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        root = QVBoxLayout(self)
+
+        # --- Oletusvideokansio: <app_base>/SOWBroadcast/Highlights, jos olemassa; muuten <app_base>/Highlights
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        cand1 = os.path.join(base, "SOWBroadcast", "Highlights")
+        cand2 = os.path.join(base, "Highlights")
+        self.default_videos_dir = cand1 if os.path.isdir(cand1) else cand2
+
+        # --- Videokansio ---
+        box_v = QGroupBox("Waiting videos (folder)")
+        lay_v = QHBoxLayout(box_v)
+        self.videos_dir = QLineEdit()
+        self.videos_dir.setReadOnly(True)
+        self.videos_dir.setPlaceholderText(self.default_videos_dir or "Select a folder that contains videos")
+        self.use_default_chk = QCheckBox("Use default (SOWBroadcast\\Highlights)")
+        self.use_default_chk.setChecked(True if self.default_videos_dir else False)
+        self.use_default_chk.toggled.connect(self._on_use_default_toggled)
+        btn_pick = QPushButton("Browse…")
+        btn_pick.clicked.connect(self._pick_folder)
+        lay_v.addWidget(self.videos_dir, 1)
+        lay_v.addWidget(btn_pick)
+        lay_v.addWidget(self.use_default_chk)
+        root.addWidget(box_v)
+
+        # --- Countdown-timer (asetusaika) ---
+        box_t = QGroupBox("Countdown timer")
+        lay_t = QHBoxLayout(box_t)
+        self.min_spin = QSpinBox(); self.min_spin.setRange(0, 999); self.min_spin.setValue(0)
+        self.sec_spin = QSpinBox(); self.sec_spin.setRange(0, 59);  self.sec_spin.setValue(0)
+        lay_t.addWidget(QLabel("Minutes:")); lay_t.addWidget(self.min_spin)
+        lay_t.addSpacing(16)
+        lay_t.addWidget(QLabel("Seconds:")); lay_t.addWidget(self.sec_spin)
+        lay_t.addStretch(1)
+
+        # Live-näyttö + ohjaimet
+        self.live_label = QLabel("00:00")
+        self.live_label.setStyleSheet("QLabel{font: 900 26px 'Segoe UI';}")
+
+        self.btn_start = QPushButton("Start")
+        self.btn_pause = QPushButton("Pause")
+        self.btn_reset = QPushButton("Reset")
+
+        self.btn_start.clicked.connect(self._start_timer)
+        self.btn_pause.clicked.connect(self._pause_timer)
+        self.btn_reset.clicked.connect(self._reset_timer_clicked)
+
+        lay_t.addWidget(self.live_label)
+        lay_t.addWidget(self.btn_start)
+        lay_t.addWidget(self.btn_pause)
+        lay_t.addWidget(self.btn_reset)
+
+
+        root.addWidget(box_t)
+
+        # Timerin sisäinen tila
+        from PyQt5.QtCore import QTimer
+        self._qtimer = QTimer(self)
+        self._qtimer.setInterval(1000)
+        self._qtimer.timeout.connect(self._tick)
+        self._preset_seconds = 0         # asetettu aika spinnereistä
+        self._remaining_seconds = 0      # jäljellä oleva aika
+
+        # Päivitä preset aina kun spinnereitä muutetaan
+        for w in (self.min_spin, self.sec_spin):
+            w.valueChanged.connect(self._on_preset_changed)
+
+        # --- Tekstit ---
+        box_x = QGroupBox("On-screen texts")
+        grid = QFormLayout(box_x)
+        self.text_starting = QLineEdit("STARTING SOON!")
+        self.text_brb      = QLineEdit("BE RIGHT BACK!")
+        self.text_end      = QLineEdit("THANK YOU FOR WATCHING")
+        for w in (self.text_starting, self.text_brb, self.text_end):
+            w.textChanged.connect(self.updated.emit)
+        grid.addRow("StartingSoon.html:", self.text_starting)
+        grid.addRow("BeRightBack.html:",  self.text_brb)
+        grid.addRow("EndScreen.html:",    self.text_end)
+        root.addWidget(box_x)
+        
+        # --- Socials ---
+        box_s = QGroupBox("Socials")
+        form_s = QFormLayout(box_s)
+
+        self.s_twitch  = QLineEdit(); self.s_twitch.setPlaceholderText("twitch.tv/… tai @käyttäjä")
+        self.s_twitter = QLineEdit(); self.s_twitter.setPlaceholderText("@käyttäjä tai x.com/…")
+        self.s_youtube = QLineEdit(); self.s_youtube.setPlaceholderText("kanavan nimi / URL lyhyenä")
+        self.s_instagram = QLineEdit(); self.s_instagram.setPlaceholderText("@käyttäjä")
+        self.s_discord = QLineEdit(); self.s_discord.setPlaceholderText("kutsu / palvelin")
+        self.s_website = QLineEdit(); self.s_website.setPlaceholderText("domain.tld")
+
+        for w in (self.s_twitch, self.s_twitter, self.s_youtube, self.s_instagram, self.s_discord, self.s_website):
+            w.textChanged.connect(self.updated.emit)
+
+        form_s.addRow("Twitch",   self.s_twitch)
+        form_s.addRow("Twitter/X",self.s_twitter)
+        form_s.addRow("YouTube",  self.s_youtube)
+        form_s.addRow("Instagram",self.s_instagram)
+        form_s.addRow("Discord",  self.s_discord)
+        form_s.addRow("Website",  self.s_website)
+
+        root.addWidget(box_s)
+
+
+        # --- Päivitä-napit ---
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        btn_reset = QPushButton("Reset this tab")
+        btn_reset.clicked.connect(self._reset_tab)
+        btn_update = QPushButton("Update (Waiting)")
+        btn_update.clicked.connect(lambda *_: self.updated.emit())
+        btns.addWidget(btn_reset); btns.addWidget(btn_update)
+        root.addLayout(btns)
+        root.addStretch(1)
+
+        # Alusta preset ja live
+        self._on_use_default_toggled(self.use_default_chk.isChecked())
+        self._on_preset_changed()
+
+    # ---------- UI handlers ----------
+    def _fmt(self, s:int)->str:
+        s=max(0,int(s)); return f"{s//60:02d}:{s%60:02d}"
+
+    def _on_preset_changed(self, *_):
+        self._preset_seconds = int(self.min_spin.value())*60 + int(self.sec_spin.value())
+        # jos ei käynnissä, päivitä live-näyttöä
+        if not self._qtimer.isActive():
+            self._remaining_seconds = self._preset_seconds
+            self.live_label.setText(self._fmt(self._remaining_seconds))
+        self.updated.emit()  # jotta preset viedään tiedostoon
+        
+    def _start_timer(self):
+        if self._remaining_seconds <= 0:
+            self._remaining_seconds = self._preset_seconds
+        self._qtimer.start()
+        self.updated.emit()  # kerrotaan overlaylle että käy
+
+    def _pause_timer(self):
+        if self._qtimer.isActive():
+            self._qtimer.stop()
+            self.updated.emit()  # paussi overlaylle
+
+
+    def _reset_timer_clicked(self):
+        self._qtimer.stop()
+        self._remaining_seconds = self._preset_seconds
+        self.live_label.setText(self._fmt(self._remaining_seconds))
+        self.updated.emit()  # reset → kirjoita ulos
+
+    def _tick(self):
+        self._remaining_seconds = max(0, self._remaining_seconds - 1)
+        self.live_label.setText(self._fmt(self._remaining_seconds))
+        if self._remaining_seconds <= 0:
+            self._qtimer.stop()
+        self.updated.emit()  # jokainen tikki viedään overlaylle
+
+
+    def _on_use_default_toggled(self, checked: bool):
+        self.videos_dir.setEnabled(not checked)
+        # näytä teksti, mutta pidä polku tyhjänä jos käytetään oletusta
+        if checked:
+            self.videos_dir.setText("")
+            self.videos_dir.setPlaceholderText(self.default_videos_dir or "")
+        self.updated.emit()
+
+    def _pick_folder(self):
+        d = QFileDialog.getExistingDirectory(self, "Select videos folder", self.default_videos_dir or "")
+        if d:
+            self.videos_dir.setText(d)
+            self.use_default_chk.setChecked(False)
+            self.updated.emit()
+
+    def _reset_tab(self):
+        self.use_default_chk.setChecked(True if self.default_videos_dir else False)
+        self.videos_dir.clear()
+        self.min_spin.setValue(0); self.sec_spin.setValue(0)
+        self.text_starting.setText("STARTING SOON!")
+        self.text_brb.setText("BE RIGHT BACK!")
+        self.text_end.setText("THANK YOU FOR WATCHING")
+        self._reset_timer_clicked()
+
+    # ---- state I/O ----
+    def to_settings(self) -> WaitingSettings:
+        secs = int(self._remaining_seconds)
+        vdir = "" if self.use_default_chk.isChecked() else self.videos_dir.text().strip()
+        socials = {
+            "twitch":   self._normalize_handle("twitch",   self.s_twitch.text()),
+            "twitter":  self._normalize_handle("twitter",  self.s_twitter.text()),
+            "youtube":  self._normalize_handle("youtube",  self.s_youtube.text()),
+            "instagram":self._normalize_handle("instagram",self.s_instagram.text()),
+            "discord":  self._normalize_handle("discord",  self.s_discord.text()),
+            "web":      self._normalize_handle("web",      self.s_website.text()),
+        }
+        socials = {k:v for k,v in socials.items() if v}
+        return WaitingSettings(
+            videos_dir=vdir,
+            timer_seconds=max(0, secs),
+            text_starting=self.text_starting.text().strip() or "STARTING SOON!",
+            text_brb=self.text_brb.text().strip() or "BE RIGHT BACK!",
+            text_end=self.text_end.text().strip() or "THANK YOU FOR WATCHING",
+            timer_running=bool(self._qtimer.isActive()),
+            socials=socials,
+        )
+
+
+    def from_settings(self, s: WaitingSettings):
+        # UI-spinnereihin laitetaan PRESET (ei overwriteta käyttäjän live-tilaa)
+        secs = int(getattr(s, "timer_seconds", 0) or 0)
+        self._remaining_seconds = max(0, secs)
+        # arvaa presetiksi sama, mutta käyttäjä voi muuttaa spinnereistä
+        self._preset_seconds = self._remaining_seconds
+        self.min_spin.setValue(self._preset_seconds // 60)
+        self.sec_spin.setValue(self._preset_seconds % 60)
+        self.live_label.setText(self._fmt(self._remaining_seconds))
+        # video-kansio
+        vdir = getattr(s, "videos_dir", "") or ""
+        if vdir:
+            self.videos_dir.setText(vdir)
+            self.use_default_chk.setChecked(False)
+        else:
+            self.use_default_chk.setChecked(True if self.default_videos_dir else False)
+            self.videos_dir.clear()
+        # tekstit
+        self.text_starting.setText(getattr(s, "text_starting", "STARTING SOON!"))
+        self.text_brb.setText(getattr(s, "text_brb", "BE RIGHT BACK!"))
+        self.text_end.setText(getattr(s, "text_end", "THANK YOU FOR WATCHING"))
+        soc = getattr(s, "socials", {}) or {}
+        self.s_twitch.setText(soc.get("twitch",""))
+        self.s_twitter.setText(soc.get("twitter",""))
+        self.s_youtube.setText(soc.get("youtube",""))
+        self.s_instagram.setText(soc.get("instagram",""))
+        self.s_discord.setText(soc.get("discord",""))
+        self.s_website.setText(soc.get("web",""))
+    
+    @staticmethod
+    def _normalize_handle(kind: str, text: str) -> str:
+        s = (text or "").strip()
+        s = re.sub(r"^https?://", "", s, flags=re.I)
+        if kind == "twitch":
+            s = re.sub(r"^[^/]*twitch\.tv/", "", s, flags=re.I)
+        elif kind == "twitter":
+            s = re.sub(r"^[^/]*(twitter\.com|x\.com)/", "", s, flags=re.I)
+        elif kind == "youtube":
+            s = re.sub(r"^[^/]*(youtube\.com|youtu\.be)/", "", s, flags=re.I)
+        elif kind == "instagram":
+            s = re.sub(r"^[^/]*instagram\.com/", "", s, flags=re.I)
+        elif kind == "discord":
+            s = re.sub(r"^[^/]*(discord\.gg/|discord\.com/invite/)", "", s, flags=re.I)
+        s = re.sub(r"^@+", "", s)          # poista johtavat @
+        s = re.sub(r"^/+", "", s)          # poista johtavat /
+        s = re.split(r"[/?#]", s)[0]       # katkaise seuraavasta / ? #
+        return s
+
+
+
+
 
 class DraftTab(QWidget):
     """Map pool -välilehti: valitse mitkä kartat ovat käytössä draftissa (ryhmitelty pelimuodoittain)."""
@@ -995,6 +1263,12 @@ class TournamentApp(QMainWindow):
         tabs.addTab(self.general_tab, "General")
         self.general_tab.from_settings(GeneralSettings())
         
+        # --- WAITING TAB ---
+        self.waiting_tab = WaitingTab()
+        self.waiting_tab.updated.connect(self._update_waiting_only)
+        tabs.addTab(self.waiting_tab, "Waiting Screen")
+
+        
         # --- DRAFT TAB (map pool) ---
         self.draft_tab = DraftTab(self._maps_by_mode)
         self.draft_tab.updated.connect(self._update)  # kun pool muuttuu -> kirjoita tiedostot
@@ -1010,6 +1284,61 @@ class TournamentApp(QMainWindow):
     # ---------------------
     # Menubar and handlers
     # ---------------------
+    
+    def _export_waiting(self, state: dict):
+        root = self._scoreboard_root()
+        wdir = os.path.join(root, "Waiting")
+        pldir = os.path.join(wdir, "Playlist")
+        os.makedirs(wdir, exist_ok=True)
+        os.makedirs(pldir, exist_ok=True)
+
+        w: dict = state.get("waiting") or {}
+        ws = WaitingSettings(**w) if isinstance(w, dict) else WaitingSettings()
+
+        self._write_txt(os.path.join(wdir, "text_starting.txt"), ws.text_starting or "STARTING SOON!")
+        self._write_txt(os.path.join(wdir, "text_brb.txt"),      ws.text_brb      or "BE RIGHT BACK!")
+        self._write_txt(os.path.join(wdir, "text_end.txt"),      ws.text_end      or "THANK YOU FOR WATCHING")
+        self._write_txt(os.path.join(wdir, "timer_seconds.txt"), str(int(ws.timer_seconds or 0)))
+        
+        import json as _json
+        soc = getattr(ws, "socials", {}) or {}
+        try:
+            with open(os.path.join(wdir, "socials.json"), "w", encoding="utf-8") as f:
+                _json.dump(soc, f, ensure_ascii=False)
+        except Exception:
+            pass
+
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        def_dir1 = os.path.join(base, "SOWBroadcast", "Highlights")
+        def_dir2 = os.path.join(base, "Highlights")
+        default_dir = def_dir1 if os.path.isdir(def_dir1) else def_dir2 if os.path.isdir(def_dir2) else ""
+        src_dir = (ws.videos_dir or "").strip() or default_dir
+
+        exts = {".mp4", ".mov", ".webm", ".mkv"}
+        filenames = []
+
+        if src_dir and os.path.isdir(src_dir):
+            for fn in sorted(os.listdir(src_dir)):
+                if os.path.splitext(fn)[1].lower() in exts:
+                    filenames.append(fn)
+                    src = os.path.join(src_dir, fn)
+                    dst = os.path.join(pldir, fn)
+                    try:
+                        if (not os.path.exists(dst)) or (os.path.getmtime(src) > os.path.getmtime(dst)):
+                            shutil.copy2(src, dst)
+                    except Exception:
+                        pass
+
+        for old in os.listdir(pldir):
+            if old not in filenames:
+                try: os.remove(os.path.join(pldir, old))
+                except Exception: pass
+
+        self._write_txt(os.path.join(wdir, "videos.txt"), "\n".join(filenames) + ("\n" if filenames else ""))
+        self._write_txt(os.path.join(wdir, "videos_dir.txt"), "")
+        self._write_txt(os.path.join(wdir, "timer_running.txt"),
+                "1" if bool(ws.timer_running) else "0")
+
     def _name_from_filename(self, path: str) -> str:
         """Ei kovakoodattuja korjauksia: vain väliviivat/alikulkevat -> välilyönti, ja title case."""
         stem = os.path.splitext(os.path.basename(path))[0]
@@ -1207,15 +1536,14 @@ class TournamentApp(QMainWindow):
         return True
 
             
-    def _build_status_text(self, state: dict) -> str:
+    def build_match_text(self, state: dict) -> str:
         """
         Muoto: Team1 (t1Total - t2Total) Team2    -    Map1 (x - y)    -    Map2 (...) ...
-        Käyttää FT-asetusta (1/2/3) -> 1/3/5 karttaa. Ottaa map-nimen vain jos se on annettu.
+        Kirjoittaa kaikki GUIhin syötetyt kartat järjestyksessä. Ottaa map-nimen vain jos se on annettu.
         """
         t1 = state.get("team1", {}) or {}
         t2 = state.get("team2", {}) or {}
         maps = state.get("maps", []) or []
-        general = state.get("general", {}) or {}
 
         t1_name = (t1.get("name") or "").strip()
         t2_name = (t2.get("name") or "").strip()
@@ -1224,12 +1552,8 @@ class TournamentApp(QMainWindow):
 
         parts = [f"{t1_name} ({t1_total} - {t2_total}) {t2_name}"]
 
-        # maps_count luetaan suoraan 1..7
-        maps_count = int(general.get("first_to") or 3)
-        count = max(1, min(7, maps_count))
-
-        for i in range(1, count + 1):
-            item = maps[i - 1] if len(maps) >= i else None
+        # Käy läpi KAIKKI maps-listan rivit (ei enää first_to/maps_count)
+        for item in maps:
             if not item:
                 continue
             name = (item.get("map") or "").strip()
@@ -1238,8 +1562,9 @@ class TournamentApp(QMainWindow):
             if name:
                 parts.append(f"{name} ({m1} - {m2})")
 
-        sep = "    -    "  # neljä välilyöntiä molemmin puolin
-        return sep.join(parts).strip() + "                  "  # pieni lopputyhjä rullausta varten
+        sep = "      •      "
+        return sep.join(parts).strip() + "                              "
+
 
     # --- Teams export/import helpers ---
 
@@ -1741,6 +2066,8 @@ class TournamentApp(QMainWindow):
         g = state.get("general") or {}
         settings = GeneralSettings(**g) if isinstance(g, dict) else GeneralSettings()
         self._export_general(settings)
+        
+        self._export_waiting(state)
     
     def _export_match(self, state: dict):
         """
@@ -1801,7 +2128,8 @@ class TournamentApp(QMainWindow):
                 f"T2Ban={(m.get('t2_ban') or '')}\n"   # NEW
             )
             self._write_txt(os.path.join(match_dir, f"Map{idx}.txt"), body)
-            
+        self._write_txt(os.path.join(match_dir, "matchtext.txt"), self.build_match_text(state))
+
         with open(os.path.join(match_dir, "match.json"), "w", encoding="utf-8") as f:
             json.dump({k: v for k, v in state.items() if k != "assets"}, f, ensure_ascii=False, indent=2)
 
@@ -1939,6 +2267,8 @@ class TournamentApp(QMainWindow):
         }
         general = self.general_tab.to_settings()
         state["general"] = asdict(general)
+        waiting = self.waiting_tab.to_settings()
+        state["waiting"] = asdict(waiting)
         return state
 
 
@@ -2005,12 +2335,14 @@ class TournamentApp(QMainWindow):
         gdata = state.get("general", {})
         self.general_tab.from_settings(GeneralSettings(**gdata))
         
+        # UUSI: Waiting settings
+        wdata = state.get("waiting", {}) or {}
+        self.waiting_tab.from_settings(WaitingSettings(**wdata))
+            
         # Map Pool (Draft)
         pool = state.get("map_pool") or []
         if hasattr(self, "draft_tab"):
             self.draft_tab.set_pool(pool)
-
-
 
     def _update(self):
         state = self._collect_state()
@@ -2034,6 +2366,8 @@ class TournamentApp(QMainWindow):
 
         # --- Vie Match (kirjoittaa mm. Scoreboard/Match/match.json ja maps.txt poolista) ---
         self._export_match(state)
+        
+        self._export_waiting(state)
 
         # --- Status-teksti + mahdollinen notifikaatio ---
         self._export_status_text(state)
@@ -2050,7 +2384,6 @@ class TournamentApp(QMainWindow):
 
         # --- Päivitä diff-vertailun lähde seuraavaa kierrosta varten ---
         self._last_state_for_diff = state
-        self._export_status_text(state)
 
     def _update_general_only(self):
         # 1) kerää vain General-tabin asetukset
@@ -2073,6 +2406,34 @@ class TournamentApp(QMainWindow):
         changed = self._diff_for_scoreboard(old, full)
         self._last_state_for_diff = full
         self._notify_overlays(changed)
+        
+    def _update_waiting_only(self):
+        # 1) kerää vain Waiting-välilehden asetukset
+        w = asdict(self.waiting_tab.to_settings())
+
+        # 2) kirjoita Waiting-kansion tiedostot (tekstit, timer ja videolista)
+        self._export_waiting({"waiting": w})
+
+        # 3) (valinnainen) kirjoita status-teksti, jotta mm. draft.html saa sen
+        g = asdict(self.general_tab.to_settings())
+        self._export_status_text({"general": g})
+
+        # 4) autosave talteen
+        self._autosave(self._collect_state())
+
+        # 5) diff & notify – kevyt runko riittää
+        full = {
+            "team1": {}, "team2": {}, "maps": [],
+            "current_map": None,
+            "general": g,
+            "waiting": w,
+            "assets": {"heroes":{}, "maps":{}, "modes":{}},
+        }
+        old = getattr(self, "_last_state_for_diff", None)
+        changed = self._diff_for_scoreboard(old, full)
+        self._last_state_for_diff = full
+        self._notify_overlays(changed)
+
 
     # ---------------------
     # Save/Load helpers
