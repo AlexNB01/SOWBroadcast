@@ -75,7 +75,6 @@
   }
 	.frame{
 	  position:relative; width:848px; height:549px; /* 16:9 */
-	  border-radius:18px;
 	  background:transparent;                      /* kamera näkyy OBS:sta läpi */
 	  box-sizing:border-box;
 	  /* korostus: vasen + oikea + ala – yhdellä inset box-shadowilla */
@@ -107,6 +106,29 @@
 
   /* ===== Footer (sama API kuin singlecamissa, piilotettuna toistaiseksi) ===== */
   .footer{ display:none; }
+  /* Status – caster-tyyli */
+#status{
+  position:absolute;
+  left:50%; bottom:6%; transform:translateX(-50%);
+  display:none;                  /* näkyy vain kun on sisältöä */
+  max-width:80vw;
+  padding:14px 28px;
+  line-height:1.2;
+
+  background:var(--primary);
+  border-left:8px solid var(--tertiary);
+  border-right:8px solid var(--tertiary);
+  border-radius:12px;
+  box-shadow:0 8px 22px rgba(0,0,0,.25);
+
+  font-size:40px; font-weight:900; letter-spacing:.6px;
+  color:var(--secondary);
+  text-align:center; text-transform:uppercase;
+
+  white-space:pre-wrap; word-break:break-word;
+  pointer-events:none;           /* ettei vie klikkauksia */
+}
+
 </style>
 </head>
 <body>
@@ -141,6 +163,7 @@
       </div>
     </div>
   </div>
+<div id="status"></div>
 
 <script>
   // ---------- Polut ----------
@@ -149,6 +172,14 @@
   async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
   const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
   const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
+
+async function upStatus(){
+  const el  = document.getElementById("status");
+  if (!el) return;
+  const txt = (await read(SB + "/Match/status.txt")).trim();
+  el.textContent = txt;
+  el.style.display = txt ? "inline-block" : "none";
+}
 
   // ---------- Värit ----------
   async function applyColors(){
@@ -205,6 +236,7 @@
   async function renderAll(){
     await applyColors();
     await Promise.all([upT1(), upT2(), upCasters()]);
+	await upStatus();
     toggleScoreBoxes();
   }
 

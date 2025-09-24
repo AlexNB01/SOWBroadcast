@@ -321,8 +321,9 @@ async function renderMaps(){
   const mapsBySlug  = bySlug((mapsManifest || {}).maps || []);
   const modesByName = Object.fromEntries(((modesManifest || {}).modes || []).map(m => [ (m.name||"").toLowerCase(), (m.slug||"").toLowerCase() ]));
   const root = document.getElementById("maps");
-  const ft = parseInt((await read(GENERAL+"/first_to.txt")).trim(),10) || 2;
-  const count = Math.max(1, 2*ft - 1);
+  const n = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 3;
+  const count = Math.max(1, Math.min(7, n));
+
 
   // Lue vain tarvittava: MapN.txt + pisteet + banit + nimi + completed
   const items = [];

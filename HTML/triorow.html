@@ -72,7 +72,7 @@
   }
   /* kolmen kehyksen koot: 596x336 (16:9) mahtuu keskelle */
   .frame{
-    position:relative; width:596px; height:505px; border-radius:18px; background:transparent;
+    position:relative; width:596px; height:505px; background:transparent;
     box-sizing:border-box;
     box-shadow:
       inset 6px 0 0 var(--tertiary),   /* vasen korostus */
@@ -89,6 +89,29 @@
     display:flex; align-items:center; justify-content:center; gap:14px; padding:0 16px;
   }
   .staffname{ font-size:34px; letter-spacing:.5px; color:var(--secondary); }
+  /* Status – caster-tyyli */
+#status{
+  position:absolute;
+  left:50%; bottom:6%; transform:translateX(-50%);
+  display:none;                  /* näkyy vain kun on sisältöä */
+  max-width:80vw;
+  padding:14px 28px;
+  line-height:1.2;
+
+  background:var(--primary);
+  border-left:8px solid var(--tertiary);
+  border-right:8px solid var(--tertiary);
+  border-radius:12px;
+  box-shadow:0 8px 22px rgba(0,0,0,.25);
+
+  font-size:40px; font-weight:900; letter-spacing:.6px;
+  color:var(--secondary);
+  text-align:center; text-transform:uppercase;
+
+  white-space:pre-wrap; word-break:break-word;
+  pointer-events:none;           /* ettei vie klikkauksia */
+}
+
 </style>
 </head>
 <body>
@@ -128,7 +151,7 @@
       </div>
     </div>
   </div>
-
+<div id="status"></div>
 <script>
   // ---------- Polut ----------
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
@@ -136,6 +159,14 @@
   async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
   const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
   const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
+
+async function upStatus(){
+  const el  = document.getElementById("status");
+  if (!el) return;
+  const txt = (await read(SB + "/Match/status.txt")).trim();
+  el.textContent = txt;
+  el.style.display = txt ? "inline-block" : "none";
+}
 
   // ---------- Värit ----------
   async function applyColors(){
@@ -195,6 +226,7 @@
   async function renderAll(){
     await applyColors();
     await Promise.all([upT1(), upT2(), upStaff()]);
+	await upStatus();
     toggleScoreBoxes();
   }
 
@@ -208,6 +240,7 @@
           if(ch.some(k=>k.startsWith("t1."))) await upT1();
           if(ch.some(k=>k.startsWith("t2."))) await upT2();
           if(ch.some(k=>k.startsWith("general."))) await upStaff();
+		  await upStatus();
           toggleScoreBoxes();
         }catch{}
       };

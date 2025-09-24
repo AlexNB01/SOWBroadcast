@@ -1,10 +1,10 @@
 {
   "team1": {
-    "name": "SrPeakCheck",
-    "abbr": "SRPC",
-    "logo_path": "C:/Users/alexl/Downloads/619px-SrPeakCheck_allmode.png",
-    "score": 1,
-    "color_hex": "#00aaff",
+    "name": "Eläke eUrheilu",
+    "abbr": "EE",
+    "logo_path": "C:/Users/alexl/Downloads/eläke.png",
+    "score": 0,
+    "color_hex": "#6f3c16",
     "players": [
       {
         "name": "LhCloudy",
@@ -53,8 +53,8 @@
     "name": "Quick X OCMR",
     "abbr": "QXO",
     "logo_path": "C:/Users/alexl/Downloads/image.png",
-    "score": 1,
-    "color_hex": "#aaaa7f",
+    "score": 0,
+    "color_hex": "#bda57a",
     "players": [
       {
         "name": "Kerfli",
@@ -124,7 +124,7 @@
     },
     {
       "index": 3,
-      "map": "Dorado",
+      "map": "Circuit Royal",
       "t1": 0,
       "t2": 0,
       "completed": false,
@@ -178,7 +178,7 @@
       "winner": ""
     }
   ],
-  "current_map": 2,
+  "current_map": 3,
   "map_pool": [
     "Nepal",
     "Oasis",
@@ -192,7 +192,7 @@
     "Colosseo"
   ],
   "general": {
-    "first_to": 2,
+    "first_to": 3,
     "host": "",
     "caster1": "",
     "caster2": "",

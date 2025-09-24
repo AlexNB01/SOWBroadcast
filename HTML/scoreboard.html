@@ -290,8 +290,8 @@ async function applyColors(){
   /* ---------- Map-bar ---------- */
 async function upMaps(){
   const bar = document.getElementById("mapbar");
-  const ft = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 2;
-  const count = 2 * ft - 1;  // Ft1=1, Ft2=3, Ft3=5
+  const n = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 3;
+  const count = Math.max(1, Math.min(7, n));
   const current = parseInt((await read(MATCH + "/CurrentMap.txt")).trim(), 10) || 0;
 
   const items = [];

@@ -49,7 +49,7 @@ class Team:
 # ---- General tab data ----
 @dataclass
 class GeneralSettings:
-    first_to: int = 2                 # Ft1=1, Ft2=2, Ft3=3
+    first_to: int = 3                 # Ft1=1, Ft2=2, Ft3=3
     host: str = ""
     caster1: str = ""
     caster2: str = ""
@@ -488,15 +488,17 @@ class GeneralTab(QWidget):
         super().__init__()
         root = QVBoxLayout(self)
 
-        # --- First to (Ft1/Ft2/Ft3) ---
+        # --- Number of maps (1–7) ---
         bo_box = QGroupBox("Number of Maps")
         bo_lay = QHBoxLayout(bo_box)
-        self.first_to = QComboBox()
-        self.first_to.addItems(["Ft1", "Ft2", "Ft3"])
-        bo_lay.addWidget(QLabel("Number of Maps (First to):"))
-        bo_lay.addWidget(self.first_to)
+        self.maps_count = QSpinBox()
+        self.maps_count.setRange(1, 7)
+        self.maps_count.setValue(3)  # oletus
+        bo_lay.addWidget(QLabel("Maps:"))
+        bo_lay.addWidget(self.maps_count)
         bo_lay.addStretch(1)
         root.addWidget(bo_box)
+
 
         # --- Selostajat & host ---
         people_box = QGroupBox("Casters & Host")
@@ -635,10 +637,8 @@ class GeneralTab(QWidget):
 
     # ---- state i/o ----
     def to_settings(self) -> GeneralSettings:
-        ft_map = {"Ft1": 1, "Ft2": 2, "Ft3": 3}
-        ft = ft_map.get(self.first_to.currentText(), 2)
         return GeneralSettings(
-            first_to=ft,
+            first_to=int(self.maps_count.value()),  # nyt: suora karttamäärä 1..7
             host=self.host.text().strip(),
             caster1=self.caster1.text().strip(),
             caster2=self.caster2.text().strip(),
@@ -648,17 +648,23 @@ class GeneralTab(QWidget):
             colors=dict(self._colors),
         )
 
+
     def from_settings(self, s: GeneralSettings):
-        # first to
-        text = {1: "Ft1", 2: "Ft2", 3: "Ft3"}.get(int(s.first_to or 2), "Ft2")
-        ix = self.first_to.findText(text)
-        self.first_to.setCurrentIndex(ix if ix >= 0 else 1)
+        # maps_count: tallenna yhä first_to-kenttään, mutta tulkitaan nyt määränä
+        try:
+            n = int(getattr(s, "first_to", 3) or 3)
+        except ValueError:
+            n = 3
+        n = max(1, min(7, n))
+        self.maps_count.setValue(n)
+
         # names
         self.host.setText(s.host or "")
         self.caster1.setText(s.caster1 or "")
         self.caster2.setText(s.caster2 or "")
         self.status_text.setText(getattr(s, "status_text", "") or "")
-        # logos
+
+        # logos & colors pysyvät ennallaan...
         self.overlay_logo_path = s.overlay_logo_path
         if s.overlay_logo_path:
             pix = QPixmap(s.overlay_logo_path)
@@ -681,11 +687,11 @@ class GeneralTab(QWidget):
             self.transition_logo_preview.clear()
             self.transition_logo_preview.setText("Transition-logo")
 
-        # colors
         self._colors = dict(s.colors or {})
         for k, btn in self.color_btns.items():
             hexv = self._colors.get(k, "#FFFFFF")
             self._set_color_button_bg(k, hexv)
+
 
     
     def reset_tab(self):
@@ -1218,9 +1224,9 @@ class TournamentApp(QMainWindow):
 
         parts = [f"{t1_name} ({t1_total} - {t2_total}) {t2_name}"]
 
-        # FT: 1 -> 1 kartta, 2 -> 3, 3 -> 5
-        ft = int(general.get("first_to") or 2)
-        count = max(1, min(5, 2 * ft - 1))
+        # maps_count luetaan suoraan 1..7
+        maps_count = int(general.get("first_to") or 3)
+        count = max(1, min(7, maps_count))
 
         for i in range(1, count + 1):
             item = maps[i - 1] if len(maps) >= i else None
