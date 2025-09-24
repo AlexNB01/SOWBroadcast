@@ -3,147 +3,176 @@
     {
       "name": "Aatlis",
       "slug": "aatlis",
+      "image": "Maps/aatlis.png",
       "mode": "Flashpoint"
-    },
-    {
-      "name": "Antartic Peninsula",
-      "slug": "antartic-peninsula",
-      "mode": "Control"
     },
     {
       "name": "Blizzard World",
       "slug": "blizzard-world",
+      "image": "Maps/blizzard-world.png",
       "mode": "Hybrid"
     },
     {
       "name": "Busan",
       "slug": "busan",
+      "image": "Maps/busan.png",
       "mode": "Control"
     },
     {
       "name": "Circuit Royal",
       "slug": "circuit-royal",
+      "image": "Maps/circuit-royal.png",
       "mode": "Escort"
     },
     {
       "name": "Colosseo",
       "slug": "colosseo",
+      "image": "Maps/colosseo.png",
       "mode": "Push"
     },
     {
       "name": "Dorado",
       "slug": "dorado",
+      "image": "Maps/dorado.png",
       "mode": "Escort"
     },
     {
       "name": "Eichenwalde",
       "slug": "eichenwalde",
+      "image": "Maps/eichenwalde.png",
       "mode": "Hybrid"
     },
     {
       "name": "Esperança",
       "slug": "esperanca",
+      "image": "Maps/esperanca.png",
       "mode": "Push"
     },
     {
       "name": "Havana",
       "slug": "havana",
+      "image": "Maps/havana.png",
       "mode": "Escort"
     },
     {
       "name": "Hollywood",
       "slug": "hollywood",
+      "image": "Maps/hollywood.png",
       "mode": "Hybrid"
     },
     {
       "name": "Ilios",
       "slug": "ilios",
+      "image": "Maps/ilios.png",
       "mode": "Control"
     },
     {
       "name": "Junkertown",
       "slug": "junkertown",
+      "image": "Maps/junkertown.png",
       "mode": "Escort"
     },
     {
       "name": "King's Row",
       "slug": "king-s-row",
+      "image": "Maps/king-s-row.png",
       "mode": "Hybrid"
     },
     {
       "name": "Lijiang Tower",
       "slug": "lijiang-tower",
+      "image": "Maps/lijiang-tower.png",
       "mode": "Control"
     },
     {
       "name": "Midtown",
       "slug": "midtown",
+      "image": "Maps/midtown.png",
       "mode": "Hybrid"
     },
     {
       "name": "Nepal",
       "slug": "nepal",
+      "image": "Maps/nepal.png",
       "mode": "Control"
     },
     {
       "name": "New Junk City",
       "slug": "new-junk-city",
+      "image": "Maps/new-junk-city.png",
       "mode": "Flashpoint"
     },
     {
       "name": "New Queen Street",
       "slug": "new-queen-street",
+      "image": "Maps/new-queen-street.png",
       "mode": "Push"
     },
     {
       "name": "Numbani",
       "slug": "numbani",
+      "image": "Maps/numbani.png",
       "mode": "Hybrid"
     },
     {
       "name": "Oasis",
       "slug": "oasis",
+      "image": "Maps/oasis.png",
       "mode": "Control"
     },
     {
       "name": "Paraíso",
       "slug": "paraiso",
+      "image": "Maps/paraiso.png",
       "mode": "Hybrid"
     },
     {
       "name": "Rialto",
       "slug": "rialto",
+      "image": "Maps/rialto.png",
       "mode": "Escort"
     },
     {
       "name": "Route 66",
       "slug": "route-66",
+      "image": "Maps/route-66.png",
       "mode": "Escort"
     },
     {
       "name": "Runasapi",
       "slug": "runasapi",
+      "image": "Maps/runasapi.png",
       "mode": "Push"
     },
     {
       "name": "Samoa",
       "slug": "samoa",
+      "image": "Maps/samoa.png",
       "mode": "Control"
     },
     {
       "name": "Shambali Monastery",
       "slug": "shambali-monastery",
+      "image": "Maps/shambali-monastery.png",
       "mode": "Escort"
     },
     {
       "name": "Suravasa",
       "slug": "suravasa",
+      "image": "Maps/suravasa.png",
       "mode": "Flashpoint"
     },
     {
       "name": "Watchpoint: Gibraltar",
       "slug": "watchpoint-gibraltar",
+      "image": "Maps/watchpoint-gibraltar.png",
       "mode": "Escort"
+    },
+    {
+      "name": "Antarctic Peninsula",
+      "slug": "antarctic-peninsula",
+      "image": "Maps/antarctic-peninsula.png",
+      "mode": "Control"
     }
   ]
 }

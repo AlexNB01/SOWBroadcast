@@ -1,45 +1,45 @@
 {
   "team1": {
-    "name": "Eläke eUrheilu",
-    "abbr": "EE",
-    "logo_path": "C:/Users/alexl/Downloads/eläke.png",
+    "name": "",
+    "abbr": "",
+    "logo_path": null,
     "score": 0,
-    "color_hex": "#6f3c16",
+    "color_hex": "#55aaff",
     "players": [
       {
-        "name": "LhCloudy",
-        "hero": "Reinhardt",
-        "role": "Tank"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Depsi",
-        "hero": "Freja",
-        "role": "Damage"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Snipu",
-        "hero": "Widowmaker",
-        "role": "Damage"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Mickji",
-        "hero": "Zenyatta",
-        "role": "Support"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Ghost91",
-        "hero": "Baptiste",
-        "role": "Support"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Vestola",
-        "hero": "Hanzo",
-        "role": "Flex"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "unto",
-        "hero": "Cassidy",
-        "role": "Damage"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
         "name": "",
@@ -50,51 +50,51 @@
     "banned_hero": ""
   },
   "team2": {
-    "name": "Quick X OCMR",
-    "abbr": "QXO",
-    "logo_path": "C:/Users/alexl/Downloads/image.png",
+    "name": "",
+    "abbr": "",
+    "logo_path": null,
     "score": 0,
-    "color_hex": "#bda57a",
+    "color_hex": "#ff557f",
     "players": [
       {
-        "name": "Kerfli",
-        "hero": "Junker Queen",
-        "role": "Tank"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Xross",
-        "hero": "Widowmaker",
-        "role": "Damage"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Chlicard",
-        "hero": "Tracer",
-        "role": "Damage"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Elkku",
-        "hero": "Kiriko",
-        "role": "Support"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Nikkechu",
-        "hero": "Wuyang",
-        "role": "Support"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Machu",
-        "hero": "Reinhardt",
-        "role": "Tank"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Rouniz",
-        "hero": "Echo",
-        "role": "Damage"
+        "name": "",
+        "hero": "",
+        "role": ""
       },
       {
-        "name": "Aaro40",
-        "hero": "Baptiste",
-        "role": "Support"
+        "name": "",
+        "hero": "",
+        "role": ""
       }
     ],
     "banned_hero": ""
@@ -102,13 +102,13 @@
   "maps": [
     {
       "index": 1,
-      "map": "Aatlis",
+      "map": "Antarctic Peninsula",
       "t1": 0,
       "t2": 0,
       "completed": false,
       "pick": "—",
-      "t1_ban": "Ashe",
-      "t2_ban": "Bastion",
+      "t1_ban": "",
+      "t2_ban": "",
       "winner": ""
     },
     {
@@ -178,7 +178,7 @@
       "winner": ""
     }
   ],
-  "current_map": 3,
+  "current_map": 1,
   "map_pool": [
     "Nepal",
     "Oasis",
@@ -194,8 +194,8 @@
   "general": {
     "first_to": 3,
     "host": "",
-    "caster1": "",
-    "caster2": "",
+    "caster1": "dsadds",
+    "caster2": "dsa",
     "status_text": "ESM 2025 by Suomi OW",
     "overlay_logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Temp/Broadcast Logos/suomiow_rintakuva_liquipedia.png",
     "transition_logo_path": null,
@@ -212,7 +212,7 @@
   },
   "waiting": {
     "videos_dir": "",
-    "timer_seconds": 210,
+    "timer_seconds": 180,
     "text_starting": "STARTING SOON!",
     "text_brb": "BE RIGHT BACK!",
     "text_end": "THANK YOU FOR WATCHING!",
@@ -220,6 +220,7 @@
     "socials": {
       "twitch": "suomiow",
       "twitter": "SuomiOverwatch",
+      "instagram": "the_suomi_ow",
       "discord": "suomiow"
     }
   }

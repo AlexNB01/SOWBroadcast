@@ -1,7 +1,7 @@
-Name=Aatlis
+Name=Antarctic Peninsula
 T1=0
 T2=0
 Completed=0
 Pick=—
-T1Ban=Ashe
-T2Ban=Bastion
+T1Ban=
+T2Ban=

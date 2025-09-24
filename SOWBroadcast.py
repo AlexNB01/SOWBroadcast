@@ -19,6 +19,46 @@ from PyQt5.QtWidgets import (
 # -----------------------------
 ROLES = ["Tank", "Damage", "Support", "Flex"]
 
+# --- DEV-lukupolut (jos ovat olemassa, käytetään näitä ensisijaisesti) ---
+DEV_ASSET_DIRS = {
+    "maps":      r"C:\Suomi OW koodiprojektit\SOWBroadcast\Scoreboard\Maps",
+    "gametypes": r"C:\Suomi OW koodiprojektit\SOWBroadcast\Scoreboard\Gametypes",
+    "heroes":    r"C:\Suomi OW koodiprojektit\SOWBroadcast\Scoreboard\Heroes",
+}
+
+def _bundled_scoreboard_dir():
+    """
+    Palauta asennuksen mukana tulleen Scoreboard-puun sijainti:
+    <app_base>/SOWBroadcast/Scoreboard
+    """
+    base = os.environ.get("SOWB_ROOT") or _app_base()
+    cand = os.path.join(base, "SOWBroadcast", "Scoreboard")
+    return cand if os.path.isdir(cand) else None
+
+def _copy_tree_if_missing(src_dir: str, dst_dir: str):
+    """
+    Kopioi src_dir -> dst_dir vain puuttuvat tiedostot/alihakemistot.
+    Ei ylikirjoita olemassa olevia (säästää käyttäjän muokkaukset).
+    """
+    if not (src_dir and os.path.isdir(src_dir)):
+        return
+    os.makedirs(dst_dir, exist_ok=True)
+    for root, dirs, files in os.walk(src_dir):
+        rel = os.path.relpath(root, src_dir)
+        out_root = os.path.join(dst_dir, rel) if rel != "." else dst_dir
+        os.makedirs(out_root, exist_ok=True)
+        for d in dirs:
+            os.makedirs(os.path.join(out_root, d), exist_ok=True)
+        for f in files:
+            s = os.path.join(root, f)
+            d = os.path.join(out_root, f)
+            if not os.path.exists(d):
+                try:
+                    shutil.copy2(s, d)
+                except Exception:
+                    pass
+
+
 @dataclass
 class Asset:
     name: str
@@ -159,9 +199,9 @@ class AssetManagerDialog(QDialog):
         name = items[0].text()
         asset = self.assets.get(name)
         if asset:
-            self.name_edit.setText(asset.name)
-            self.logo_edit.setText(asset.image_path or "")
-            self._load_preview(asset.image_path)
+            p = asset.source_path or asset.image_path or ""
+            self.logo_edit.setText(p)
+            self._load_preview(p)
             if self.title == "Maps" and self.mode_combo:
                 ix = self.mode_combo.findText(asset.mode or "", Qt.MatchExactly)
                 self.mode_combo.setCurrentIndex(ix if ix >= 0 else 0)
@@ -190,9 +230,18 @@ class AssetManagerDialog(QDialog):
         mode = None
         if self.title == "Maps" and self.mode_combo:
             mode = self.mode_combo.currentText().strip()
+        # AssetManagerDialog._add_or_update
         slug = TournamentApp._slugify(name)
-        # image_path = lopullinen tiedosto Scoreboard/Maps/<slug>.png
-        image_path = os.path.join("Scoreboard", "Maps", f"{slug}.png")
+
+        if self.title == "Heroes":
+            rel_dir = os.path.join("Scoreboard", "Heroes")
+        elif self.title == "Game Modes":
+            rel_dir = os.path.join("Scoreboard", "Gametypes")
+        else:  # "Maps"
+            rel_dir = os.path.join("Scoreboard", "Maps")
+
+        image_path = os.path.join(rel_dir, f"{slug}.png")
+
         source_path = self.logo_edit.text().strip() or None
 
         self.assets[name] = Asset(
@@ -725,6 +774,11 @@ def _ensure_scoreboard_tree(root):
     os.makedirs(root, exist_ok=True)
     for d in subdirs:
         os.makedirs(os.path.join(root, d), exist_ok=True)
+
+def _norm_rel(path: str, root: str) -> str:
+    """Palauta rootista suhteellinen polku forward slasheilla."""
+    rel = os.path.relpath(path, root)
+    return rel.replace("\\", "/")
 
 class WaitingTab(QWidget):
     updated = pyqtSignal()
@@ -1273,7 +1327,9 @@ class TournamentApp(QMainWindow):
         self.draft_tab = DraftTab(self._maps_by_mode)
         self.draft_tab.updated.connect(self._update)  # kun pool muuttuu -> kirjoita tiedostot
         tabs.addTab(self.draft_tab, "Draft")
-
+        
+        self._ensure_default_assets_installed()   # kopioi bundlatut tiedostot käyttäjän Scoreboardiin (vain puuttuvat)
+        self._auto_discover_assets()  
 
         # Try to load autosave AFTER tabs exist
         self._load_autosave()
@@ -1284,6 +1340,115 @@ class TournamentApp(QMainWindow):
     # ---------------------
     # Menubar and handlers
     # ---------------------
+    
+    def _ensure_default_assets_installed(self):
+        """
+        Ensimmäisellä käynnillä kopioi asennuksen mukana tulleet Scoreboard/Maps,
+        /Gametypes ja /Heroes -sisällöt käyttäjän Scoreboard-juureen,
+        jos siellä ei vielä ole vastaavia tiedostoja.
+        """
+        user_root = self._scoreboard_root()  # luo puun tarvittaessa
+        bundled = _bundled_scoreboard_dir()
+        if not bundled:
+            return
+        for sub in ("Maps", "Gametypes", "Heroes"):
+            _copy_tree_if_missing(os.path.join(bundled, sub), os.path.join(user_root, sub))
+
+    def _auto_discover_assets(self):
+        """
+        Lataa assetit jokaisessa käynnistyksessä.
+        1) Yritä ensin lukea Scoreboard/<Category>/index.json (säilyttää erikoismerkit nimissä ja käyttää kuvapolkua suoraan).
+        2) Jos JSON puuttuu/rikki, pudotaan skannaukseen:
+           - Prioriteetti: DEV_ASSET_DIRS -> bundlattu SOWBroadcast/Scoreboard -> käyttäjän Scoreboard
+           - Skannataan kuvat (.png/.jpg/.jpeg/.webp) ja arvataan nimi tiedostonimestä.
+        Lopuksi päivitetään UI ja kirjoitetaan exportit (png + index.json).
+        """
+        import os
+        import re
+
+        def pick_dir(kind: str) -> str:
+            """
+            Palauta ensisijainen kansio annetulle kategoriatyypille ('maps'|'heroes'|'gametypes')
+            prioriteetilla: DEV -> bundlattu -> käyttäjän Scoreboard.
+            """
+            # 1) DEV-kansiot (helpottaa kehitystä)
+            dev = DEV_ASSET_DIRS.get(kind)
+            if dev and os.path.isdir(dev):
+                return dev
+
+            # 2) Bundlattu Scoreboard EXE:n vieressä
+            b = _bundled_scoreboard_dir()
+            sub = "Gametypes" if kind == "gametypes" else kind.capitalize()
+            if b:
+                cand = os.path.join(b, sub)
+                if os.path.isdir(cand):
+                    return cand
+
+            # 3) Käyttäjän Scoreboard-juuri
+            user = os.path.join(self._scoreboard_root(), sub)
+            return user
+
+        # 0) JSON-ensilataus (jos index.json löytyy, käytä sitä)
+        loaded_maps   = self._load_assets_from_index("Maps", self.maps)
+        loaded_heroes = self._load_assets_from_index("Heroes", self.heroes)
+        loaded_modes  = self._load_assets_from_index("Gametypes", self.modes)
+
+        # 1) HEROES — skannaa vain jos JSON-lataus ei onnistunut
+        if not loaded_heroes:
+            heroes_dir = pick_dir("heroes")
+            heroes_files = self._scan_image_files(heroes_dir)
+            self.heroes.clear()
+            for p, name in heroes_files:
+                self.heroes[name] = Asset(
+                    name=name,
+                    image_path=os.path.join("Scoreboard", "Heroes", f"{self._slugify(name)}.png"),
+                    source_path=p
+                )
+
+        # 2) MAPS — skannaa vain jos JSON-lataus ei onnistunut
+        if not loaded_maps:
+            maps_dir = pick_dir("maps")
+            maps_files = self._scan_image_files(maps_dir)
+            self.maps.clear()
+            for p, name in maps_files:
+                self.maps[name] = Asset(
+                    name=name,
+                    image_path=os.path.join("Scoreboard", "Maps", f"{self._slugify(name)}.png"),
+                    mode=None,  # moodi voidaan päätellä myöhemmin tai lukea JSONista
+                    source_path=p
+                )
+
+        # 3) GAMETYPES — skannaa vain jos JSON-lataus ei onnistunut
+        if not loaded_modes:
+            modes_dir = pick_dir("gametypes")
+            mode_files = self._scan_image_files(modes_dir)
+            self.modes.clear()
+            if mode_files:
+                for p, name in mode_files:
+                    self.modes[name] = Asset(
+                        name=name,
+                        image_path=os.path.join("Scoreboard", "Gametypes", f"{self._slugify(name)}.png"),
+                        source_path=p
+                    )
+            else:
+                # Fallback: lue nimet .txt/.json -tiedostojen nimistä
+                if os.path.isdir(modes_dir):
+                    for fn in sorted(os.listdir(modes_dir)):
+                        stem, ext = os.path.splitext(fn)
+                        if ext.lower() in {".txt", ".json"}:
+                            name = re.sub(r"[-_]+", " ", stem).strip().title()
+                            if name:
+                                self.modes[name] = Asset(name=name)
+
+        # 4) Päivitä UI-valikot ja kirjoita exportit (png + index.json)
+        self._on_assets_changed()
+
+        # Kirjoita Scoreboard/<Category> exportit: luo PNG:t (slugin mukaan) ja index.json,
+        # jossa jokaisella itemillä on {name, slug, image, (mode)}.
+        self._export_assets_category("Heroes", self.heroes)
+        self._export_assets_category("Maps", self.maps)
+        self._export_assets_category("Gametypes", self.modes)
+
     
     def _export_waiting(self, state: dict):
         root = self._scoreboard_root()
@@ -1872,6 +2037,47 @@ class TournamentApp(QMainWindow):
 
         return keys
 
+    def _load_assets_from_index(self, category: str, target_dict: dict) -> bool:
+        """
+        Lataa Scoreboard/<category>/index.json ja täyttää target_dict:
+        - category: "Maps" | "Heroes" | "Gametypes"
+        Palauttaa True jos lataus onnistui, muuten False.
+        """
+        root = self._scoreboard_root()
+        cat_dir = os.path.join(root, category)
+        p = os.path.join(cat_dir, "index.json")
+        if not os.path.isfile(p):
+            return False
+
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            key = "maps" if category == "Maps" else "heroes" if category == "Heroes" else "modes"
+            rows = data.get(key, [])
+            target_dict.clear()
+
+            for it in rows:
+                name = (it.get("name") or "").strip()
+                img_rel = (it.get("image") or "").replace("/", os.sep)
+                img_abs = os.path.join(root, img_rel) if img_rel else None
+                mode = it.get("mode") if category == "Maps" else None
+
+                if not name:
+                    continue
+
+                target_dict[name] = Asset(
+                    name=name,
+                    image_path=img_rel if img_rel else None,           # talletetaan relatiivinen polku Scoreboard-juureen
+                    mode=mode,
+                    source_path=img_abs if (img_abs and os.path.isfile(img_abs)) else None
+                )
+            return True
+        except Exception:
+            return False
+
+
+
     def _export_map_pool_to_match(self, state: dict):
         """
         Kirjoita Scoreboard/Match/maps.txt poolin perusteella.
@@ -1938,7 +2144,7 @@ class TournamentApp(QMainWindow):
     @staticmethod
     def _ensure_dir(p: str):
         os.makedirs(p, exist_ok=True)
-
+   
     def _save_pixmap_as_png(self, src_path: Optional[str], dst_path: str, *, force: bool = False):
         if not src_path:
             return
@@ -2004,26 +2210,27 @@ class TournamentApp(QMainWindow):
                 print(f"[Maps] copy failed {src} -> {out_png}: {e}")
 
         # RAKENNA MANIFEST
-        if category_name == "Maps":
-            manifest = []
+        if category_name in {"Maps", "Heroes", "Gametypes"}:
+            items = []
             for name, asset in assets.items():
-                manifest.append({
-                    "name": name,
-                    "slug": self._slugify(name),
-                    "mode": (asset.mode or "")
-                })
-            with open(os.path.join(cat_dir, "index.json"), "w", encoding="utf-8") as f:
-                json.dump({"maps": manifest}, f, ensure_ascii=False, indent=2)
+                slug = self._slugify(name)
+                out_png = os.path.join(cat_dir, f"{slug}.png")
+                img_rel = _norm_rel(out_png, root)  # esim. "Scoreboard/Maps/kings-row.png"
 
-        elif category_name == "Gametypes":
-            manifest = []
-            for name, asset in assets.items():
-                manifest.append({
-                    "name": name,
-                    "slug": self._slugify(name)
-                })
-            with open(os.path.join(cat_dir, "index.json"), "w", encoding="utf-8") as f:
-                json.dump({"modes": manifest}, f, ensure_ascii=False, indent=2)
+                item = {"name": name, "slug": slug, "image": img_rel}
+                if category_name == "Maps":
+                    item["mode"] = (asset.mode or "")
+                items.append(item)
+
+            # Kirjoita index.json oikealla juurinimellä
+            index_json_path = os.path.join(cat_dir, "index.json")
+            payload = (
+                {"maps": items} if category_name == "Maps" else
+                {"heroes": items} if category_name == "Heroes" else
+                {"modes": items}   # Gametypes
+            )
+            with open(index_json_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
     def _export_general(self, settings: 'GeneralSettings'):

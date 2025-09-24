@@ -2,23 +2,28 @@
   "modes": [
     {
       "name": "Control",
-      "slug": "control"
+      "slug": "control",
+      "image": "Gametypes/control.png"
     },
     {
       "name": "Escort",
-      "slug": "escort"
+      "slug": "escort",
+      "image": "Gametypes/escort.png"
     },
     {
       "name": "Flashpoint",
-      "slug": "flashpoint"
+      "slug": "flashpoint",
+      "image": "Gametypes/flashpoint.png"
     },
     {
       "name": "Hybrid",
-      "slug": "hybrid"
+      "slug": "hybrid",
+      "image": "Gametypes/hybrid.png"
     },
     {
       "name": "Push",
-      "slug": "push"
+      "slug": "push",
+      "image": "Gametypes/push.png"
     }
   ]
 }
