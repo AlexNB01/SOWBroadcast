@@ -24,6 +24,11 @@
       "name": "Push",
       "slug": "push",
       "image": "Gametypes/push.png"
+    },
+    {
+      "name": "CS2",
+      "slug": "cs2",
+      "image": "Gametypes/cs2.png"
     }
   ]
 }

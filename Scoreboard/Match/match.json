@@ -1,6 +1,6 @@
 {
   "team1": {
-    "name": "rwerew",
+    "name": "",
     "abbr": "",
     "logo_path": null,
     "score": 0,
@@ -50,7 +50,7 @@
     "banned_hero": ""
   },
   "team2": {
-    "name": "rwer3w4er",
+    "name": "",
     "abbr": "",
     "logo_path": null,
     "score": 0,
@@ -178,26 +178,15 @@
       "winner": ""
     }
   ],
-  "current_map": 1,
-  "map_pool": [
-    "Nepal",
-    "Oasis",
-    "Dorado",
-    "Havana",
-    "Junkertown",
-    "Aatlis",
-    "New Junk City",
-    "Hollywood",
-    "Midtown",
-    "Colosseo"
-  ],
+  "current_map": null,
+  "map_pool": [],
   "general": {
     "first_to": 3,
     "host": "",
-    "caster1": "dsadds",
-    "caster2": "dsa",
+    "caster1": "",
+    "caster2": "",
     "status_text": "",
-    "overlay_logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Temp/Broadcast Logos/suomiow_rintakuva_liquipedia.png",
+    "overlay_logo_path": null,
     "transition_logo_path": null,
     "colors": {
       "primary": "#FFFFFF",
@@ -217,11 +206,6 @@
     "text_brb": "BE RIGHT BACK!",
     "text_end": "THANK YOU FOR WATCHING",
     "timer_running": false,
-    "socials": {
-      "twitch": "suomiow",
-      "twitter": "SuomiOverwatch",
-      "instagram": "the_suomi_ow",
-      "discord": "suomiow"
-    }
+    "socials": {}
   }
 }

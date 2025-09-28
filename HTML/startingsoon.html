@@ -52,8 +52,19 @@ html,body{
   display:flex; align-items:center; justify-content:center; text-align:center;
   position:relative;
 }
-.bigtext span{
-  font-size:68px; font-weight:900; text-transform:uppercase; letter-spacing:.8px;
+.bigtext span {
+  font-size: 68px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  hyphens: none;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  line-height: 1.1;
 }
 .bigtext::before, .bigtext::after{
   content:""; position:absolute; top:0; bottom:0; width:8px;
@@ -275,6 +286,7 @@ upOverlayLogo = async function(){
 const _oldUpStartText = upStartText;
 upStartText = async function(){
   await _oldUpStartText();
+  fitBigText();
   positionOverlayLogo();
 };
 
@@ -284,8 +296,8 @@ upTimer = async function(){
   positionOverlayLogo();
 };
 
-window.addEventListener("resize", positionOverlayLogo);
-document.fonts && document.fonts.ready && document.fonts.ready.then(positionOverlayLogo);
+window.addEventListener("resize", function(){ fitBigText(); positionOverlayLogo(); });
+document.fonts && document.fonts.ready && document.fonts.ready.then(function(){ fitBigText(); positionOverlayLogo(); });
 
   // --- Starting Soon text ---
   async function upStartText(){
@@ -421,6 +433,67 @@ function autoScaleSocials(){
 window.addEventListener("resize", autoScaleSocials);
 document.fonts && document.fonts.ready && document.fonts.ready.then(autoScaleSocials);
 
+function fitBigText(){
+  const box = document.querySelector(".bigtext");
+  const span = document.getElementById("startText");
+  if(!box || !span) return;
+
+  const MAX_SIZE = 68;   // sama kuin CSS
+  const MIN_SIZE = 14;
+  const SAFETY  = 16;    // px, ettei osu sivulistoihin
+
+  // Rivitä vain välilyönneistä, ei tavutusta
+  span.style.whiteSpace   = "normal";
+  span.style.wordBreak    = "keep-all";
+  span.style.overflowWrap = "normal";
+  span.style.hyphens      = "none";
+  span.style.display      = "block";
+  span.style.width        = "100%";
+
+  // Käytettävissä oleva leveys (sis. turvamarginaali)
+  const cs = getComputedStyle(box);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const available = Math.max(0, box.clientWidth - padX - SAFETY);
+
+  // Etsi pisin sana
+  const words = (span.textContent || "").trim().split(/\s+/).filter(Boolean);
+  const longest = words.reduce((a,w)=> w.length>a.length ? w : a, "");
+
+  // Jos ei tekstiä, ei tehdä mitään
+  if (!longest) { span.style.fontSize = MAX_SIZE + "px"; return; }
+
+  // Mittaus-solmu pituuden mittaamiseen
+  const meas = document.createElement("span");
+  const sCS = getComputedStyle(span);
+  meas.style.position = "absolute";
+  meas.style.visibility = "hidden";
+  meas.style.whiteSpace = "nowrap";
+  meas.style.fontFamily = sCS.fontFamily;
+  meas.style.fontWeight = sCS.fontWeight;
+  meas.style.letterSpacing = sCS.letterSpacing;
+  meas.style.textTransform = sCS.textTransform; // uppercase
+  meas.textContent = longest;
+  document.body.appendChild(meas);
+
+  // Binäärihaku: skaalataan niin, että **pisin sana** mahtuu
+  let lo = MIN_SIZE, hi = MAX_SIZE, best = MIN_SIZE;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    meas.style.fontSize = mid + "px";
+    if (meas.scrollWidth <= available + 0.5) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  // Aseta lopullinen koko ja siivoa
+  span.style.fontSize = best + "px";
+  meas.remove();
+}
+
+
 // --- Timer ---
 let timerSeconds = 0;
 
@@ -501,6 +574,7 @@ function startSSE(){
 (async ()=>{
   await applyColors();
   await Promise.all([upStartText(), upTimer(), loadPlaylist(), upTicker(), upOverlayLogo(), positionOverlayLogo(), upSocials()]);
+  fitBigText();
   startSSE();
 
   setInterval(upTimer, 500);

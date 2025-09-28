@@ -261,10 +261,42 @@ class AssetManagerDialog(QDialog):
         if not items:
             return
         name = items[0].text()
-        if name in self.assets:
-            del self.assets[name]
-            self._reload()
-            self.name_edit.clear(); self.logo_edit.clear(); self._load_preview(None)
+        if name not in self.assets:
+            return
+
+        # 1) Poista muistista
+        asset = self.assets.pop(name, None)
+
+        # 2) Poista levyltä Scoreboard/<Category>/<slug>.png
+        try:
+            # Johda kategoria nimen perusteella
+            if self.title == "Heroes":
+                category = "Heroes"
+            elif self.title in ("Game Modes", "Gametypes"):
+                category = "Gametypes"
+            else:
+                category = "Maps"
+
+            slug = type(self.parent())._slugify(name)
+            root = self.parent()._scoreboard_root()
+            png_path = os.path.join(root, category, f"{slug}.png")
+            if os.path.isfile(png_path):
+                os.remove(png_path)
+        except Exception:
+            # ei kaadeta UI:ta
+            pass
+
+        # 3) Kirjoita päivitetty index.json heti, ettei palaudu uudelleenkäynnistyksessä
+        try:
+            self.parent()._export_assets_category(category, self.assets)
+        except Exception:
+            pass
+
+        # 4) Päivitä UI
+        self._reload()
+        self.name_edit.clear()
+        self.logo_edit.clear()
+        self._load_preview(None)
 
 # -----------------------------
 # Team Panel
@@ -307,7 +339,7 @@ class TeamPanel(QGroupBox):
         self.team_name = QLineEdit(); self.team_name.setPlaceholderText("Team name")
         self.team_abbr = QLineEdit(); self.team_abbr.setPlaceholderText("ABC")  # <-- UUSI
         self.team_abbr.setMaxLength(6)
-        self.score = QSpinBox(); self.score.setRange(0, 10)
+        self.score = QSpinBox(); self.score.setRange(0, 200)
         self.logo_preview = QLabel(); self.logo_preview.setFixedSize(120, 120)
         self.logo_preview.setStyleSheet("QLabel{border:1px solid #DDD;border-radius:8px;background:#FFF}")
         self.logo_preview.setAlignment(Qt.AlignCenter)
@@ -467,8 +499,8 @@ class MapRow(QWidget):
 
         # Map + scores
         self.map_combo = QComboBox(); self.refresh_maps()
-        self.t1score = QSpinBox(); self.t1score.setRange(0, 10)
-        self.t2score = QSpinBox(); self.t2score.setRange(0, 10)
+        self.t1score = QSpinBox(); self.t1score.setRange(0, 200)
+        self.t2score = QSpinBox(); self.t2score.setRange(0, 200)
 
         # Pick (None/T1/T2)
         self.pick = QComboBox()
@@ -1239,7 +1271,8 @@ class TournamentApp(QMainWindow):
             app_dir = os.path.join(os.path.expanduser("~"), ".ow_tournament_manager")
         self.app_dir = app_dir
         os.makedirs(self.app_dir, exist_ok=True)
-        self.autosave_path = os.path.join(self.app_dir, "autosave.json")
+        base_root = os.environ.get("SOWB_ROOT") or _app_base()   # EXE:n kansio tai SOWB_ROOT
+        self.autosave_path = os.path.join(base_root, "autosave.json")  # <-- ennen: os.path.join(self.app_dir, "autosave.json")
         self.current_save_path: Optional[str] = None
         self.export_dir = os.path.join(self.app_dir, "exports")
         os.makedirs(self.export_dir, exist_ok=True)
@@ -1343,16 +1376,21 @@ class TournamentApp(QMainWindow):
     
     def _ensure_default_assets_installed(self):
         """
-        Ensimmäisellä käynnillä kopioi asennuksen mukana tulleet Scoreboard/Maps,
-        /Gametypes ja /Heroes -sisällöt käyttäjän Scoreboard-juureen,
-        jos siellä ei vielä ole vastaavia tiedostoja.
+        Ensimmäisellä käynnillä kopioi bundle-sisällöt käyttäjän Scoreboardiin.
+        Jos käyttäjän kansiossa on index.json, oletetaan että lista on kuratoitu
+        -> ei kopioida mitään takaisin (estää "zombie"-assetit).
         """
-        user_root = self._scoreboard_root()  # luo puun tarvittaessa
+        user_root = self._scoreboard_root()
         bundled = _bundled_scoreboard_dir()
         if not bundled:
             return
         for sub in ("Maps", "Gametypes", "Heroes"):
-            _copy_tree_if_missing(os.path.join(bundled, sub), os.path.join(user_root, sub))
+            user_sub = os.path.join(user_root, sub)
+            # UUSI EHTO: jos index.json on olemassa, ohita kokonaan
+            if os.path.isfile(os.path.join(user_sub, "index.json")):
+                continue
+            _copy_tree_if_missing(os.path.join(bundled, sub), user_sub)
+
 
     def _auto_discover_assets(self):
         """
@@ -2581,17 +2619,19 @@ class TournamentApp(QMainWindow):
         self._notify_overlays(changed)
 
         # --- Tallenna myös export-kansioon ja autosave (jos haluat säilyttää nämäkin) ---
-        match_path = os.path.join(self.export_dir, "match.json")
+        base_root = os.environ.get("SOWB_ROOT") or _app_base()
+
+        match_path = os.path.join(base_root, "match.json")   # <-- ennen: self.export_dir/match.json
         with open(match_path, "w", encoding="utf-8") as f:
             json.dump({k: v for k, v in state.items() if k != "assets"}, f, ensure_ascii=False, indent=2)
-        assets_path = os.path.join(self.export_dir, "assets.json")
+
+        assets_path = os.path.join(base_root, "assets.json") # <-- ennen: self.export_dir/assets.json
         with open(assets_path, "w", encoding="utf-8") as f:
             json.dump(state.get("assets", {}), f, ensure_ascii=False, indent=2)
+
         self._autosave(state)
-
-        # --- Päivitä diff-vertailun lähde seuraavaa kierrosta varten ---
         self._last_state_for_diff = state
-
+        
     def _update_general_only(self):
         # 1) kerää vain General-tabin asetukset
         g = asdict(self.general_tab.to_settings())
