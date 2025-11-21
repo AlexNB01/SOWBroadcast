@@ -1,6 +1,5 @@
 import sys, os, json, re, shutil, time, threading, unicodedata, shutil
-# varmista, että PyInstaller pakkaa server.py:n mukaan
-import server as _sb__force_include  # noqa: F401
+import server as _sb__force_include
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 
@@ -19,7 +18,6 @@ from PyQt5.QtWidgets import (
 # -----------------------------
 ROLES = ["Tank", "Damage", "Support", "Flex"]
 
-# --- DEV-lukupolut (jos ovat olemassa, käytetään näitä ensisijaisesti) ---
 DEV_ASSET_DIRS = {
     "maps":      r"C:\Suomi OW koodiprojektit\SOWBroadcast\Scoreboard\Maps",
     "gametypes": r"C:\Suomi OW koodiprojektit\SOWBroadcast\Scoreboard\Gametypes",
@@ -89,18 +87,17 @@ class Team:
 # ---- General tab data ----
 @dataclass
 class GeneralSettings:
-    first_to: int = 3                 # Ft1=1, Ft2=2, Ft3=3
+    first_to: int = 3
     host: str = ""
     caster1: str = ""
     caster2: str = ""
     status_text: str = ""
-    overlay_logo_path: Optional[str] = None      # näkyy tietyissä overlayeissa
-    transition_logo_path: Optional[str] = None   # transition.html
-    colors: Dict[str, str] = None                # esim. {"primary": "#...", ...}
+    overlay_logo_path: Optional[str] = None
+    transition_logo_path: Optional[str] = None
+    colors: Dict[str, str] = None
 
     def __post_init__(self):
         if self.colors is None:
-            # Oletusvärit (voit vaihtaa)
                 self.colors = {
                     "primary":   "#FFFFFF",  
                     "secondary": "#000000",  
@@ -133,24 +130,21 @@ class AssetManagerDialog(QDialog):
         self._last_state_for_diff = None
         self.setWindowTitle(title)
         self.title = title
-        self.assets = assets  # reference to shared dict
+        self.assets = assets
         self._mode_names = mode_names or []
 
         self.resize(700, 420)
 
         root = QHBoxLayout(self)
 
-        # Left: list
         self.listw = QListWidget()
         self.listw.itemSelectionChanged.connect(self._on_select)
         root.addWidget(self.listw, 2)
 
-        # Right: form and preview
         right = QVBoxLayout()
         form = QFormLayout()
         self.name_edit = QLineEdit()
         form.addRow("Name", self.name_edit)
-        # Mode vain Maps-dialogille (täytetään TournamentApp.modes-listasta)
         self.mode_combo = None
         if self.title == "Maps":
             self.mode_combo = QComboBox()
@@ -168,14 +162,12 @@ class AssetManagerDialog(QDialog):
         form.addRow("Logo", logo_row)
         right.addLayout(form)
 
-        # Preview
         self.preview = QLabel("No Image")
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setFixedHeight(180)
         self.preview.setStyleSheet("QLabel{border:1px solid #CCC;border-radius:8px;background:#FAFAFA}")
         right.addWidget(self.preview)
 
-        # Action buttons
         btns = QHBoxLayout()
         self.add_btn = QPushButton("Add / Update")
         self.add_btn.clicked.connect(self._add_or_update)
@@ -232,14 +224,13 @@ class AssetManagerDialog(QDialog):
         mode = None
         if self.title == "Maps" and self.mode_combo:
             mode = self.mode_combo.currentText().strip()
-        # AssetManagerDialog._add_or_update
         slug = TournamentApp._slugify(name)
 
         if self.title == "Heroes":
             rel_dir = os.path.join("Scoreboard", "Heroes")
         elif self.title == "Game Modes":
             rel_dir = os.path.join("Scoreboard", "Gametypes")
-        else:  # "Maps"
+        else:
             rel_dir = os.path.join("Scoreboard", "Maps")
 
         image_path = os.path.join(rel_dir, f"{slug}.png")
@@ -253,7 +244,6 @@ class AssetManagerDialog(QDialog):
             source_path=source_path
         )
         self._reload()
-        # Select the updated/added item
         matches = self.listw.findItems(name, Qt.MatchExactly)
         if matches:
             self.listw.setCurrentItem(matches[0])
@@ -266,12 +256,9 @@ class AssetManagerDialog(QDialog):
         if name not in self.assets:
             return
 
-        # 1) Poista muistista
         asset = self.assets.pop(name, None)
 
-        # 2) Poista levyltä Scoreboard/<Category>/<slug>.png
         try:
-            # Johda kategoria nimen perusteella
             if self.title == "Heroes":
                 category = "Heroes"
             elif self.title in ("Game Modes", "Gametypes"):
@@ -285,16 +272,12 @@ class AssetManagerDialog(QDialog):
             if os.path.isfile(png_path):
                 os.remove(png_path)
         except Exception:
-            # ei kaadeta UI:ta
             pass
-
-        # 3) Kirjoita päivitetty index.json heti, ettei palaudu uudelleenkäynnistyksessä
         try:
             self.parent()._export_assets_category(category, self.assets)
         except Exception:
             pass
 
-        # 4) Päivitä UI
         self._reload()
         self.name_edit.clear()
         self.logo_edit.clear()
@@ -313,7 +296,7 @@ class PlayerRow(QWidget):
         self.name = QLineEdit(); self.name.setPlaceholderText("Name")
         self.hero = QComboBox(); self.refresh_heroes()
         self.role = QComboBox()
-        self.role.addItem("- Role -")   # placeholder
+        self.role.addItem("- Role -")
         self.role.addItems(ROLES)
         row.addWidget(self.label)
         row.addWidget(self.name, 2)
@@ -325,7 +308,6 @@ class PlayerRow(QWidget):
         self.hero.clear()
         self.hero.addItem("— Hero —")
         self.hero.addItems(self.get_hero_names())
-        # Try to restore selection
         if current:
             ix = self.hero.findText(current)
             if ix >= 0:
@@ -339,7 +321,7 @@ class TeamPanel(QGroupBox):
 
         top = QHBoxLayout()
         self.team_name = QLineEdit(); self.team_name.setPlaceholderText("Team name")
-        self.team_abbr = QLineEdit(); self.team_abbr.setPlaceholderText("ABC")  # <-- UUSI
+        self.team_abbr = QLineEdit(); self.team_abbr.setPlaceholderText("ABC")
         self.team_abbr.setMaxLength(6)
         self.score = QSpinBox(); self.score.setRange(0, 200)
         self.logo_preview = QLabel(); self.logo_preview.setFixedSize(120, 120)
@@ -348,7 +330,6 @@ class TeamPanel(QGroupBox):
         self.logo_btn = QPushButton("Load Logo…")
         self.logo_btn.clicked.connect(self._select_logo)
 
-        # Color picker
         self.default_color = default_color
         self.color_hex = default_color
         self.color_btn = QPushButton("Color")
@@ -370,7 +351,6 @@ class TeamPanel(QGroupBox):
         top.addWidget(self.logo_preview, 1)
         lay.addLayout(top)
 
-        # Players
         grid = QVBoxLayout()
         self.player_rows: List[PlayerRow] = []
         for i in range(1, 9):
@@ -379,7 +359,6 @@ class TeamPanel(QGroupBox):
             grid.addWidget(pr)
         lay.addLayout(grid)
 
-        # Fill space
         spacer = QWidget(); spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         lay.addWidget(spacer)
 
@@ -395,7 +374,6 @@ class TeamPanel(QGroupBox):
             self._apply_color_style()
 
     def _select_logo(self):
-        # Oletuspolku: C:\SOWBroadcast\Scoreboard\Temp\Team Logos (tai SOWB_ROOT)
         base = os.environ.get("SOWB_ROOT") or _app_base()
         start_dir = os.path.join(base, "Scoreboard", "Temp", "Team Logos")
         os.makedirs(start_dir, exist_ok=True)
@@ -414,8 +392,6 @@ class TeamPanel(QGroupBox):
                     pix.scaled(self.logo_preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 )
 
-
-    # Utility accessors
     def to_team(self) -> Team:
         t = Team()
         t.name = self.team_name.text().strip()
@@ -466,7 +442,6 @@ class TeamPanel(QGroupBox):
                 pr.role.setCurrentIndex(0)
 
     def refresh_hero_lists(self):
-        # Päivitä pelaajien hero-dropdownit
         for pr in self.player_rows:
             pr.refresh_heroes()
     
@@ -478,12 +453,7 @@ class TeamPanel(QGroupBox):
         self.logo_preview.clear()
         for pr in self.player_rows:
             pr.name.clear(); pr.hero.setCurrentIndex(0); pr.role.setCurrentIndex(0)
-        # keep color as-is; caller may override
 
-
-# -----------------------------
-# Map rows
-# -----------------------------
 # -----------------------------
 # Map rows
 # -----------------------------
@@ -499,23 +469,18 @@ class MapRow(QWidget):
 
         self.label = QLabel(f"Map {index}")
 
-        # Map + scores
         self.map_combo = QComboBox(); self.refresh_maps()
         self.t1score = QSpinBox(); self.t1score.setRange(0, 200)
         self.t2score = QSpinBox(); self.t2score.setRange(0, 200)
 
-        # Pick (None/T1/T2)
         self.pick = QComboBox()
         self.pick.addItems(["—", "T1", "T2"])
 
-        # Completed
         self.completed = QCheckBox("Completed")
 
-        # NEW: per-map bans
         self.t1ban = QComboBox(); self.refresh_hero_list(self.t1ban)
         self.t2ban = QComboBox(); self.refresh_hero_list(self.t2ban)
 
-        # Layout
         row.addWidget(self.label)
         row.addWidget(self.map_combo, 2)
         row.addWidget(self.t1score)
@@ -532,7 +497,7 @@ class MapRow(QWidget):
     def refresh_maps(self):
         current = self.map_combo.currentText() if hasattr(self, "map_combo") else ""
         self.map_combo.clear()
-        self.map_combo.addItem("")  # tyhjä = ei valintaa
+        self.map_combo.addItem("")
         for name in sorted(self.get_map_names() or []):
             self.map_combo.addItem(name)
         if current:
@@ -580,19 +545,16 @@ class GeneralTab(QWidget):
         super().__init__()
         root = QVBoxLayout(self)
 
-        # --- Number of maps (1–7) ---
         bo_box = QGroupBox("Number of Maps")
         bo_lay = QHBoxLayout(bo_box)
         self.maps_count = QSpinBox()
         self.maps_count.setRange(1, 7)
-        self.maps_count.setValue(3)  # oletus
+        self.maps_count.setValue(3)
         bo_lay.addWidget(QLabel("Maps:"))
         bo_lay.addWidget(self.maps_count)
         bo_lay.addStretch(1)
         root.addWidget(bo_box)
 
-
-        # --- Selostajat & host ---
         people_box = QGroupBox("Casters & Host")
         people = QGridLayout(people_box)
         self.host = QLineEdit()
@@ -603,10 +565,8 @@ class GeneralTab(QWidget):
         people.addWidget(QLabel("Caster 2:"), 2, 0);     people.addWidget(self.caster2,2, 1)
         root.addWidget(people_box)
 
-        # --- Logot ---
         logo_box = QGroupBox("Logos")
         logo = QGridLayout(logo_box)
-        # Overlay-logo
         self.overlay_logo_path = None
         self.overlay_logo_preview = QLabel("Overlay logo")
         self.overlay_logo_preview.setAlignment(Qt.AlignCenter)
@@ -614,7 +574,6 @@ class GeneralTab(QWidget):
         self.overlay_logo_preview.setStyleSheet("QLabel{border:1px solid #CCC;background:#FAFAFA;}")
         btn_overlay = QPushButton("Load overlay logo…")
         btn_overlay.clicked.connect(self._pick_overlay_logo)
-        # Transition-logo
         self.transition_logo_path = None
         self.transition_logo_preview = QLabel("Transition logo")
         self.transition_logo_preview.setAlignment(Qt.AlignCenter)
@@ -627,12 +586,10 @@ class GeneralTab(QWidget):
         logo.addWidget(QLabel("Transition-logo:"),1, 0); logo.addWidget(self.transition_logo_preview,1, 1); logo.addWidget(btn_transition,1, 2)
         root.addWidget(logo_box)
 
-        # --- Väriteema ---
         color_box = QGroupBox("Overlay colours")
         colors = QVBoxLayout(color_box)
         self.color_btns: Dict[str, QPushButton] = {}
 
-        # --- Status-teksti (näkyy HTML-sivuissa) ---
         status_box = QGroupBox("Status text")
         status_lay = QVBoxLayout(status_box)
         self.status_text = QLineEdit()
@@ -640,17 +597,14 @@ class GeneralTab(QWidget):
         status_lay.addWidget(self.status_text)
         root.addWidget(status_box)
 
-        # päivityssignaali kun teksti muuttuu
         self.status_text.textChanged.connect(self._emit_update)
 
-        
         for key, label in self.COLOR_FIELDS:
             row = QHBoxLayout()
             row.addWidget(QLabel(label))
             btn = QPushButton("Select colour")
             btn.setFixedWidth(130)
             btn.clicked.connect(lambda _, k=key: self._pick_color(k))
-            # alustus (päivitetään from_settingsissä)
             btn.setStyleSheet("QPushButton{border:1px solid #CCC; padding:6px; background:#FFFFFF;}")
             self.color_btns[key] = btn
             row.addStretch(1)
@@ -658,7 +612,6 @@ class GeneralTab(QWidget):
             colors.addLayout(row)
 
         root.addWidget(color_box)
-        # --- Tab-specific actions ---
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
 
@@ -674,12 +627,9 @@ class GeneralTab(QWidget):
 
         root.addStretch(1)
 
-        # sisäinen tila
         self._colors: Dict[str, str] = {}
 
-    # ---- logo-pickers ----
     def _pick_overlay_logo(self):
-        # Oletuspolku: C:\SOWBroadcast\Scoreboard\Temp\Broadcast Logos (tai SOWB_ROOT)
         base = os.environ.get("SOWB_ROOT") or _app_base()
         start_dir = os.path.join(base, "Scoreboard", "Temp", "Broadcast Logos")
         os.makedirs(start_dir, exist_ok=True)
@@ -698,7 +648,6 @@ class GeneralTab(QWidget):
             )
 
     def _pick_transition_logo(self):
-        # Oletuspolku: C:\SOWBroadcast\Scoreboard\Temp\Broadcast Logos (tai SOWB_ROOT)
         base = os.environ.get("SOWB_ROOT") or _app_base()
         start_dir = os.path.join(base, "Scoreboard", "Temp", "Broadcast Logos")
         os.makedirs(start_dir, exist_ok=True)
@@ -716,7 +665,6 @@ class GeneralTab(QWidget):
                 pix.scaled(self.transition_logo_preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
             )
 
-    # ---- color picker ----
     def _pick_color(self, key: str):
         start = QColor(self._colors.get(key, "#FFFFFF"))
         color = QColorDialog.getColor(start, self, "Valitse väri")
@@ -725,10 +673,9 @@ class GeneralTab(QWidget):
             self._colors[key] = hexv
             self.color_btns[key].setStyleSheet(f"QPushButton{{border:1px solid #CCC; padding:6px; background:{hexv};}}")
 
-    # ---- state i/o ----
     def to_settings(self) -> GeneralSettings:
         return GeneralSettings(
-            first_to=int(self.maps_count.value()),  # nyt: suora karttamäärä 1..7
+            first_to=int(self.maps_count.value()),
             host=self.host.text().strip(),
             caster1=self.caster1.text().strip(),
             caster2=self.caster2.text().strip(),
@@ -740,7 +687,6 @@ class GeneralTab(QWidget):
 
 
     def from_settings(self, s: GeneralSettings):
-        # maps_count: tallenna yhä first_to-kenttään, mutta tulkitaan nyt määränä
         try:
             n = int(getattr(s, "first_to", 3) or 3)
         except ValueError:
@@ -748,13 +694,11 @@ class GeneralTab(QWidget):
         n = max(1, min(7, n))
         self.maps_count.setValue(n)
 
-        # names
         self.host.setText(s.host or "")
         self.caster1.setText(s.caster1 or "")
         self.caster2.setText(s.caster2 or "")
         self.status_text.setText(getattr(s, "status_text", "") or "")
 
-        # logos & colors pysyvät ennallaan...
         self.overlay_logo_path = s.overlay_logo_path
         if s.overlay_logo_path:
             pix = QPixmap(s.overlay_logo_path)
@@ -785,8 +729,7 @@ class GeneralTab(QWidget):
 
     
     def reset_tab(self):
-        """Nollaa vain General-tabin asetukset oletuksiin."""
-        defaults = GeneralSettings()            # sisältää oletusvärit ja Ft2
+        defaults = GeneralSettings()
         self.from_settings(defaults)
         self.status_text.clear()
 
@@ -795,9 +738,7 @@ class GeneralTab(QWidget):
             f"QPushButton{{border:1px solid #CCC; padding:6px; background:{hexv};}}"
         )
 
-# --- module-level helpers ---
 def _app_base():
-    # EXE:n kansio paketoituna, muuten .py-tiedoston kansio
     return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
 
 def _ensure_scoreboard_tree(root):
@@ -821,13 +762,11 @@ class WaitingTab(QWidget):
         super().__init__()
         root = QVBoxLayout(self)
 
-        # --- Oletusvideokansio: <app_base>/SOWBroadcast/Highlights, jos olemassa; muuten <app_base>/Highlights
         base = os.environ.get("SOWB_ROOT") or _app_base()
         cand1 = os.path.join(base, "SOWBroadcast", "Highlights")
         cand2 = os.path.join(base, "Highlights")
         self.default_videos_dir = cand1 if os.path.isdir(cand1) else cand2
 
-        # --- Videokansio ---
         box_v = QGroupBox("Waiting videos (folder)")
         lay_v = QHBoxLayout(box_v)
         self.videos_dir = QLineEdit()
@@ -843,7 +782,6 @@ class WaitingTab(QWidget):
         lay_v.addWidget(self.use_default_chk)
         root.addWidget(box_v)
 
-        # --- Countdown-timer (asetusaika) ---
         box_t = QGroupBox("Countdown timer")
         lay_t = QHBoxLayout(box_t)
         self.min_spin = QSpinBox(); self.min_spin.setRange(0, 999); self.min_spin.setValue(0)
@@ -853,7 +791,6 @@ class WaitingTab(QWidget):
         lay_t.addWidget(QLabel("Seconds:")); lay_t.addWidget(self.sec_spin)
         lay_t.addStretch(1)
 
-        # Live-näyttö + ohjaimet
         self.live_label = QLabel("00:00")
         self.live_label.setStyleSheet("QLabel{font: 900 26px 'Segoe UI';}")
 
@@ -873,19 +810,16 @@ class WaitingTab(QWidget):
 
         root.addWidget(box_t)
 
-        # Timerin sisäinen tila
         from PyQt5.QtCore import QTimer
         self._qtimer = QTimer(self)
         self._qtimer.setInterval(1000)
         self._qtimer.timeout.connect(self._tick)
-        self._preset_seconds = 0         # asetettu aika spinnereistä
-        self._remaining_seconds = 0      # jäljellä oleva aika
+        self._preset_seconds = 0
+        self._remaining_seconds = 0
 
-        # Päivitä preset aina kun spinnereitä muutetaan
         for w in (self.min_spin, self.sec_spin):
             w.valueChanged.connect(self._on_preset_changed)
 
-        # --- Tekstit ---
         box_x = QGroupBox("On-screen texts")
         grid = QFormLayout(box_x)
         self.text_starting = QLineEdit("STARTING SOON!")
@@ -898,7 +832,6 @@ class WaitingTab(QWidget):
         grid.addRow("EndScreen.html:",    self.text_end)
         root.addWidget(box_x)
         
-        # --- Ticker override ---
         box_o = QGroupBox("Ticker override")
         lay_o = QHBoxLayout(box_o)
         self.ticker_override_edit = QLineEdit()
@@ -909,8 +842,7 @@ class WaitingTab(QWidget):
         lay_o.addWidget(self.ticker_override_edit, 1)
         lay_o.addWidget(self.ticker_override_chk)
         root.addWidget(box_o)
-        
-        # --- Socials ---
+
         box_s = QGroupBox("Socials")
         form_s = QFormLayout(box_s)
 
@@ -933,8 +865,6 @@ class WaitingTab(QWidget):
 
         root.addWidget(box_s)
 
-
-        # --- Päivitä-napit ---
         btns = QHBoxLayout()
         btns.addStretch(1)
         btn_reset = QPushButton("Reset this tab")
@@ -944,34 +874,31 @@ class WaitingTab(QWidget):
         btns.addWidget(btn_reset); btns.addWidget(btn_update)
         root.addLayout(btns)
         root.addStretch(1)
-
-        # Alusta preset ja live
+        
         self._on_use_default_toggled(self.use_default_chk.isChecked())
         self._on_preset_changed()
         self._on_ticker_override_toggled(False)
 
-    # ---------- UI handlers ----------
     def _fmt(self, s:int)->str:
         s=max(0,int(s)); return f"{s//60:02d}:{s%60:02d}"
 
     def _on_preset_changed(self, *_):
         self._preset_seconds = int(self.min_spin.value())*60 + int(self.sec_spin.value())
-        # jos ei käynnissä, päivitä live-näyttöä
         if not self._qtimer.isActive():
             self._remaining_seconds = self._preset_seconds
             self.live_label.setText(self._fmt(self._remaining_seconds))
-        self.updated.emit()  # jotta preset viedään tiedostoon
+        self.updated.emit()
         
     def _start_timer(self):
         if self._remaining_seconds <= 0:
             self._remaining_seconds = self._preset_seconds
         self._qtimer.start()
-        self.updated.emit()  # kerrotaan overlaylle että käy
+        self.updated.emit()
 
     def _pause_timer(self):
         if self._qtimer.isActive():
             self._qtimer.stop()
-            self.updated.emit()  # paussi overlaylle
+            self.updated.emit()
 
     def _on_ticker_override_toggled(self, checked: bool):
         self.ticker_override_edit.setEnabled(checked)
@@ -981,19 +908,18 @@ class WaitingTab(QWidget):
         self._qtimer.stop()
         self._remaining_seconds = self._preset_seconds
         self.live_label.setText(self._fmt(self._remaining_seconds))
-        self.updated.emit()  # reset → kirjoita ulos
+        self.updated.emit()
 
     def _tick(self):
         self._remaining_seconds = max(0, self._remaining_seconds - 1)
         self.live_label.setText(self._fmt(self._remaining_seconds))
         if self._remaining_seconds <= 0:
             self._qtimer.stop()
-        self.updated.emit()  # jokainen tikki viedään overlaylle
+        self.updated.emit()
 
 
     def _on_use_default_toggled(self, checked: bool):
         self.videos_dir.setEnabled(not checked)
-        # näytä teksti, mutta pidä polku tyhjänä jos käytetään oletusta
         if checked:
             self.videos_dir.setText("")
             self.videos_dir.setPlaceholderText(self.default_videos_dir or "")
@@ -1018,7 +944,6 @@ class WaitingTab(QWidget):
         self.ticker_override_edit.clear()
         self._reset_timer_clicked()
 
-    # ---- state I/O ----
     def to_settings(self) -> WaitingSettings:
         secs = int(self._remaining_seconds)
         vdir = "" if self.use_default_chk.isChecked() else self.videos_dir.text().strip()
@@ -1045,15 +970,12 @@ class WaitingTab(QWidget):
 
 
     def from_settings(self, s: WaitingSettings):
-        # UI-spinnereihin laitetaan PRESET (ei overwriteta käyttäjän live-tilaa)
         secs = int(getattr(s, "timer_seconds", 0) or 0)
         self._remaining_seconds = max(0, secs)
-        # arvaa presetiksi sama, mutta käyttäjä voi muuttaa spinnereistä
         self._preset_seconds = self._remaining_seconds
         self.min_spin.setValue(self._preset_seconds // 60)
         self.sec_spin.setValue(self._preset_seconds % 60)
         self.live_label.setText(self._fmt(self._remaining_seconds))
-        # video-kansio
         vdir = getattr(s, "videos_dir", "") or ""
         if vdir:
             self.videos_dir.setText(vdir)
@@ -1061,7 +983,6 @@ class WaitingTab(QWidget):
         else:
             self.use_default_chk.setChecked(True if self.default_videos_dir else False)
             self.videos_dir.clear()
-        # tekstit
         self.text_starting.setText(getattr(s, "text_starting", "STARTING SOON!"))
         self.text_brb.setText(getattr(s, "text_brb", "BE RIGHT BACK!"))
         self.text_end.setText(getattr(s, "text_end", "THANK YOU FOR WATCHING"))
@@ -1090,9 +1011,9 @@ class WaitingTab(QWidget):
             s = re.sub(r"^[^/]*instagram\.com/", "", s, flags=re.I)
         elif kind == "discord":
             s = re.sub(r"^[^/]*(discord\.gg/|discord\.com/invite/)", "", s, flags=re.I)
-        s = re.sub(r"^@+", "", s)          # poista johtavat @
-        s = re.sub(r"^/+", "", s)          # poista johtavat /
-        s = re.split(r"[/?#]", s)[0]       # katkaise seuraavasta / ? #
+        s = re.sub(r"^@+", "", s)
+        s = re.sub(r"^/+", "", s)
+        s = re.split(r"[/?#]", s)[0]
         return s
 
 
@@ -1100,15 +1021,13 @@ class WaitingTab(QWidget):
 
 
 class DraftTab(QWidget):
-    """Map pool -välilehti: valitse mitkä kartat ovat käytössä draftissa (ryhmitelty pelimuodoittain)."""
     updated = pyqtSignal()
 
     def __init__(self, get_maps_by_mode):
         super().__init__()
-        self.get_maps_by_mode = get_maps_by_mode  # callable -> OrderedDict/Dict: mode -> [map-names]
+        self.get_maps_by_mode = get_maps_by_mode
         root = QVBoxLayout(self)
 
-        # Ylärivin napit
         row = QHBoxLayout()
         self.btn_all = QPushButton("Select All")
         self.btn_none = QPushButton("Select None")
@@ -1117,18 +1036,15 @@ class DraftTab(QWidget):
         row.addStretch(1)
         root.addLayout(row)
 
-        # Puumainen lista
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setSelectionMode(QTreeWidget.NoSelection)
         root.addWidget(self.tree, 1)
 
-        # Tapahtumat
         self.btn_all.clicked.connect(self.select_all)
         self.btn_none.clicked.connect(self.select_none)
         self.tree.itemChanged.connect(lambda *_: self.updated.emit())
 
-        # "Päivitä"-nappi (jos haluat manuaalisen triggerin)
         self.update_btn = QPushButton("Update")
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
         root.addWidget(self.update_btn)
@@ -1150,17 +1066,16 @@ class DraftTab(QWidget):
         self.tree.clear()
 
         data = self.get_maps_by_mode() or {}
-        # Pidä moodien järjestys jos mahdollista (esim. sama kuin Gametypes-listassa)
         for mode_name, maps in data.items():
             if not maps:
                 continue
             mode_item = QTreeWidgetItem([mode_name or "Unspecified"])
-            mode_item.setFlags(mode_item.flags() & ~Qt.ItemIsUserCheckable)  # otsikko ei ole checkattava
+            mode_item.setFlags(mode_item.flags() & ~Qt.ItemIsUserCheckable)
             self.tree.addTopLevelItem(mode_item)
             for name in sorted(maps):
                 it = QTreeWidgetItem([name])
                 it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
-                checked = (name in old_selected) or (not old_selected)  # jos ei aiempia valintoja -> kaikki päälle
+                checked = (name in old_selected) or (not old_selected)
                 it.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
                 mode_item.addChild(it)
 
@@ -1203,7 +1118,7 @@ class BulkImportRow(QWidget):
     """Yksi rivi import-listassa."""
     def __init__(self, kind: str, file_path: str, name_guess: str, mode_names=None):
         super().__init__()
-        self.kind = kind  # "Hero" tai "Map"
+        self.kind = kind
         self.file_path = file_path
 
         row = QHBoxLayout(self)
@@ -1223,7 +1138,7 @@ class BulkImportRow(QWidget):
         self.mode_combo = None
         if kind == "Map":
             self.mode_combo = QComboBox()
-            self.mode_combo.addItem("")  # tyhjä mahdollinen
+            self.mode_combo.addItem("")
             for m in sorted(mode_names or []):
                 self.mode_combo.addItem(m)
             row.addWidget(QLabel("Mode:"))
@@ -1258,14 +1173,12 @@ class BulkImportDialog(QDialog):
 
         self.rows: list[BulkImportRow] = []
 
-        # Herot
         if heroes_files:
             self.container.addWidget(QLabel("Heroes"))
             for p, name_guess in heroes_files:
                 r = BulkImportRow("Hero", p, name_guess)
                 self.rows.append(r); self.container.addWidget(r)
 
-        # Kartat
         if maps_files:
             self.container.addWidget(QLabel("Maps"))
             for p, name_guess in maps_files:
@@ -1291,38 +1204,32 @@ class TournamentApp(QMainWindow):
         self.setWindowTitle("SOW Broadcast")
         self.resize(1400, 860)
 
-        # Persistence paths
         app_dir = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
         if not app_dir:
             app_dir = os.path.join(os.path.expanduser("~"), ".ow_tournament_manager")
         self.app_dir = app_dir
         os.makedirs(self.app_dir, exist_ok=True)
-        base_root = os.environ.get("SOWB_ROOT") or _app_base()   # EXE:n kansio tai SOWB_ROOT
-        self.autosave_path = os.path.join(base_root, "autosave.json")  # <-- ennen: os.path.join(self.app_dir, "autosave.json")
+        base_root = os.environ.get("SOWB_ROOT") or _app_base()
+        self.autosave_path = os.path.join(base_root, "autosave.json")
         self.current_save_path: Optional[str] = None
         self.export_dir = os.path.join(self.app_dir, "exports")
         os.makedirs(self.export_dir, exist_ok=True)
 
-        # Shared asset stores
         self.heroes: Dict[str, Asset] = {}
         self.maps: Dict[str, Asset] = {}
         self.modes: Dict[str, Asset] = {}
 
-        # Menubar
         self._build_menubar()
 
-        # Central UI with tabs
         central = QWidget(); self.setCentralWidget(central)
         root = QVBoxLayout(central)
 
         tabs = QTabWidget()
         root.addWidget(tabs)
 
-        # --- MATCH TAB (existing UI moved here) ---
         match_tab = QWidget()
         match_root = QVBoxLayout(match_tab)
 
-        # Teams side-by-side
         splitter = QSplitter()
         self.team1_panel = TeamPanel("Team 1", self._hero_names, default_color="#55aaff")
         self.team2_panel = TeamPanel("Team 2", self._hero_names, default_color="#ff557f")
@@ -1331,7 +1238,6 @@ class TournamentApp(QMainWindow):
         splitter.setSizes([700, 700])
         match_root.addWidget(splitter, 6)
 
-        # Maps box
         maps_box = QGroupBox("Maps")
         maps_layout = QVBoxLayout(maps_box)
 
@@ -1341,7 +1247,6 @@ class TournamentApp(QMainWindow):
             self.map_rows.append(mr)
             maps_layout.addWidget(mr)
 
-        # Current map selection
         current_row = QHBoxLayout()
         current_row.addWidget(QLabel("Current:"))
         self.current_map_buttons: List[QRadioButton] = []
@@ -1354,7 +1259,6 @@ class TournamentApp(QMainWindow):
 
         match_root.addWidget(maps_box, 4)
 
-        # Bottom buttons: Reset, Swap, Update
         bottom = QHBoxLayout()
         self.reset_btn = QPushButton("Reset")
         self.reset_btn.clicked.connect(self._reset_all)
@@ -1384,13 +1288,12 @@ class TournamentApp(QMainWindow):
         
         # --- DRAFT TAB (map pool) ---
         self.draft_tab = DraftTab(self._maps_by_mode)
-        self.draft_tab.updated.connect(self._update)  # kun pool muuttuu -> kirjoita tiedostot
+        self.draft_tab.updated.connect(self._update)
         tabs.addTab(self.draft_tab, "Draft")
         
-        self._ensure_default_assets_installed()   # kopioi bundlatut tiedostot käyttäjän Scoreboardiin (vain puuttuvat)
+        self._ensure_default_assets_installed()
         self._auto_discover_assets()  
 
-        # Try to load autosave AFTER tabs exist
         self._load_autosave()
         self._last_state_for_diff = None
         self._start_replay_watcher()
@@ -1412,35 +1315,20 @@ class TournamentApp(QMainWindow):
             return
         for sub in ("Maps", "Gametypes", "Heroes"):
             user_sub = os.path.join(user_root, sub)
-            # UUSI EHTO: jos index.json on olemassa, ohita kokonaan
             if os.path.isfile(os.path.join(user_sub, "index.json")):
                 continue
             _copy_tree_if_missing(os.path.join(bundled, sub), user_sub)
 
 
     def _auto_discover_assets(self):
-        """
-        Lataa assetit jokaisessa käynnistyksessä.
-        1) Yritä ensin lukea Scoreboard/<Category>/index.json (säilyttää erikoismerkit nimissä ja käyttää kuvapolkua suoraan).
-        2) Jos JSON puuttuu/rikki, pudotaan skannaukseen:
-           - Prioriteetti: DEV_ASSET_DIRS -> bundlattu SOWBroadcast/Scoreboard -> käyttäjän Scoreboard
-           - Skannataan kuvat (.png/.jpg/.jpeg/.webp) ja arvataan nimi tiedostonimestä.
-        Lopuksi päivitetään UI ja kirjoitetaan exportit (png + index.json).
-        """
         import os
         import re
 
         def pick_dir(kind: str) -> str:
-            """
-            Palauta ensisijainen kansio annetulle kategoriatyypille ('maps'|'heroes'|'gametypes')
-            prioriteetilla: DEV -> bundlattu -> käyttäjän Scoreboard.
-            """
-            # 1) DEV-kansiot (helpottaa kehitystä)
             dev = DEV_ASSET_DIRS.get(kind)
             if dev and os.path.isdir(dev):
                 return dev
 
-            # 2) Bundlattu Scoreboard EXE:n vieressä
             b = _bundled_scoreboard_dir()
             sub = "Gametypes" if kind == "gametypes" else kind.capitalize()
             if b:
@@ -1448,16 +1336,13 @@ class TournamentApp(QMainWindow):
                 if os.path.isdir(cand):
                     return cand
 
-            # 3) Käyttäjän Scoreboard-juuri
             user = os.path.join(self._scoreboard_root(), sub)
             return user
 
-        # 0) JSON-ensilataus (jos index.json löytyy, käytä sitä)
         loaded_maps   = self._load_assets_from_index("Maps", self.maps)
         loaded_heroes = self._load_assets_from_index("Heroes", self.heroes)
         loaded_modes  = self._load_assets_from_index("Gametypes", self.modes)
 
-        # 1) HEROES — skannaa vain jos JSON-lataus ei onnistunut
         if not loaded_heroes:
             heroes_dir = pick_dir("heroes")
             heroes_files = self._scan_image_files(heroes_dir)
@@ -1469,7 +1354,6 @@ class TournamentApp(QMainWindow):
                     source_path=p
                 )
 
-        # 2) MAPS — skannaa vain jos JSON-lataus ei onnistunut
         if not loaded_maps:
             maps_dir = pick_dir("maps")
             maps_files = self._scan_image_files(maps_dir)
@@ -1478,11 +1362,10 @@ class TournamentApp(QMainWindow):
                 self.maps[name] = Asset(
                     name=name,
                     image_path=os.path.join("Scoreboard", "Maps", f"{self._slugify(name)}.png"),
-                    mode=None,  # moodi voidaan päätellä myöhemmin tai lukea JSONista
+                    mode=None,
                     source_path=p
                 )
 
-        # 3) GAMETYPES — skannaa vain jos JSON-lataus ei onnistunut
         if not loaded_modes:
             modes_dir = pick_dir("gametypes")
             mode_files = self._scan_image_files(modes_dir)
@@ -1495,7 +1378,6 @@ class TournamentApp(QMainWindow):
                         source_path=p
                     )
             else:
-                # Fallback: lue nimet .txt/.json -tiedostojen nimistä
                 if os.path.isdir(modes_dir):
                     for fn in sorted(os.listdir(modes_dir)):
                         stem, ext = os.path.splitext(fn)
@@ -1504,11 +1386,8 @@ class TournamentApp(QMainWindow):
                             if name:
                                 self.modes[name] = Asset(name=name)
 
-        # 4) Päivitä UI-valikot ja kirjoita exportit (png + index.json)
         self._on_assets_changed()
 
-        # Kirjoita Scoreboard/<Category> exportit: luo PNG:t (slugin mukaan) ja index.json,
-        # jossa jokaisella itemillä on {name, slug, image, (mode)}.
         self._export_assets_category("Heroes", self.heroes)
         self._export_assets_category("Maps", self.maps)
         self._export_assets_category("Gametypes", self.modes)
@@ -1580,7 +1459,6 @@ class TournamentApp(QMainWindow):
         """Ei kovakoodattuja korjauksia: vain väliviivat/alikulkevat -> välilyönti, ja title case."""
         stem = os.path.splitext(os.path.basename(path))[0]
         raw = re.sub(r"[-_]+", " ", stem).strip()
-        # Title case; käyttäjä voi muuttaa dialogissa
         return raw.title()
 
     def _scan_image_files(self, folder: str) -> list[tuple[str, str]]:
@@ -1603,7 +1481,6 @@ class TournamentApp(QMainWindow):
         heroes_files = self._scan_image_files(heroes_dir)
         maps_files   = self._scan_image_files(maps_dir)
 
-        # Suodata jo olemassa olevat nimet pois ehdotuksista (voit silti muuttaa nimen dialogissa)
         existing_hero_names = set(self.heroes.keys())
         heroes_files = [(p, n if n not in existing_hero_names else n) for (p, n) in heroes_files]
 
@@ -1625,7 +1502,6 @@ class TournamentApp(QMainWindow):
             if not name:
                 continue
             if r["kind"] == "Hero":
-                # Älä ylikirjoita olemassa olevaa sama­nimistä
                 if name in self.heroes:
                     continue
                 self.heroes[name] = Asset(
@@ -1634,7 +1510,7 @@ class TournamentApp(QMainWindow):
                     source_path=r["file_path"]
                 )
                 added_h += 1
-            else:  # Map
+            else:
                 if name in self.maps:
                     continue
                 mode = (r.get("mode") or "").strip() or None
@@ -1658,7 +1534,6 @@ class TournamentApp(QMainWindow):
         customm = mb.addMenu("Customize")
         teamsm = mb.addMenu("Teams")
 
-        # Customize -> asset managers
         act_hero = QAction("Manage Heroes…", self)
         act_hero.triggered.connect(lambda: self._open_asset_manager("Heroes", self.heroes, self._on_assets_changed))
         act_map = QAction("Manage Maps…", self)
@@ -1675,7 +1550,6 @@ class TournamentApp(QMainWindow):
         customm.addSeparator()
         customm.addAction(act_bulk_import)        
 
-        # File actions: Load / Save / Save As
         act_load = QAction("Load…", self); act_load.triggered.connect(self._load_from_file)
         act_save = QAction("Save", self); act_save.triggered.connect(self._save)
         act_saveas = QAction("Save As…", self); act_saveas.triggered.connect(self._save_as)
@@ -1687,13 +1561,11 @@ class TournamentApp(QMainWindow):
         act_quit.triggered.connect(self.close)
         filem.addAction(act_quit)
         
-        # Home (Team 1)
         act_ex_home = QAction("Export Home…", self)
         act_ex_home.triggered.connect(lambda: self._export_team_dialog(self.team1_panel))
         act_im_home = QAction("Import Home…", self)
         act_im_home.triggered.connect(lambda: self._import_team_dialog(self.team1_panel))
 
-        # Away (Team 2)
         act_ex_away = QAction("Export Away…", self)
         act_ex_away.triggered.connect(lambda: self._export_team_dialog(self.team2_panel))
         act_im_away = QAction("Import Away…", self)
@@ -1708,7 +1580,7 @@ class TournamentApp(QMainWindow):
     def _open_asset_manager(self, title: str, store: Dict[str, Asset], on_close):
         mode_names = None
         if title == "Maps":
-            mode_names = list(self.modes.keys())  # käytä olemassa olevaa Gametypes-listaa
+            mode_names = list(self.modes.keys())
         dlg = AssetManagerDialog(self, title, store, mode_names=mode_names)
         dlg.exec_()
         on_close()
@@ -1721,22 +1593,18 @@ class TournamentApp(QMainWindow):
         """
         from collections import OrderedDict
         by_mode = OrderedDict()
-        # ensin olemassa olevien pelimuoto-assetien järjestys
         for m in self.modes.keys():
             by_mode[m] = []
-        # placeholder myös niille joilla ei ole moodia
         by_mode.setdefault("Unspecified", [])
         for name, asset in self.maps.items():
             mode = (asset.mode or "").strip() or "Unspecified"
             by_mode.setdefault(mode, [])
             by_mode[mode].append(name)
-        # suodata tyhjät moodit pois, paitsi jos haluat näyttää myös tyhjät otsikot
         cleaned = OrderedDict((k, v) for k, v in by_mode.items() if v)
         return cleaned
 
 
     def _on_assets_changed(self):
-        # Refresh dynamic dropdowns
         self.team1_panel.refresh_hero_lists()
         self.team2_panel.refresh_hero_lists()
         for mr in self.map_rows:
@@ -1746,8 +1614,6 @@ class TournamentApp(QMainWindow):
         if hasattr(self, "draft_tab"):
             self.draft_tab.reload()
 
-
-    # Helpers to provide names
     def _hero_names(self) -> List[str]:
         return sorted(self.heroes.keys())
 
@@ -1789,7 +1655,6 @@ class TournamentApp(QMainWindow):
 
         parts = [f"{t1_name} ({t1_total} - {t2_total}) {t2_name}"]
 
-        # Käy läpi KAIKKI maps-listan rivit (ei enää first_to/maps_count)
         for item in maps:
             if not item:
                 continue
@@ -1802,9 +1667,6 @@ class TournamentApp(QMainWindow):
         sep = "      •      "
         return sep.join(parts).strip() + "                              "
 
-
-    # --- Teams export/import helpers ---
-
     def _teams_dir(self) -> str:
         """Scoreboard/Teams kansio."""
         root = self._scoreboard_root()
@@ -1816,11 +1678,9 @@ class TournamentApp(QMainWindow):
         """Exporttaa yhden tiimin JSON + logon PNG:nä. Logon tiedostonimi = tiimin nimi (slug)."""
         t = panel.to_team()
 
-        # exportissa ei viedä scorea eikä bännättyä heroa
         t.score = 0
         t.banned_hero = ""
 
-        # Oletustiedostonimet
         base_slug = self._slugify(t.name or "team")
         default_json = os.path.join(self._teams_dir(), f"{base_slug}.sowteam.json")
 
@@ -1835,7 +1695,6 @@ class TournamentApp(QMainWindow):
 
         out_dir = os.path.dirname(path)
 
-        # LOGO: sama nimi kuin tiimillä (slug).png
         logo_name = f"{base_slug}.png"
         logo_path_out = os.path.join(out_dir, logo_name)
 
@@ -1843,7 +1702,6 @@ class TournamentApp(QMainWindow):
             "version": 1,
             "name": t.name,
             "abbr": t.abbr,
-            # väri EI kuulu exporttiin
             "logo_png": logo_name if t.logo_path else None,
             "players": [
                 {"name": p.name, "hero": p.hero, "role": p.role}
@@ -1851,11 +1709,9 @@ class TournamentApp(QMainWindow):
             ],
         }
 
-        # Tallenna JSON
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-        # Tallenna logo PNG:ksi
         if t.logo_path:
             try:
                 self._save_pixmap_as_png(t.logo_path, logo_path_out)
@@ -1877,28 +1733,23 @@ class TournamentApp(QMainWindow):
             QMessageBox.warning(self, "Import failed", str(e))
             return
 
-        # säilytä nykyinen score + ban
         keep_score = panel.score.value()
 
-
-        # rakenna Team-olio
         players = []
         for p in data.get("players", []):
             players.append(Player(name=p.get("name",""), hero=p.get("hero",""), role=p.get("role","")))
-        # täydennä 8:aan
         while len(players) < 8:
             players.append(Player())
 
         t = Team(
             name=data.get("name",""),
             abbr=data.get("abbr",""),
-            logo_path=None,   # asetetaan alla
-            score=keep_score,             # säilytä
+            logo_path=None,
+            score=keep_score,
             players=players,
-            banned_hero=""        # säilytä
+            banned_hero=""
         )
 
-        # logo polku suhteessa JSON-tiedoston kansioon
         logo_rel = data.get("logo_png")
         cand = None
         if logo_rel:
@@ -1906,8 +1757,6 @@ class TournamentApp(QMainWindow):
             if not os.path.exists(cand):
                 cand = None
 
-        # Backcompat: jos logo_png puuttuu (vanhat exportit), yritä:
-        # 1) <jsonin_nimi_ilman_päätettä>.png  2) "Logo.png"
         if not cand:
             base_noext = os.path.splitext(os.path.basename(path))[0]
             try_candidates = [
@@ -1929,7 +1778,6 @@ class TournamentApp(QMainWindow):
         """Kirjoita käyttäjän asettama status-teksti Scoreboard/Match/status.txt"""
         match_dir = os.path.join(self._scoreboard_root(), "Match")
         os.makedirs(match_dir, exist_ok=True)
-        # Ota käyttäjän syöttämä teksti talteen
         general = state.get("general", {}) or {}
         text = general.get("status_text", "").strip()
         self._write_txt(os.path.join(match_dir, "status.txt"), text)
@@ -1979,9 +1827,9 @@ class TournamentApp(QMainWindow):
         replay_dir, playlist_dir = self._replay_dirs()
         src = os.path.join(replay_dir, "Replay Replay.mp4")
 
-        observed_sig = None      # viimeisin havaittu (mtime,size)
-        last_copied_sig = None   # viimeisin kopioitu (mtime,size)
-        stable_hits = 0          # montako peräkkäistä tarkistusta sama koko+mtime
+        observed_sig = None
+        last_copied_sig = None
+        stable_hits = 0
 
         while True:
             try:
@@ -1989,14 +1837,12 @@ class TournamentApp(QMainWindow):
                     st = os.stat(src)
                     sig = (int(st.st_mtime), st.st_size)
 
-                    # jos havaittu tila muuttui -> aloita vakauden laskenta alusta
                     if sig != observed_sig:
                         observed_sig = sig
                         stable_hits = 1
                     else:
                         stable_hits += 1
 
-                    # Kun sama koko+mtime ~1.5s (3*0.5s) JA emme ole vielä kopioineet tätä sisältöä
                     if stable_hits >= 3 and sig != last_copied_sig:
                         n = self._next_replay_number(playlist_dir)
                         base_hyphen = os.path.basename(src).replace(" ", "-")
@@ -2005,15 +1851,13 @@ class TournamentApp(QMainWindow):
                         try:
                             shutil.copy2(src, dst)
                             self._write_replay_pointer(dst_name)
-                            last_copied_sig = sig   # merkitse kopioiduksi -> ei toistokopioita
+                            last_copied_sig = sig
                         except Exception:
                             pass
                 else:
-                    # lähdetiedostoa ei ole -> nollaa laskurit
                     observed_sig = None
                     stable_hits = 0
             except Exception:
-                # ei kaadeta sovellusta vahtisäikeen virheistä
                 pass
 
             time.sleep(0.5)
@@ -2021,7 +1865,6 @@ class TournamentApp(QMainWindow):
     def _diff_for_scoreboard(self, old: dict, new: dict):
         keys = []
         if not old:
-            # Ensimmäisellä kerralla kaikki lasketaan muuttuneiksi
             return [
                 "assets.heroes", "assets.maps", "assets.modes",
                 "general.colors",
@@ -2035,7 +1878,6 @@ class TournamentApp(QMainWindow):
         o2, n2 = old.get("team2", {}), new.get("team2", {})
         og, ng = old.get("general", {}), new.get("general", {})
 
-        # --- assets (nimet ja polut) ---
         oa, na = old.get("assets", {}) or {}, new.get("assets", {}) or {}
         for cat in ("heroes", "maps", "modes"):
             od = oa.get(cat) or {}
@@ -2048,14 +1890,13 @@ class TournamentApp(QMainWindow):
                     a, b = od.get(k) or {}, nd.get(k) or {}
                     if (a.get("name") != b.get("name")) \
                        or (a.get("image_path") != b.get("image_path")) \
-                       or (a.get("mode") != b.get("mode")):   # <-- tämä lisäys
+                       or (a.get("mode") != b.get("mode")):
                         changed = True
 
                         break
             if changed:
                 keys.append(f"assets.{cat}")
 
-        # --- general ---
         if (og.get("colors") or {}) != (ng.get("colors") or {}):
             keys.append("general.colors")
 
@@ -2092,7 +1933,6 @@ class TournamentApp(QMainWindow):
         if (go.get("host") or "").strip() != (gn.get("host") or "").strip():
             keys.append("general.host")
 
-        # Maps: jos jokin nimi/piste/completed/current/pick muuttuu -> 'maps'
         if old.get("current_map") != new.get("current_map"):
             keys.append("maps")
         om, nm = old.get("maps") or [], new.get("maps") or []
@@ -2140,7 +1980,7 @@ class TournamentApp(QMainWindow):
 
                 target_dict[name] = Asset(
                     name=name,
-                    image_path=img_rel if img_rel else None,           # talletetaan relatiivinen polku Scoreboard-juureen
+                    image_path=img_rel if img_rel else None,
                     mode=mode,
                     source_path=img_abs if (img_abs and os.path.isfile(img_abs)) else None
                 )
@@ -2164,13 +2004,11 @@ class TournamentApp(QMainWindow):
         pool = state.get("map_pool") or []
         names = pool if pool else sorted(self.maps.keys())
 
-        # Muunna nimi -> tiedostonimi kuten asset-export tekee: <slug>.png
         files = [f"{self._slugify(name)}.png" for name in names if name in self.maps]
 
         txt = "\n".join(files) + ("\n" if files else "")
         self._write_txt(out_path, txt)
 
-        # (Halutessasi myös kirjoita nimilista talteen)
         names_txt = os.path.join(root, "Match", "map_pool.txt")
         self._write_txt(names_txt, "\n".join(names) + ("\n" if names else ""))
 
@@ -2189,15 +2027,12 @@ class TournamentApp(QMainWindow):
             )
             urllib.request.urlopen(req, timeout=0.5).read()
         except Exception:
-            # ei kaadeta GUI:ta vaikka palvelin ei olisi käynnissä
             pass
 
     def _scoreboard_root(self):
-        # jos launcher asetti SOWB_ROOT, käytä sitä; muuten EXE:n kansio
         base = os.environ.get("SOWB_ROOT") or _app_base()
         root = os.path.join(base, "Scoreboard")
         _ensure_scoreboard_tree(root)
-        # (valinnainen debug-jälki; turvallisesti try/except)
         try:
             with open(os.path.join(root, "__last_gui_touch.txt"), "w", encoding="utf-8") as f:
                 f.write("ok")
@@ -2208,7 +2043,7 @@ class TournamentApp(QMainWindow):
     @staticmethod
     def _slugify(name: str) -> str:
         s = unicodedata.normalize("NFKD", (name or "").strip().lower())
-        s = "".join(ch for ch in s if not unicodedata.combining(ch))  # poista aksentit
+        s = "".join(ch for ch in s if not unicodedata.combining(ch))
         s = re.sub(r"[^a-z0-9]+", "-", s)
         s = re.sub(r"-{2,}", "-", s).strip("-")
         return s or "item"
@@ -2239,20 +2074,15 @@ class TournamentApp(QMainWindow):
         cat_dir = os.path.join(root, category_name)
         self._ensure_dir(cat_dir)
 
-        # index.txt: jokainen nimi omalle riville
         index_path = os.path.join(cat_dir, "index.txt")
         with open(index_path, "w", encoding="utf-8") as f:
             for name in sorted(assets.keys()):
                 f.write(name + "\n")
 
-        # _export_assets_category(...):
         for name, asset in assets.items():
             slug = self._slugify(name)
             out_png = os.path.join(cat_dir, f"{slug}.png")
 
-            # Valitse lähde:
-            # 1) ensisijaisesti Asset.source_path (eli käyttäjän selaama alkuperäinen kuva)
-            # 2) toissijaisesti Asset.image_path (legacy), jos se on jokin muu polku kuin out_png
             src = None
             if asset.source_path and os.path.exists(asset.source_path):
                 src = asset.source_path
@@ -2261,10 +2091,8 @@ class TournamentApp(QMainWindow):
                 src = asset.image_path
 
             if not src:
-                # ei uutta lähdettä -> jätä olemassa oleva tiedosto ennalleen
                 continue
 
-            # Kopioi raakana (ilman mitään kuvamuunnosta) ja vältä turhaa ylikirjoitusta
             try:
                 need_copy = True
                 try:
@@ -2276,72 +2104,54 @@ class TournamentApp(QMainWindow):
                     pass
 
                 if need_copy:
-                    shutil.copy2(src, out_png)  # säilyttää mtime/metadata
+                    shutil.copy2(src, out_png)
             except Exception as e:
-                # ei kaadeta UI:ta – mutta jätetään pieni jälki konsoliin
                 print(f"[Maps] copy failed {src} -> {out_png}: {e}")
 
-        # RAKENNA MANIFEST
         if category_name in {"Maps", "Heroes", "Gametypes"}:
             items = []
             for name, asset in assets.items():
                 slug = self._slugify(name)
                 out_png = os.path.join(cat_dir, f"{slug}.png")
-                img_rel = _norm_rel(out_png, root)  # esim. "Scoreboard/Maps/kings-row.png"
+                img_rel = _norm_rel(out_png, root)
 
                 item = {"name": name, "slug": slug, "image": img_rel}
                 if category_name == "Maps":
                     item["mode"] = (asset.mode or "")
                 items.append(item)
 
-            # Kirjoita index.json oikealla juurinimellä
             index_json_path = os.path.join(cat_dir, "index.json")
             payload = (
                 {"maps": items} if category_name == "Maps" else
                 {"heroes": items} if category_name == "Heroes" else
-                {"modes": items}   # Gametypes
+                {"modes": items}
             )
             with open(index_json_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
     def _export_general(self, settings: 'GeneralSettings'):
-        """
-        Kirjoittaa Scoreboard/General -kansion:
-          host.txt, caster1.txt, caster2.txt, first_to.txt, colors.txt,
-          OverlayLogo.png, TransitionLogo.png
-        """
         root = self._scoreboard_root()
         gen_dir = os.path.join(root, "General")
         self._ensure_dir(gen_dir)
 
-        # Tekstit
         self._write_txt(os.path.join(gen_dir, "host.txt"),     settings.host or "")
         self._write_txt(os.path.join(gen_dir, "caster1.txt"),  settings.caster1 or "")
         self._write_txt(os.path.join(gen_dir, "caster2.txt"),  settings.caster2 or "")
         self._write_txt(os.path.join(gen_dir, "first_to.txt"), str(settings.first_to))
 
-        # Värit key=value per rivi
         with open(os.path.join(gen_dir, "colors.txt"), "w", encoding="utf-8") as f:
             for k, v in (settings.colors or {}).items():
                 f.write(f"{k}={v}\n")
 
-        # _export_general(...)
         self._save_pixmap_as_png(settings.overlay_logo_path,    os.path.join(gen_dir, "OverlayLogo.png"),    force=True)
         self._save_pixmap_as_png(settings.transition_logo_path, os.path.join(gen_dir, "TransitionLogo.png"), force=True)
 
     def _export_scoreboard(self, state: dict):
-        """
-        Pää-vientimetodi Scoreboard-polkuihin:
-          Heroes, Maps, Gametypes (index + png:t)
-          General (txt:t + png:t)
-        """
-        # 1) Asset-kategoriat
         self._export_assets_category("Heroes", self.heroes)
         self._export_assets_category("Maps", self.maps)
         self._export_assets_category("Gametypes", self.modes)
 
-        # 2) General
         g = state.get("general") or {}
         settings = GeneralSettings(**g) if isinstance(g, dict) else GeneralSettings()
         self._export_general(settings)
@@ -2349,22 +2159,16 @@ class TournamentApp(QMainWindow):
         self._export_waiting(state)
     
     def _export_match(self, state: dict):
-        """
-        Kirjoittaa kaikki Match-välilehden tiedot Scoreboard/Match -kansioon
-        vain, jos sisältö on muuttunut.
-        """
         root = self._scoreboard_root()
         match_dir = os.path.join(root, "Match")
         self._ensure_dir(match_dir)
 
         def write_team_flat(prefix: str, team: dict):
-            # Perustekstit
             self._write_txt(os.path.join(match_dir, f"{prefix}Name.txt"),  team.get("name", "") or "")
             self._write_txt(os.path.join(match_dir, f"{prefix}Score.txt"), str(team.get("score", 0)))
             self._write_txt(os.path.join(match_dir, f"{prefix}Color.txt"), team.get("color_hex", "") or "")
             self._write_txt(os.path.join(match_dir, f"{prefix}Abbr.txt"),  team.get("abbr", "") or "")
 
-            # Pelaajat: index\tname\thero\trole per rivi
             lines = []
             for i, p in enumerate(team.get("players") or [], start=1):
                 name = (p.get("name") or "").replace("\t", " ")
@@ -2373,21 +2177,17 @@ class TournamentApp(QMainWindow):
                 lines.append(f"{i}\t{name}\t{hero}\t{role}")
             self._write_txt(os.path.join(match_dir, f"{prefix}Players.txt"), "\n".join(lines) + ("\n" if lines else ""))
 
-            # Logo PNG (PNG tallennus voi olla hidasta – jätä kuten kohdassa 1 ehdotettu mtime-skippaus _save_pixmap_as_png:iin)
             logo_src = team.get("logo_path")
             self._save_pixmap_as_png(logo_src, os.path.join(match_dir, f"{prefix}Logo.png"), force=True)
 
-        # Tiimit
         t1 = state.get("team1") or {}
         t2 = state.get("team2") or {}
         write_team_flat("T1", t1)
         write_team_flat("T2", t2)
 
-        # Nykyinen kartta
         cur = state.get("current_map")
         self._write_txt(os.path.join(match_dir, "CurrentMap.txt"), "" if cur is None else str(cur))
 
-        # Kartat: Map1.txt, Map2.txt, ...
         maps = state.get("maps") or []
         for m in maps:
             idx = int(m.get("index", 0)) or 0
@@ -2403,8 +2203,8 @@ class TournamentApp(QMainWindow):
                 f"T2={t2s}\n"
                 f"Completed={comp}\n"
                 f"Pick={(m.get('pick') or '')}\n"
-                f"T1Ban={(m.get('t1_ban') or '')}\n"   # NEW
-                f"T2Ban={(m.get('t2_ban') or '')}\n"   # NEW
+                f"T1Ban={(m.get('t1_ban') or '')}\n"
+                f"T2Ban={(m.get('t2_ban') or '')}\n"
             )
             self._write_txt(os.path.join(match_dir, f"Map{idx}.txt"), body)
         self._write_txt(os.path.join(match_dir, "matchtext.txt"), self.build_match_text(state))
@@ -2412,7 +2212,6 @@ class TournamentApp(QMainWindow):
         with open(os.path.join(match_dir, "match.json"), "w", encoding="utf-8") as f:
             json.dump({k: v for k, v in state.items() if k != "assets"}, f, ensure_ascii=False, indent=2)
 
-        # Lisäksi yksittäiset pelaajarivit overlayta varten (T1P1Name.txt jne.)
         t1_players = (state.get("team1") or {}).get("players") or []
         for i in range(8):
             p = t1_players[i] if i < len(t1_players) else {}
@@ -2433,22 +2232,17 @@ class TournamentApp(QMainWindow):
     # Actions: Reset & Swap
     # ---------------------
     def _reset_all(self):
-        # Teams
         self.team1_panel.reset()
         self.team2_panel.reset()
-        # Keep default colors
         self.team1_panel.color_hex = "#55aaff"; self.team1_panel._apply_color_style()
         self.team2_panel.color_hex = "#ff557f"; self.team2_panel._apply_color_style()
-        # Maps
         for i, rb in enumerate(self.current_map_buttons, start=1):
             rb.setChecked(i == 1)
         for mr in self.map_rows:
             mr.reset()
-        # autosave after reset
         self._autosave(self._collect_state())
 
     def _swap_teams(self):
-        # Ota talteen tiimit ja tarkista ovatko värit manuaalisia (≠ oletus)
         t1 = self.team1_panel.to_team()
         t2 = self.team2_panel.to_team()
 
@@ -2460,13 +2254,9 @@ class TournamentApp(QMainWindow):
         t1_custom = _norm(t1.color_hex) != _norm(T1_DEF)
         t2_custom = _norm(t2.color_hex) != _norm(T2_DEF)
 
-        # Vaihda tekstitiedot paneeleihin
         self.team1_panel.from_team(t2)
         self.team2_panel.from_team(t1)
 
-        # Värit:
-        #  - jos tiimillä oli manuaalinen väri -> anna sen seurata tiimiä
-        #  - muuten jätä paneelille sen oman puolen oletusväri
         if t2_custom:
             self.team1_panel.color_hex = t2.color_hex
         else:
@@ -2479,7 +2269,6 @@ class TournamentApp(QMainWindow):
         self.team1_panel._apply_color_style()
         self.team2_panel._apply_color_style()
 
-        # Vaihda myös karttapisteet ja pick
         for mr in self.map_rows:
             a = mr.t1score.value()
             mr.t1score.setValue(mr.t2score.value())
@@ -2489,14 +2278,11 @@ class TournamentApp(QMainWindow):
                 mr.pick.setCurrentIndex(2)
             elif idx == 2:
                 mr.pick.setCurrentIndex(1)
-                # Vaihda myös per-map banit
             t1b_ix = mr.t1ban.currentIndex()
             t2b_ix = mr.t2ban.currentIndex()
             mr.t1ban.setCurrentIndex(t2b_ix)
             mr.t2ban.setCurrentIndex(t1b_ix)
 
-
-        # Tallenna autosaveen
         self._autosave()
 
 
@@ -2508,14 +2294,12 @@ class TournamentApp(QMainWindow):
         t1 = self.team1_panel.to_team()
         t2 = self.team2_panel.to_team()
 
-        # Current map
         current_ix = None
         for i, rb in enumerate(self.current_map_buttons, start=1):
             if rb.isChecked():
                 current_ix = i
                 break
 
-        # Maps (huom. oikeat kenttien nimet ja index enumerate:lla)
         maps = []
         for idx, mr in enumerate(self.map_rows, start=1):
             maps.append({
@@ -2552,14 +2336,12 @@ class TournamentApp(QMainWindow):
 
 
     def _apply_state(self, state: dict):
-        # Assets first
         assets = state.get("assets", {})
         self.heroes = {k: Asset(**v) for k, v in assets.get("heroes", {}).items()}
         self.maps = {k: Asset(**v) for k, v in assets.get("maps", {}).items()}
         self.modes = {k: Asset(**v) for k, v in assets.get("modes", {}).items()}
         self._on_assets_changed()
 
-        # Teams
         t1 = Team(**{k: v for k, v in state.get("team1", {}).items() if k != "players"})
         t1.players = [Player(**p) for p in state.get("team1", {}).get("players", [])]
         t2 = Team(**{k: v for k, v in state.get("team2", {}).items() if k != "players"})
@@ -2567,7 +2349,6 @@ class TournamentApp(QMainWindow):
         self.team1_panel.from_team(t1)
         self.team2_panel.from_team(t2)
 
-        # Maps
         for mr in self.map_rows:
             mr.reset()
 
@@ -2581,16 +2362,14 @@ class TournamentApp(QMainWindow):
                     mr.map_combo.setCurrentIndex(ix if ix >= 0 else 0)
                 mr.t1score.setValue(int(item.get("t1", 0)))
                 mr.t2score.setValue(int(item.get("t2", 0)))
-                # ... map fields ...
                 mr.completed.setChecked(bool(item.get("completed", False)))
 
-                # pick back
                 txt = (item.get("pick") or "")
                 if txt == "T1": mr.pick.setCurrentIndex(1)
                 elif txt == "T2": mr.pick.setCurrentIndex(2)
                 else: mr.pick.setCurrentIndex(0)
 
-                # NEW: per-map bans back to combos
+
                 t1b = (item.get("t1_ban") or "")
                 t2b = (item.get("t2_ban") or "")
                 if t1b:
@@ -2604,21 +2383,16 @@ class TournamentApp(QMainWindow):
                 else:
                     mr.t2ban.setCurrentIndex(0)
 
-
-        # Current map
         cur = state.get("current_map")
         for i, rb in enumerate(self.current_map_buttons, start=1):
             rb.setChecked(i == cur)
         
-        # General settings
         gdata = state.get("general", {})
         self.general_tab.from_settings(GeneralSettings(**gdata))
         
-        # UUSI: Waiting settings
         wdata = state.get("waiting", {}) or {}
         self.waiting_tab.from_settings(WaitingSettings(**wdata))
             
-        # Map Pool (Draft)
         pool = state.get("map_pool") or []
         if hasattr(self, "draft_tab"):
             self.draft_tab.set_pool(pool)
@@ -2626,11 +2400,9 @@ class TournamentApp(QMainWindow):
     def _update(self):
         state = self._collect_state()
 
-        # --- Laske diff vanhaan tilaan verrattuna (turvallisesti, jos ei vielä ole) ---
         old = getattr(self, "_last_state_for_diff", None)
         changed = self._diff_for_scoreboard(old, state)
 
-        # --- Vie assetit vain jos muuttui ---
         if "assets.heroes" in changed:
             self._export_assets_category("Heroes", self.heroes)
         if "assets.maps" in changed:
@@ -2638,28 +2410,24 @@ class TournamentApp(QMainWindow):
         if "assets.modes" in changed:
             self._export_assets_category("Gametypes", self.modes)
 
-        # --- Vie General (kevyt) ---
         g = state.get("general") or {}
         settings = GeneralSettings(**g) if isinstance(g, dict) else GeneralSettings()
         self._export_general(settings)
 
-        # --- Vie Match (kirjoittaa mm. Scoreboard/Match/match.json ja maps.txt poolista) ---
         self._export_match(state)
         
         self._export_waiting(state)
 
-        # --- Status-teksti + mahdollinen notifikaatio ---
         self._export_status_text(state)
         self._notify_overlays(changed)
 
-        # --- Tallenna myös export-kansioon ja autosave (jos haluat säilyttää nämäkin) ---
         base_root = os.environ.get("SOWB_ROOT") or _app_base()
 
-        match_path = os.path.join(base_root, "match.json")   # <-- ennen: self.export_dir/match.json
+        match_path = os.path.join(base_root, "match.json")
         with open(match_path, "w", encoding="utf-8") as f:
             json.dump({k: v for k, v in state.items() if k != "assets"}, f, ensure_ascii=False, indent=2)
 
-        assets_path = os.path.join(base_root, "assets.json") # <-- ennen: self.export_dir/assets.json
+        assets_path = os.path.join(base_root, "assets.json")
         with open(assets_path, "w", encoding="utf-8") as f:
             json.dump(state.get("assets", {}), f, ensure_ascii=False, indent=2)
 
@@ -2667,16 +2435,9 @@ class TournamentApp(QMainWindow):
         self._last_state_for_diff = state
         
     def _update_general_only(self):
-        # 1) kerää vain General-tabin asetukset
         g = asdict(self.general_tab.to_settings())
-
-        # 2) kirjoita General-kansion tekstit + värit + logot
         self._export_general(GeneralSettings(**g))
-
-        # 3) kirjoita status-teksti Match-kansioon (status.txt), jotta draft.html saa sen
         self._export_status_text({"general": g})
-
-        # 4) diff & notify – käytä turvallista oletusta, jos attribuuttia ei vielä ole
         full = {
             "team1": {}, "team2": {}, "maps": [],
             "current_map": None,
@@ -2689,20 +2450,11 @@ class TournamentApp(QMainWindow):
         self._notify_overlays(changed)
         
     def _update_waiting_only(self):
-        # 1) kerää vain Waiting-välilehden asetukset
         w = asdict(self.waiting_tab.to_settings())
-
-        # 2) kirjoita Waiting-kansion tiedostot (tekstit, timer ja videolista)
         self._export_waiting({"waiting": w})
-
-        # 3) (valinnainen) kirjoita status-teksti, jotta mm. draft.html saa sen
         g = asdict(self.general_tab.to_settings())
         self._export_status_text({"general": g})
-
-        # 4) autosave talteen
         self._autosave(self._collect_state())
-
-        # 5) diff & notify – kevyt runko riittää
         full = {
             "team1": {}, "team2": {}, "maps": [],
             "current_map": None,
@@ -2725,7 +2477,6 @@ class TournamentApp(QMainWindow):
         try:
             with open(self.autosave_path, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=2)
-            # (valinnainen) tulosta minne tallennettiin
             print(f"[autosave] wrote {self.autosave_path}")
         except Exception as e:
             print(f"[autosave] failed: {e}")
@@ -2736,8 +2487,6 @@ class TournamentApp(QMainWindow):
                 with open(self.autosave_path, "r", encoding="utf-8") as f:
                     state = json.load(f)
                 self._apply_state(state)
-                # Huom: ei aseteta current_save_path = autosave_path
-                #       (ettei 'Save' kirjoita vahingossa autosaveen).
                 print(f"[autosave] loaded {self.autosave_path}")
             except Exception as e:
                 print(f"[autosave] load failed: {e}")
@@ -2747,7 +2496,6 @@ class TournamentApp(QMainWindow):
         if self.current_save_path and self.current_save_path != self.autosave_path:
             path = self.current_save_path
         else:
-            # default to Save As if no explicit path yet
             return self._save_as()
         state = self._collect_state()
         with open(path, "w", encoding="utf-8") as f:
@@ -2780,16 +2528,12 @@ class TournamentApp(QMainWindow):
             QMessageBox.critical(self, "Load failed", str(e))
 
     def closeEvent(self, event):
-        # autosave on close
         self._autosave()
         super().closeEvent(event)
-        
-    # --- embedattu HTTP-palvelin GUI:n sisään ---
 def _start_http_server(bind="127.0.0.1", port=8324):
     import http.server, threading, atexit
     from server import PushHandler
 
-    # palvele EXE:n hakemistosta (jossa HTML/Scoreboard ovat)
     base = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
     os.chdir(base)
 
@@ -2805,8 +2549,6 @@ def _start_http_server(bind="127.0.0.1", port=8324):
 if __name__ == "__main__":
     from PyQt5.QtCore import QCoreApplication
 
-    # TÄRKEÄÄ: aseta nimet ennen TournamentAppin luontia,
-    # jotta QStandardPaths.AppDataLocation osoittaa pysyvään kansioon.
     QCoreApplication.setOrganizationName("SOWBroadcast")
     QCoreApplication.setApplicationName("SOWBroadcast")
     
