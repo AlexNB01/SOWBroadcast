@@ -285,11 +285,11 @@ async function upTicker(){
       const txt = over.trim();
       if (txt) {
         document.getElementById("tickerInner").textContent = txt;
+        return;
       }
     }
   } catch (e) {
   }
-
   const raw = (await read(MATCH + "/matchtext.txt")).trim();
   document.getElementById("tickerInner").textContent = raw;
 }
