@@ -305,10 +305,24 @@ document.fonts && document.fonts.ready && document.fonts.ready.then(function(){ 
     document.getElementById("startText").textContent = txt.toUpperCase();
   }
 
-  // --- Ticker: reads matchtext.txt and scrolls ---
 async function upTicker(){
-  const raw = (await read(MATCH+"/matchtext.txt")).trim();
-  // ei tehdä replaceä, Python hoitaa jo karttaerottimen
+  try {
+    // Katso käytetäänkö overridea
+    const useRaw = (await read(WAIT + "/ticker_use_override.txt")).trim();
+    if (useRaw === "1") {
+      const over = (await read(WAIT + "/ticker_override.txt"));
+      const txt = over.trim();
+      if (txt) {
+        document.getElementById("tickerInner").textContent = txt;
+        return; // älä lue matchtextiä jos override on voimassa
+      }
+    }
+  } catch (e) {
+    // jos jokin menee pieleen, tippuu defaulttiin
+  }
+
+  // Default: käytä Match/matchtext.txt
+  const raw = (await read(MATCH + "/matchtext.txt")).trim();
   document.getElementById("tickerInner").textContent = raw;
 }
 

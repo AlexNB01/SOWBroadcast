@@ -114,13 +114,15 @@ class GeneralSettings:
 
 @dataclass
 class WaitingSettings:
-    videos_dir: str = ""          # kansio, josta videot luetaan
-    timer_seconds: int = 0        # countdownin pituus sekunteina
+    videos_dir: str = ""         
+    timer_seconds: int = 0
     text_starting: str = "STARTING SOON!"
     text_brb: str = "BE RIGHT BACK!"
     text_end: str = "THANK YOU FOR WATCHING"
     timer_running: bool = False
     socials: Dict[str, str] = None
+    ticker_override: str = ""
+    ticker_override_enabled: bool = False
 
 # -----------------------------
 # Asset Manager Dialog
@@ -896,6 +898,18 @@ class WaitingTab(QWidget):
         grid.addRow("EndScreen.html:",    self.text_end)
         root.addWidget(box_x)
         
+        # --- Ticker override ---
+        box_o = QGroupBox("Ticker override")
+        lay_o = QHBoxLayout(box_o)
+        self.ticker_override_edit = QLineEdit()
+        self.ticker_override_edit.setPlaceholderText("Custom ticker text…")
+        self.ticker_override_chk = QCheckBox("Overwrite default ticker text")
+        self.ticker_override_edit.textChanged.connect(self.updated.emit)
+        self.ticker_override_chk.toggled.connect(self._on_ticker_override_toggled)
+        lay_o.addWidget(self.ticker_override_edit, 1)
+        lay_o.addWidget(self.ticker_override_chk)
+        root.addWidget(box_o)
+        
         # --- Socials ---
         box_s = QGroupBox("Socials")
         form_s = QFormLayout(box_s)
@@ -934,6 +948,7 @@ class WaitingTab(QWidget):
         # Alusta preset ja live
         self._on_use_default_toggled(self.use_default_chk.isChecked())
         self._on_preset_changed()
+        self._on_ticker_override_toggled(False)
 
     # ---------- UI handlers ----------
     def _fmt(self, s:int)->str:
@@ -958,6 +973,9 @@ class WaitingTab(QWidget):
             self._qtimer.stop()
             self.updated.emit()  # paussi overlaylle
 
+    def _on_ticker_override_toggled(self, checked: bool):
+        self.ticker_override_edit.setEnabled(checked)
+        self.updated.emit()
 
     def _reset_timer_clicked(self):
         self._qtimer.stop()
@@ -996,6 +1014,9 @@ class WaitingTab(QWidget):
         self.text_brb.setText("BE RIGHT BACK!")
         self.text_end.setText("THANK YOU FOR WATCHING!")
         self._reset_timer_clicked()
+        self.ticker_override_chk.setChecked(False)
+        self.ticker_override_edit.clear()
+        self._reset_timer_clicked()
 
     # ---- state I/O ----
     def to_settings(self) -> WaitingSettings:
@@ -1018,6 +1039,8 @@ class WaitingTab(QWidget):
             text_end=self.text_end.text().strip() or "THANK YOU FOR WATCHING",
             timer_running=bool(self._qtimer.isActive()),
             socials=socials,
+            ticker_override=self.ticker_override_edit.text().strip(),
+            ticker_override_enabled=bool(self.ticker_override_chk.isChecked()),
         )
 
 
@@ -1049,6 +1072,9 @@ class WaitingTab(QWidget):
         self.s_instagram.setText(soc.get("instagram",""))
         self.s_discord.setText(soc.get("discord",""))
         self.s_website.setText(soc.get("web",""))
+        self.ticker_override_edit.setText(getattr(s, "ticker_override", ""))
+        self.ticker_override_chk.setChecked(bool(getattr(s, "ticker_override_enabled", False)))
+        self.ticker_override_edit.setEnabled(self.ticker_override_chk.isChecked())
     
     @staticmethod
     def _normalize_handle(kind: str, text: str) -> str:
@@ -1502,6 +1528,14 @@ class TournamentApp(QMainWindow):
         self._write_txt(os.path.join(wdir, "text_brb.txt"),      ws.text_brb      or "BE RIGHT BACK!")
         self._write_txt(os.path.join(wdir, "text_end.txt"),      ws.text_end      or "THANK YOU FOR WATCHING")
         self._write_txt(os.path.join(wdir, "timer_seconds.txt"), str(int(ws.timer_seconds or 0)))
+        
+        ticker_override = getattr(ws, "ticker_override", "") or ""
+        use_override = bool(getattr(ws, "ticker_override_enabled", False) and ticker_override.strip())
+        self._write_txt(os.path.join(wdir, "ticker_override.txt"), ticker_override)
+        self._write_txt(
+            os.path.join(wdir, "ticker_use_override.txt"),
+            "1" if use_override else "0"
+        )
         
         import json as _json
         soc = getattr(ws, "socials", {}) or {}
