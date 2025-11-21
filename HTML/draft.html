@@ -8,7 +8,7 @@
 <title>Draft</title>
 
 <style>
-  /* ==== Fonts (sama kuin singlecam) ==== */
+  /* ==== Fonts ==== */
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
 
@@ -27,7 +27,7 @@
     --sb-w:1620px; --sb-h:100px;
   }
 
-  /* ==== SCOREBOARD (singlecam-look) ==== */
+  /* ==== SCOREBOARD ==== */
 .scoreboardwrapper{
   position:absolute; left:0; top:0; width:1920px; height:var(--sb-h);
   display:flex; align-items:center; justify-content:center; pointer-events:none;
@@ -36,8 +36,8 @@
 .scorebar{
   width:1920px; height:var(--sb-h);
   background:var(--primary); color:var(--tertiary);
-  border-radius:0;                 /* ei pyöristyksiä = ei gappeja */
-  box-shadow:none;                 /* ei varjoa = tasainen reuna */
+  border-radius:0;                 
+  box-shadow:none;                 
   position:relative;
   display:grid; grid-template-columns:1fr auto 1fr;
   align-items:center; padding:0 16px;
@@ -69,7 +69,7 @@
     font-size:68px; font-weight:900;
   }
 
-  /* ==== DRAFT-ALUE ==== */
+  /* ==== DRAFT ==== */
 .draft-area{
   position:absolute; left:0; top:var(--sb-h);
   width:1920px; bottom:20px;
@@ -81,7 +81,6 @@
 }
 
   .col{ display:flex; flex-direction:column; gap:12px; }
-/* Uusi header container taustalla */
 .mode-header {
   display: flex;
   align-items: center;
@@ -94,24 +93,22 @@
   text-shadow: 0 0 6px rgba(0,0,0,.35);
   text-align: center;
 
-  /* uusi tausta */
   background: #1e2b38;
   border-top: 2px solid #0f1a24;
   border-bottom: 2px solid #0f1a24;
   position: relative;
 }
 
-/* erotusviivat pystysuunnassa */
 .mode-column {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  border-left: 2px solid #1db954;  /* vihreä erotusviiva */
+  border-left: 2px solid #1db954;
 }
 
 .mode-column:first-child {
-  border-left: none; /* ensimmäisessä ei vasemman reunan viivaa */
+  border-left: none;
 }
 
 .mode-header img {
@@ -127,20 +124,17 @@
   background-position:center;
   box-shadow:var(--shadow);
 
-  /* Reunavuodon estot */
-  overflow:hidden;                 /* leikkaa kaikki sisällöt reunan sisään */
-  background-clip:padding-box;     /* tausta ei piirry “borderin alle” */
-  isolation:isolate;               /* lapsivarjot eivät vuoda ulos */
+  overflow:hidden;                 
+  background-clip:padding-box;     
+  isolation:isolate;               
 
-  /* Fokusreunaa varten pidetään border, mutta klipataan oikein */
 }
 
-  /* KOKO LEVYINEN NIMITANKO */
 .map-card.winner-t1::before,
 .map-card.winner-t2::before{
   content:"";
   position:absolute; inset:0;
-  border-radius:inherit;                 /* ← tärkeä */
+  border-radius:inherit;                 
   background: linear-gradient(
     0deg,
     rgba(var(--winner-rgb), .75) 0%,
@@ -150,7 +144,7 @@
   pointer-events:none;
 }
 
-.winner-center{ position:absolute; inset:0; border-radius:inherit; /* ← */ 
+.winner-center{ position:absolute; inset:0; border-radius:inherit;
   display:flex; align-items:center; justify-content:center; pointer-events:none;
 }
 
@@ -158,7 +152,7 @@
   position:absolute; left:0; right:0; bottom:0;
   background:rgba(0,0,0,.70);
   color:#fff; padding:10px 16px;
-  border-radius:0 0 calc(var(--radius) - 4px) calc(var(--radius) - 4px); /* sovita borderiin */
+  border-radius:0 0 calc(var(--radius) - 4px) calc(var(--radius) - 4px);
   font-size:22px; font-weight:900; text-align:center;
   letter-spacing:.4px; text-shadow:0 0 6px rgba(0,0,0,.8);
 }
@@ -174,11 +168,10 @@
     opacity:.95;
   }
 
-  /* PICK-badge: valkoinen lätkä keskellä alhaalla (muutettu .badge-tyyli pyyntösi mukaan) */
   .badge{
     position:absolute; display:flex; align-items:center; gap:8px;
     padding:0; margin:0; border:0;
-    pointer-events:none; /* estä osumat OBS:ssa */
+    pointer-events:none;
   }
   .badge.pick{
     bottom:56px; left:50%; transform:translateX(-50%);
@@ -188,7 +181,6 @@
   }
   .badge.pick img{ width:30px; height:30px; border-radius:4px; }
 
-  /* Fokus valitulle kartalle: reunus + nimitangon väri tiimin mukaan */
   .map-card.picked-t1{ border-color:var(--t1); box-shadow:0 10px 26px rgba(0,0,0,.35); }
   .map-card.picked-t2{ border-color:var(--t2); box-shadow:0 10px 26px rgba(0,0,0,.35); }
   .map-card.picked-t1 .map-name{ background:rgba(var(--t1-rgb), .85); }
@@ -196,11 +188,10 @@
 
   .empty-note{ grid-column:1 / -1; color:#ddd; font-size:22px; opacity:.9; margin:16px 8px; }
   
-  /* Poista tumma tausta, kun kartta on pelattu */
 .map-card.winner-t1 .map-name,
 .map-card.winner-t2 .map-name {
-  background: none !important;    /* poistaa palkin */
-  text-shadow: 0 0 8px rgba(0,0,0,.7); /* lisätään vähän kontrastia */
+  background: none !important;
+  text-shadow: 0 0 8px rgba(0,0,0,.7);
 }
 .map-card.disabled { filter: grayscale(60%) brightness(60%); }
 
@@ -210,7 +201,6 @@
   width:220px; height:220px;
   display:flex; align-items:flex-end; justify-content:center;
   pointer-events:none; z-index:50;
-  /* lasimainen tausta nimen ‘chipille’ */
 }
 .corner-ban.left  { left:22px; }
 .corner-ban.right { right:22px; }
@@ -315,7 +305,6 @@
 
 
 <script>
-/* ----- Polut ja helperit ----- */
 const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
 async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
 async function readJSON(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.json():{}; }catch{ return {}; } }
@@ -332,7 +321,6 @@ function hexToRgb(hexStr){
   return [(n>>16)&255,(n>>8)&255,n&255];
 }
 
-// pienen apurin voi jakaa
 const heroSlug = (name) =>
   (name||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
     .toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
@@ -359,7 +347,7 @@ async function readMapBansByIndex(n){
 function cornerBanHTML(side, hero){
   if(!hero) return "";
   const slug = heroSlug(hero);
-  const img  = slug ? `${SB}/Heroes/${slug}.png` : ""; // EI Date.now -> ei vilku
+  const img  = slug ? `${SB}/Heroes/${slug}.png` : "";
   return `
     <div class="corner-ring ${side}"></div>
     <div class="corner-hero" style="${img ? `background-image:url('${img}')` : ""}"></div>
@@ -385,7 +373,6 @@ async function upStatusText(){
 }
 
 async function renderCornerBans(state){
-  // 1) Current map index: match.json -> fallback CurrentMap.txt
   let ci = Number(state.current || 0);
   if(!ci){
     const ctxt = (await read(MATCH + "/CurrentMap.txt")).trim();
@@ -393,7 +380,6 @@ async function renderCornerBans(state){
   }
   const idx = ci > 0 ? (ci - 1) : -1;
 
-  // 2) Lähde 1: match.json → t1_ban/t2_ban
   let b1 = "", b2 = "";
   const cur = (idx >= 0 && (state.maps||[])[idx]) ? state.maps[idx] : null;
   if(cur){
@@ -401,14 +387,12 @@ async function renderCornerBans(state){
     b2 = (cur.t2_ban || "").trim();
   }
 
-  // 3) Fallback: MapN.txt, jos match.json ei vielä sisällä ban-kenttiä
   if(!b1 && !b2 && ci > 0){
     const fb = await readMapBansByIndex(ci);
     b1 = fb.t1_ban || "";
     b2 = fb.t2_ban || "";
   }
 
-  // 4) Päivitä DOM vain jos muuttui (välttää vilkkumisen)
   if(b1 !== _prevCorner.b1){
     const el = document.getElementById("banLeft");
     el.innerHTML   = b1 ? cornerBanHTML("t1", b1) : "";
@@ -424,7 +408,7 @@ async function renderCornerBans(state){
 }
 
 
-/* ----- Värit General/colors.txt:stä ----- */
+/* ----- Colours ----- */
 async function applyColors(){
   const kv={};
   (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
@@ -437,7 +421,7 @@ async function applyColors(){
   document.documentElement.style.setProperty("--quaternary",q);
 }
 
-/* ----- Tiimit (singlecam-logiikka + RGB:t voittajaliukua varten) ----- */
+/* ----- Teams ----- */
 async function upT1(){
   document.getElementById("t1name").textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
   document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0";
@@ -466,26 +450,23 @@ function toggleScoreBoxes(){
   document.getElementById("t2scorebox").style.display=show?"flex":"none";
 }
 
-/* ----- Draftin renderöinti sarakkeisiin (modes manifestista) ----- */
+/* ----- Draft rendering ----- */
 async function renderDraft(){
   const state = await readJSON(MATCH + "/match.json");
 
   const T1A = (state.team1?.abbr || state.team1?.name || "T1").toUpperCase();
   const T2A = (state.team2?.abbr || state.team2?.name || "T2").toUpperCase();
 
-  // pool (slug.png)
   const files = (await read(MATCH + "/maps.txt")).split(/\r?\n/).filter(Boolean);
 
-  // manifestit
-  const mapsManifest  = await readJSON(SB + "/Maps/index.json");      // {maps:[{name,slug,mode}]}
-  const modesManifest = await readJSON(SB + "/Gametypes/index.json"); // {modes:[{name,slug}]}
+  const mapsManifest  = await readJSON(SB + "/Maps/index.json");
+  const modesManifest = await readJSON(SB + "/Gametypes/index.json");
   const mapsBySlug = bySlug(mapsManifest.maps || []);
   const modes = (modesManifest.modes || []).slice().sort((a,b)=>(a.name||"").localeCompare(b.name||""));
 
-  // pelatut & voittajat & pick
   const played  = new Set((state.maps||[]).filter(m => m.completed).map(m => m.map));
-  const winners = Object.fromEntries((state.maps||[]).map(m => [m.map, (""+m.winner).toLowerCase()]));   // "t1"/"t2"/""
-  const picksRaw= Object.fromEntries((state.maps||[]).map(m => [m.map, (m.pick||"")])); // "T1"/"T2"/"Team 1"/"Team 2"
+  const winners = Object.fromEntries((state.maps||[]).map(m => [m.map, (""+m.winner).toLowerCase()]));
+  const picksRaw= Object.fromEntries((state.maps||[]).map(m => [m.map, (m.pick||"")]));
   const picks   = {};
   Object.keys(picksRaw).forEach(k=>{
     let v = (""+picksRaw[k]).toUpperCase();
@@ -493,26 +474,23 @@ async function renderDraft(){
     picks[k]=v;
   });
   
-// mikä kartta on pickattu / valittuna missäkin modessa?
 const pickedByMode = {};
 (state.maps || []).forEach(m => {
   const hasPick = ("" + (m.pick || "")).trim() !== "";
   if (!hasPick) return;
   const mk = ((m.mode || (mapsBySlug[nameToSlug(m.map)]?.mode) || "") + "").toLowerCase();
-  if (mk) pickedByMode[mk] = nameToSlug(m.map);   // <-- SLUG talteen
+  if (mk) pickedByMode[mk] = nameToSlug(m.map);
 });
 
-// Lisäksi: jos GUIn "NOW PICK" on vain current-indeksissä
 const ci = Number(state.current || 0) - 1;
 if (ci >= 0 && (state.maps || [])[ci]) {
   const cur = state.maps[ci];
   if (!cur.completed) {
     const mk = ((cur.mode || (mapsBySlug[nameToSlug(cur.map)]?.mode) || "") + "").toLowerCase();
-    if (mk && !pickedByMode[mk]) pickedByMode[mk] = nameToSlug(cur.map); // <-- SLUG
+    if (mk && !pickedByMode[mk]) pickedByMode[mk] = nameToSlug(cur.map);
   }
 }
 
-  // saatavuuslogiikka: modet kerrallaan → kaikki auki kun kaikki käytetty
   const completed = new Set((state.maps||[]).filter(m=>m.completed).map(m=>{
     const meta = mapsBySlug[nameToSlug(m.map)];
     return ((m.mode || (meta?.mode) || "") + "").toLowerCase();
@@ -522,7 +500,6 @@ if (ci >= 0 && (state.maps || [])[ci]) {
       ? new Set(allModeKeys)
       : new Set(allModeKeys.filter(x=>!completed.has(x)));
 
-  // rakenna sarakkeet kaikille modeille dynaamisesti ja skaalaa leveys modien määrän mukaan
   const root = document.getElementById("draftArea");
   root.style.gridTemplateColumns = `repeat(${Math.max(1, modes.length)}, 1fr)`;
   root.innerHTML = "";
@@ -531,14 +508,12 @@ if (ci >= 0 && (state.maps || [])[ci]) {
     const modeKey=(mm.name||"").toLowerCase();
     const col=document.createElement("div"); col.className="col";
 
-    // otsikko + ikoni
     const h=document.createElement("div"); h.className="mode-header";
     if(mm.slug){ const i=document.createElement("img"); i.src=`${SB}/Gametypes/${mm.slug}.png?_=${Date.now()}`; i.alt=mm.name; h.appendChild(i); }
     const lbl=document.createElement("div"); lbl.textContent=(mm.name||modeKey).toUpperCase();
     h.appendChild(lbl);
     col.appendChild(h);
 
-    // kortit (vain poolista ja oikean moden mukaan)
     files.forEach(file=>{
       const slug=file.replace(/\.(png|jpg|jpeg|webp)$/i,"");
       const meta=mapsBySlug[slug]; if(!meta) return;
@@ -549,11 +524,8 @@ if (ci >= 0 && (state.maps || [])[ci]) {
       card.style.backgroundImage=`url('${SB}/Maps/${file}?_=${Date.now()}')`;
       card.innerHTML=`<div class="map-name">${meta.name}</div>`;
 
-      // ÄLÄ harmaannuta pelattuja: disabled vain jos EI pelattu JA mode ei ole tällä hetkellä valittavissa
-      // 1) Pelattuja EI harmaanneta
 		const thisSlug = slug;
 
-		// 1) Pelattuja EI harmaanneta
 		let disable = false;
 
 		if (!played.has(meta.name)) {
@@ -561,18 +533,15 @@ if (ci >= 0 && (state.maps || [])[ci]) {
 		  const isPickedHere = pickedSlugInThisMode && pickedSlugInThisMode === thisSlug;
 
 		  if (pickedSlugInThisMode) {
-			// Jos jokin on pickattu tässä modessa, harmaannutetaan vain MUUT kartat
 			disable = !isPickedHere;
 		  } else {
-			// Ei pickkiä tässä modessa: harmaanna jos mode ei ole nyt käytettävissä
 			disable = !available.has(modeKey);
 		  }
 		}
 
 		if (disable) card.classList.add("disabled");
 
-      // VOITTAJA: liukuväri + keskitetty logo
-      const w = winners[meta.name]; // "t1"/"t2"
+      const w = winners[meta.name];
       if(w==="t1" || w==="t2"){
         const rgbVar = getComputedStyle(document.documentElement)
                          .getPropertyValue(w==="t1" ? "--t1-rgb" : "--t2-rgb").trim() || "255,255,255";
@@ -581,7 +550,7 @@ if (ci >= 0 && (state.maps || [])[ci]) {
         const center = document.createElement("div");
         center.className = "winner-center";
         const img = document.createElement("img");
-        img.src = `${MATCH}/${w.toUpperCase()}Logo.png?_=${Date.now()}`; // T1Logo/T2Logo
+        img.src = `${MATCH}/${w.toUpperCase()}Logo.png?_=${Date.now()}`;
         img.alt = w.toUpperCase();
         center.appendChild(img);
         card.appendChild(center);
@@ -589,13 +558,12 @@ if (ci >= 0 && (state.maps || [])[ci]) {
         card.classList.add(w==="t1" ? "winner-t1" : "winner-t2");
       }
 
-      // PICK-badge: logo + abbr + "PICK" – mutta älä näytä jos kartta on jo pelattu (winner näkyy)
-      const p = (picks[meta.name]||"").toUpperCase(); // "T1"/"T2"
+      const p = (picks[meta.name]||"").toUpperCase();
       if((p==="T1" || p==="T2") && !(w==="t1" || w==="t2")){
         const b=document.createElement("div");
         b.className="badge pick";
         const img=document.createElement("img");
-        img.src=`${MATCH}/${p}Logo.png?_=${Date.now()}`; // T1Logo/T2Logo
+        img.src=`${MATCH}/${p}Logo.png?_=${Date.now()}`;
         img.alt=p;
         b.appendChild(img);
         const txt=document.createElement("span");
@@ -604,15 +572,14 @@ if (ci >= 0 && (state.maps || [])[ci]) {
         b.appendChild(txt);
         card.appendChild(b);
 
-        // fokus-efekti valitulle kartalle
         card.classList.add(p==="T1" ? "picked-t1" : "picked-t2");
       }
 
       col.appendChild(card);
     });
 	const count = col.querySelectorAll('.map-card').length;
-	const GAP = 12;           // vastaa .col { gap:12px; }
-	const BASE = 200;         // peruskortin korkeus
+	const GAP = 12;
+	const BASE = 200;
 	const TOTAL = 3*BASE + 2*GAP;
 	const perCard = count > 0 ? (TOTAL - (count-1)*GAP) / count : BASE;
 	col.style.setProperty('--card-h', `${Math.max(120, perCard)}px`);
@@ -620,7 +587,6 @@ if (ci >= 0 && (state.maps || [])[ci]) {
   });
 }
 
-/* ----- Kevyt vahti: reagoi pooliin, tiimitiedostoihin JA match.json/maps-muutoksiin ----- */
 let _prevSig=null;
 async function tick(){
   try{
@@ -632,11 +598,9 @@ async function tick(){
       readJSON(MATCH+"/match.json"),
     ]);
 
-    // Ota bannit talteen
     const b1 = (state.team1?.banned_hero || "").trim();
     const b2 = (state.team2?.banned_hero || "").trim();
 
-    // tiivis allekirjoitus: pool + tiimit + olennaiset tiedot
     const mapsSig = JSON.stringify((state.maps||[]).map(m=>({
       map:m.map, completed:!!m.completed, winner:(m.winner||""), pick:(m.pick||""), mode:(m.mode||"")
     })));
@@ -652,7 +616,6 @@ async function tick(){
       await renderDraft();
     }
 	upStatusText().catch(()=>{});
-    // Päivitä bannit joka kierroksella
     await renderCornerBans(state);
 
   }finally{

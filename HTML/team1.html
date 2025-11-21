@@ -14,16 +14,15 @@
             font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
 
   :root{
-    --primary:#0f1114;   /* tausta */
-    --text:#ffffff;      /* teksti */
+    --primary:#0f1114;
+    --text:#ffffff;
     --muted:#00000;
-    --tcolor:#27AAE1;    /* tiimiväri T1 */
-    --card:#141a20;      /* kortin pinta */
+    --tcolor:#27AAE1;
+    --card:#141a20;
   }
 
   .wrap{position:relative; width:1920px; height:1080px; color:var(--text)}
 
-  /* Header */
   .header{
     position:absolute; top:24px; left:64px; right:64px; height:110px;
     display:flex; align-items:center; gap:18px;
@@ -35,7 +34,6 @@
   .hdr-name{font-size:56px; font-weight:900; text-transform:uppercase; letter-spacing:.5px;
             white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
-  /* Starters grid (max 5) */
   .starters{
     position:absolute; left:64px; right:64px; top:160px;
     display:grid; grid-template-columns:repeat(3,1fr); gap:22px;
@@ -52,7 +50,6 @@
   .p-name{font-size:40px; font-weight:900; text-transform:uppercase; white-space:nowrap;
           overflow:hidden; text-overflow:ellipsis}
   .p-row{display:flex; align-items:center; gap:10px}
-	/* Rooli-ikoni */
 	.roleimg{
 	  width:28px; height:28px;
 	  object-fit:contain; display:block;
@@ -63,9 +60,8 @@
 
   .muted{color:var(--muted); font-weight:700; font-size:28px;letter-spacing:.3px}
 
-  /* Subs row (rest) */
   .subs{
-    position:absolute; left:64px; right:64px; bottom:64px; display:none;  /* hidden if empty */
+    position:absolute; left:64px; right:64px; bottom:64px; display:none;
     gap:22px; align-items:stretch;
   }
   .sub{flex:1 1 0; display:flex; gap:14px; align-items:center; min-height:150px;
@@ -73,14 +69,12 @@
        border-radius:12px; max-width:450px; padding:12px 14px; box-shadow:0 6px 18px rgba(0,0,0,.2)}
   .sub .hero{width:170px; height:126px; border-radius:10px}
   .sub .p-name{font-size:32px}
-  .sub .roleimg{ width:24px; height:24px; } /* pienempi varapelaajille */
+  .sub .roleimg{ width:24px; height:24px; }
   
-/* ==== Staggered fade-in for player cards ==== */
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-/* lähtötilassa piilossa */
 .card, .sub { opacity: 0; }
 
 </style>
@@ -158,7 +152,7 @@
       const name=(await read(`${MATCH}/${TEAM}P${i}Name.txt`)).trim();
       const role=(await read(`${MATCH}/${TEAM}P${i}Role.txt`)).trim();
       const hero=(await read(`${MATCH}/${TEAM}P${i}Hero.txt`)).trim();
-      if(!name) continue; // vain nimetyt
+      if(!name) continue;
       arr.push({i,name,role,hero});
     }
     return arr;
@@ -168,7 +162,6 @@ function createStarter(p){
   const card = document.createElement("div"); 
   card.className = "card";
 
-  // Hero-kuva
   const heroBox = document.createElement("div"); 
   heroBox.className = "hero";
   const img = document.createElement("img"); 
@@ -179,19 +172,17 @@ function createStarter(p){
     ok(path).then(exists => { if (exists) img.src = path + "?_=" + Date.now(); });
   }
 
-  // Tekstit
   const meta = document.createElement("div"); 
   meta.className = "meta";
   const name = document.createElement("div"); 
   name.className = "p-name"; 
   name.textContent = p.name.toUpperCase();
 
-  // Rooli-IKONI + label
   const row = document.createElement("div"); 
   row.className = "p-row";
   const rIcon = document.createElement("img"); 
   rIcon.className = "roleimg";
-  setRoleIcon(rIcon, p.role);                   // ei awaitia
+  setRoleIcon(rIcon, p.role);
   const rLabel = document.createElement("div"); 
   rLabel.className = "muted";
   rLabel.textContent = parseRole(p.role).label;
@@ -226,7 +217,7 @@ function createSub(p){
   row.className = "p-row";
   const rIcon = document.createElement("img"); 
   rIcon.className = "roleimg";
-  setRoleIcon(rIcon, p.role);                   // ei awaitia
+  setRoleIcon(rIcon, p.role);
   const rLabel = document.createElement("div"); 
   rLabel.className = "muted";
   rLabel.textContent = parseRole(p.role).label;
@@ -237,8 +228,6 @@ function createSub(p){
   return card;
 }
 
-// Kuinka kauan odotetaan ennen kuin aloitetaan sisääntulo (ms).
-// Oletus osuu transition.html-animaation loppuun (~1.8s). Yliaja URL:lla ?stinger=2000
 function getStingerStartMs(){
   const qs = new URLSearchParams(location.search);
   const q = parseInt(qs.get("stinger") || qs.get("delay") || "", 10);
@@ -246,19 +235,16 @@ function getStingerStartMs(){
   return 1800;
 }
 
-// Aja korttien "yksi kerrallaan" -animaatio
 function applyStagger(){
-  const base = getStingerStartMs();     // startti transitionin jälkeen
-  const step = 150;                     // väli pelaajien välillä (ms)
+  const base = getStingerStartMs();
+  const step = 150;
   const nodes = [
     ...document.querySelectorAll("#starters .card"),
     ...document.querySelectorAll("#subs .sub"),
   ];
   nodes.forEach((el, i) => {
     const delay = base + i * step;
-    // resetoi mahdollinen aiempi anim
     el.style.animation = "none";
-    // force reflow
     void el.offsetWidth;
     el.style.animation = `fadeIn 680ms ease-out ${delay}ms both`;
   });
@@ -297,7 +283,6 @@ function applyStagger(){
         }catch{}
       };
     }catch{}
-    // fallback poll 1.5s
   }
 
   (async()=>{ await render(); startSSE(); })();

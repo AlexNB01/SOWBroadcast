@@ -12,16 +12,15 @@
 
   html,body{margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden}
   :root{
-    --primary:#0f1114;    /* General: primary */
-    --secondary:#ffffff;  /* General: secondary */
-    --tertiary:#3a3a90;   /* General: tertiary */
-    --quaternary:#2f3a43; /* General: quaternary */
+    --primary:#0f1114;
+    --secondary:#ffffff;
+    --tertiary:#3a3a90;
+    --quaternary:#2f3a43;
   }
 
   video{position:absolute; inset:0; width:1920px; height:1080px; object-fit:cover; background:#000}
   .hidden{display:none}
 
-  /* Replay badge vas. yläreunassa */
   .replaytext{
     position:absolute; top:210px; left:30px; display:flex; flex-direction:column; align-items:flex-start;
     font-family:'Rajdhani',sans-serif; text-transform:uppercase; pointer-events:none;
@@ -36,7 +35,7 @@
     padding:6px 12px;
     font-weight:900; font-size:48px; letter-spacing:.5px;
     box-shadow:0 8px 22px rgba(0,0,0,.25);
-    animation: slidein 900ms cubic-bezier(0,0,0,1) 1200ms both; /* pieni viive */
+    animation: slidein 900ms cubic-bezier(0,0,0,1) 1200ms both;
   }
 
   @keyframes slidein{
@@ -47,7 +46,6 @@
 </head>
 <body>
 
-  <!-- Kaksoisbufferointi ettei vilku -->
   <video id="v1" class=""  autoplay loop playsinline></video>
   <video id="v2" class="hidden" autoplay loop playsinline></video>
 
@@ -102,14 +100,10 @@
   }
 
   async function tick(){
-    // värit voidaan hakea harvakseltaan, mutta se on kevyt -> annat olla
-    // hae viimeisin polku
     const name = (await read(REPLAY+"/replaypath.txt")).trim();
     if(!name){ return; }
     if(name !== lastName){
-      // OBS/Windows: vaihdetaan mahdolliset "ö"/"ä" yms. jos tallentaa erikoismerkkejä – me kopioimme nimen sellaisenaan,
-      // joten ei tehdään aggressiivista korjausta. Rakennetaan polku Playlistiin:
-      const src = `${PLAYLIST}/${encodeURIComponent(name)}`; // välilyönnit toimii
+      const src = `${PLAYLIST}/${encodeURIComponent(name)}`;
       swapTo(src);
       lastName = name;
     }

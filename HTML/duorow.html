@@ -7,12 +7,10 @@
 <meta http-equiv="Expires" content="0"/>
 <title>Duo Cam Row</title>
 <style>
-  /* ===== Fonts ===== */
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
   @font-face{font-family:'FontAwesome';src:url("fonts/Font Awesome/Font Awesome 5 Brands-Regular-400.otf") format('OpenType')}
 
-  /* ===== Base ===== */
   html,body{
     margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden;
     font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
@@ -21,25 +19,21 @@
   }
 
   :root{
-    /* Värit (luetaan JS:llä General/colors.txt:stä) */
-    --primary:#0f1114;        /* korttien tausta */
-    --secondary:#ffffff;      /* tekstit */
-    --tertiary:#3a3a90;       /* korostus */
-    --quaternary:#2f3a43;     /* score-tausta */
-    --t1:#27AAE1;             /* tiimivärit */
+    --primary:#0f1114;       
+    --secondary:#ffffff;      
+    --tertiary:#3a3a90;      
+    --quaternary:#2f3a43;     
+    --t1:#27AAE1;             
     --t2:#C80013;
 
-    /* Mitat & tyyli */
     --radius:12px;
     --radius-sm:10px;
     --shadow:0 8px 22px rgba(0,0,0,.25);
 
-    /* Scoreboard-mitat */
     --sb-w:1620px;
     --sb-h:100px;
   }
 
-  /* ===== Scoreboard (sama kuin singlecam) ===== */
   .scoreboardwrapper{
     position:absolute; left:0; top:40px; width:1920px; height:calc(var(--sb-h) + 10px);
     display:flex; align-items:center; justify-content:center; pointer-events:none;
@@ -68,49 +62,44 @@
   .vs{ height:100%; display:flex; align-items:center; justify-content:center;
        padding:0 30px; background:var(--tertiary); color:var(--primary); font-size:68px; font-weight:900; }
 
-  /* ===== Duo Cam Row ===== */
   .duo {
     position:absolute; left:0; top:220px; width:1920px; height:750px;
     display:flex; align-items:center; justify-content:center; gap:48px; pointer-events:none;
   }
 	.frame{
-	  position:relative; width:848px; height:549px; /* 16:9 */
-	  background:transparent;                      /* kamera näkyy OBS:sta läpi */
+	  position:relative; width:848px; height:549px;
+	  background:transparent;                     
 	  box-sizing:border-box;
-	  /* korostus: vasen + oikea + ala – yhdellä inset box-shadowilla */
 	  box-shadow:
-		inset 6px 0 0 var(--tertiary),             /* vasen */
-		inset -6px 0 0 var(--tertiary),            /* oikea */
-		inset 0 -6px 0 var(--tertiary),            /* ala */
-		0 12px 28px rgba(0,0,0,.35);               /* ulkoinen varjo */
-	  outline: none;                                /* ei erillistä outlinea */
+		inset 6px 0 0 var(--tertiary),             
+		inset -6px 0 0 var(--tertiary),            
+		inset 0 -6px 0 var(--tertiary),            
+		0 12px 28px rgba(0,0,0,.35);              
+	  outline: none;                                
 	}
 
-	/* ei tarvita enää pseudo-elementtejä */
 	.frame::before, .frame::after{ content:none; }
 
   .frame.left::before{ left:0;  background:var(--tertiary); border-radius:18px 0 0 18px; }
   .frame.right::after{ right:0; background:var(--tertiary); border-radius:0 18px 18px 0; }
 
-  /* Nimiplanssi kiinni kehyksen alareunaan */
 	.plate{
-	  position:absolute; left:0; right:0; bottom:0; height:72px; /* koko leveys */
+	  position:absolute; left:0; right:0; bottom:0; height:72px; 
 	  background:var(--primary);
-	  border:0;                       /* ei omia reunoja */
-	  border-radius:0;                /* ei pyöristyksiä */
-	  box-shadow:none;                /* ei erillistä varjoa */
+	  border:0;                       
+	  border-radius:0;                
+	  box-shadow:none;                
 	  display:flex; align-items:center; justify-content:center; gap:16px;
 	  padding:0 18px;
 	}
   .staffname{ font-size:40px; letter-spacing:.6px; color:var(--secondary); }
 
-  /* ===== Footer (sama API kuin singlecamissa, piilotettuna toistaiseksi) ===== */
   .footer{ display:none; }
-  /* Status – caster-tyyli */
+
 #status{
   position:absolute;
   left:50%; bottom:6%; transform:translateX(-50%);
-  display:none;                  /* näkyy vain kun on sisältöä */
+  display:none;                 
   max-width:80vw;
   padding:14px 28px;
   line-height:1.2;
@@ -126,14 +115,12 @@
   text-align:center; text-transform:uppercase;
 
   white-space:pre-wrap; word-break:break-word;
-  pointer-events:none;           /* ettei vie klikkauksia */
+  pointer-events:none;
 }
 
 </style>
 </head>
 <body>
-
-  <!-- Scoreboard -->
   <div class="scoreboardwrapper">
     <div class="scorebar">
       <div class="team team1">
@@ -149,8 +136,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Duo cam frames -->
   <div class="duo">
     <div class="frame left">
       <div class="plate">
@@ -166,7 +151,6 @@
 <div id="status"></div>
 
 <script>
-  // ---------- Polut ----------
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
   async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
   async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
@@ -181,7 +165,6 @@ async function upStatus(){
   el.style.display = txt ? "inline-block" : "none";
 }
 
-  // ---------- Värit ----------
   async function applyColors(){
     const kv={};
     (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
@@ -194,7 +177,6 @@ async function upStatus(){
     document.documentElement.style.setProperty("--quaternary",q);
   }
 
-  // ---------- Tiimit ----------
   async function upT1(){
     document.getElementById("t1name").textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
     document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0";
@@ -219,7 +201,6 @@ async function upStatus(){
     document.getElementById("t2scorebox").style.display=show?"flex":"none";
   }
 
-  // ---------- Casters ----------
   function parseHandle(line){
     const n=(line||"").trim(); if(!n) return {name:"",handle:""};
     const m=n.match(/\s+@([A-Za-z0-9_]+)/);
@@ -232,7 +213,6 @@ async function upStatus(){
     document.getElementById("caster2name").textContent=c2.name.toUpperCase();
   }
 
-  // ---------- Init + SSE ----------
   async function renderAll(){
     await applyColors();
     await Promise.all([upT1(), upT2(), upCasters()]);

@@ -144,36 +144,24 @@ video{ width:100%; height:100%; background:#000; object-fit:cover; }
 </head>
 <body>
 <div class="root">
-  <!-- Vasen palkki: teksti + (kelluva) logo-->
   <div class="left-column">
-    <!-- Yläteksti -->
     <div class="bigtext">
       <span id="endText">Thank You for Watching!</span>
     </div>
-
-    <!-- Logo keskellä palkkia (näkyy kun OverlayLogo.png löytyy) -->
     <img id="overlayLogo" class="overlay-logo" alt="overlay logo" style="display:none;">
 </div>
-  <!-- Oikea: videoruutu (1420x799) -->
   <div class="video-wrap">
     <video id="player" autoplay muted playsinline></video>
     <div id="noVideo" class="novideo" style="display:none;">NO VIDEOS CONFIGURED</div>
   </div>
-
-  <!-- Liukuteksti (videon alla) -->
   <div class="ticker">
     <div id="tickerInner" class="ticker-inner"></div>
   </div>
-    <!-- Socials (bottom bar) -->
   <div id="socials" class="socials" style="display:none;"></div>
-
 </div>
-
-
 <script>
-// --- Paths & helpers ---
 const IS_UNDER_HTML = location.pathname.toLowerCase().includes("/html/");
-let ROOT = IS_UNDER_HTML ? ".." : ".";          // jos sivu asuu /HTML/, noustaan ylös
+let ROOT = IS_UNDER_HTML ? ".." : ".";
 let SB, GENERAL, MATCH, WAIT;
 
 function setRoots(){
@@ -185,7 +173,6 @@ function setRoots(){
 setRoots();
 
 async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
-// Jos mennäänkin eri rakenteessa, koita vielä varmistaa ROOT heuristiikalla:
 (async ()=>{
   if (!(await ok(GENERAL + "/colors.txt"))) {
     for (const cand of ["..","../..","." ]) {
@@ -211,9 +198,8 @@ const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim()
     document.documentElement.style.setProperty("--quaternary",q);
   }
 
-	// Etsi overlay-logo tyypillisestä polusta
 async function resolveOverlayLogo(){
-  const p = GENERAL + "/OverlayLogo.png";   // GUI exportoi tänne
+  const p = GENERAL + "/OverlayLogo.png";
   try{
     const r = await fetch(p + "?_=" + Date.now(), { method:"HEAD" });
     if (r.ok) return p;
@@ -227,8 +213,6 @@ async function upOverlayLogo(){
   if (path){
     img.src = path + "?_=" + Date.now();
     img.style.display = "block";
-    // halutessasi lisää reunaviiva:
-    // img.classList.add("stroke");
   }else{
     img.removeAttribute("src");
     img.style.display = "none";
@@ -250,8 +234,6 @@ function positionOverlayLogo(){
   img.style.height = `${targetH}px`;
 }
 
-
-// Aja keskitys aina kun logo päivittyy, teksti muuttuu tai ikkuna skaalautuu
 const _oldUpOverlayLogo = upOverlayLogo;
 upOverlayLogo = async function(){
   await _oldUpOverlayLogo();
@@ -268,7 +250,6 @@ upendText = async function(){
 window.addEventListener("resize", function(){ fitBigText(); positionOverlayLogo(); });
 document.fonts && document.fonts.ready && document.fonts.ready.then(function(){ fitBigText(); positionOverlayLogo(); });
 
-  // --- Thank You for Watching text ---
   async function upendText(){
     const txt=(await read(WAIT+"/text_end.txt")).trim() || "Thank You for Watching!";
     document.getElementById("endText").textContent = txt.toUpperCase();
@@ -276,21 +257,17 @@ document.fonts && document.fonts.ready && document.fonts.ready.then(function(){ 
 
 async function upTicker(){
   try {
-    // Katso käytetäänkö overridea
     const useRaw = (await read(WAIT + "/ticker_use_override.txt")).trim();
     if (useRaw === "1") {
       const over = (await read(WAIT + "/ticker_override.txt"));
       const txt = over.trim();
       if (txt) {
         document.getElementById("tickerInner").textContent = txt;
-        return; // älä lue matchtextiä jos override on voimassa
+        return;
       }
     }
   } catch (e) {
-    // jos jokin menee pieleen, tippuu defaulttiin
   }
-
-  // Default: käytä Match/matchtext.txt
   const raw = (await read(MATCH + "/matchtext.txt")).trim();
   document.getElementById("tickerInner").textContent = raw;
 }
@@ -303,7 +280,6 @@ function labelFor(kind, handle){
   return "@" + handle;
 }
 
-// Yritä ladata brändi-SVG paikallisesta kansiosta; jos puuttuu, käytä fallback-ikonia
 async function iconNode(kind){
   const path = GENERAL + "/Icons/" + kind + ".svg";
   try{
@@ -316,7 +292,6 @@ async function iconNode(kind){
       return img;
     }
   }catch{}
-  // Fallback-ikoni (currentColor → valkoinen)
   const wrap = document.createElement("span");
   wrap.className = "social-icon";
   wrap.innerHTML = ({
@@ -342,12 +317,11 @@ function onlyHandle(kind, val){
     web:/^/
   };
   if(doms[kind]) s = s.replace(doms[kind], "");
-  s = s.replace(/^[@\/]+/, "");         // poista johtavat @ ja /
-  s = s.split(/[\/\?\#]/)[0];           // katkaise
+  s = s.replace(/^[@\/]+/, "");
+  s = s.split(/[\/\?\#]/)[0];
   return s;
 }
 
-// Rakenna rivin sisällöt
 async function upSocials(){
   const el = document.getElementById("socials");
   try{
@@ -377,7 +351,7 @@ async function upSocials(){
     }
 
     el.style.display = el.childElementCount ? "flex" : "none";
-    autoScaleSocials();  // skaalaa fontti jäljellä olevaan tilaan
+    autoScaleSocials();
   }catch(e){
     el.style.display="none"; el.innerHTML=""
   }
@@ -421,11 +395,10 @@ function fitBigText(){
   const span = document.getElementById("endText");
   if(!box || !span) return;
 
-  const MAX_SIZE = 68;   // sama kuin CSS
+  const MAX_SIZE = 68;
   const MIN_SIZE = 14;
-  const SAFETY  = 16;    // px, ettei osu sivulistoihin
+  const SAFETY  = 16;
 
-  // Rivitä vain välilyönneistä, ei tavutusta
   span.style.whiteSpace   = "normal";
   span.style.wordBreak    = "keep-all";
   span.style.overflowWrap = "normal";
@@ -433,19 +406,15 @@ function fitBigText(){
   span.style.display      = "block";
   span.style.width        = "100%";
 
-  // Käytettävissä oleva leveys (sis. turvamarginaali)
   const cs = getComputedStyle(box);
   const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
   const available = Math.max(0, box.clientWidth - padX - SAFETY);
 
-  // Etsi pisin sana
   const words = (span.textContent || "").trim().split(/\s+/).filter(Boolean);
   const longest = words.reduce((a,w)=> w.length>a.length ? w : a, "");
 
-  // Jos ei tekstiä, ei tehdä mitään
   if (!longest) { span.style.fontSize = MAX_SIZE + "px"; return; }
 
-  // Mittaus-solmu pituuden mittaamiseen
   const meas = document.createElement("span");
   const sCS = getComputedStyle(span);
   meas.style.position = "absolute";
@@ -454,11 +423,10 @@ function fitBigText(){
   meas.style.fontFamily = sCS.fontFamily;
   meas.style.fontWeight = sCS.fontWeight;
   meas.style.letterSpacing = sCS.letterSpacing;
-  meas.style.textTransform = sCS.textTransform; // uppercase
+  meas.style.textTransform = sCS.textTransform;
   meas.textContent = longest;
   document.body.appendChild(meas);
 
-  // Binäärihaku: skaalataan niin, että **pisin sana** mahtuu
   let lo = MIN_SIZE, hi = MAX_SIZE, best = MIN_SIZE;
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
@@ -471,18 +439,13 @@ function fitBigText(){
     }
   }
 
-  // Aseta lopullinen koko ja siivoa
   span.style.fontSize = best + "px";
   meas.remove();
 }
 
-
-
-
-  // --- Video playlist ---
   let playlist = []; let playIndex = 0;
 	function resolveUrl(_base, file){
-	  return WAIT + "/Playlist/" + file;  // videot HTTP:n yli Playlististä
+	  return WAIT + "/Playlist/" + file; 
 	}
   async function loadPlaylist(){
     const base = (await read(WAIT+"/videos_dir.txt")).trim();
@@ -500,7 +463,7 @@ function fitBigText(){
     if(playIndex<0 || playIndex>=playlist.length) playIndex = 0;
     const src = playlist[playIndex];
     v.src = src;
-    try{ await v.play(); }catch(e){ /* autoplay might be blocked if unmuted; we keep muted */ }
+    try{ await v.play(); }catch(e){}
   }
   function nextVideo(){
     if(playlist.length===0) return;
@@ -513,7 +476,7 @@ function fitBigText(){
     v.addEventListener("error", nextVideo);
   })();
 
-  // --- SSE updates (hot reload on change) ---
+
 function startSSE(){
   try{
     const es=new EventSource("/events");

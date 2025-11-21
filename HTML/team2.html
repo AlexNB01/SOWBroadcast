@@ -16,15 +16,14 @@
   }
 
   :root{
-    --primary:#0f1114;     /* korttien tausta (General/primary) */
-    --text:#ffffff;        /* teksti (General/secondary)        */
+    --primary:#0f1114;
+    --text:#ffffff;
     --muted:#00000;
-    --tcolor:#C80013;      /* tiimin väri T2Color.txt           */
+    --tcolor:#C80013;
   }
 
   .wrap{position:relative;width:1920px;height:1080px;color:var(--text)}
 
-  /* Header */
   .header{
     position:absolute;top:24px;left:64px;right:64px;height:110px;
     display:flex;align-items:center;gap:18px;
@@ -39,8 +38,6 @@
     font-size:56px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis
   }
-
-  /* Starters (max 5) */
   .starters{
     position:absolute;left:64px;right:64px;top:160px;
     display:grid;grid-template-columns:repeat(3,1fr);gap:22px
@@ -63,7 +60,6 @@
   .p-row{display:flex;align-items:center;gap:10px}
   .muted{color:var(--muted); font-weight:700; font-size:28px;letter-spacing:.3px}
 
-  /* Rooli-ikoni */
 	.roleimg{
 	  width:28px; height:28px;
 	  object-fit:contain; display:block;
@@ -71,7 +67,6 @@
 	  border-radius:4px;
 	}
 
-  /* Subs (loput pelaajat) */
   .subs{
     position:absolute;left:64px;right:64px;bottom:64px;display:none;
     gap:22px;align-items:stretch
@@ -85,12 +80,10 @@
   .sub .p-name{font-size:32px}
   .sub .roleimg{width:24px;height:24px}
   
-  /* ==== Staggered fade-in for player cards ==== */
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-/* lähtötilassa piilossa */
 .card, .sub { opacity: 0; }
 
 </style>
@@ -107,7 +100,6 @@
 </div>
 
 <script>
-  /* ---------- Polut & apurit ---------- */
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
   const ROLES = SB + "/Roles";
   const TEAM="T2";
@@ -161,7 +153,7 @@
       const name=(await read(`${MATCH}/${TEAM}P${i}Name.txt`)).trim();
       const role=(await read(`${MATCH}/${TEAM}P${i}Role.txt`)).trim();
       const hero=(await read(`${MATCH}/${TEAM}P${i}Hero.txt`)).trim();
-      if(!name) continue;            // näytä vain nimetyt pelaajat
+      if(!name) continue;
       arr.push({i,name,role,hero});
     }
     return arr;
@@ -227,19 +219,16 @@ function getStingerStartMs(){
   return 1800;
 }
 
-// Aja korttien "yksi kerrallaan" -animaatio
 function applyStagger(){
-  const base = getStingerStartMs();     // startti transitionin jälkeen
-  const step = 150;                     // väli pelaajien välillä (ms)
+  const base = getStingerStartMs();
+  const step = 150;
   const nodes = [
     ...document.querySelectorAll("#starters .card"),
     ...document.querySelectorAll("#subs .sub"),
   ];
   nodes.forEach((el, i) => {
     const delay = base + i * step;
-    // resetoi mahdollinen aiempi anim
     el.style.animation = "none";
-    // force reflow
     void el.offsetWidth;
     el.style.animation = `fadeIn 680ms ease-out ${delay}ms both`;
   });
@@ -280,7 +269,6 @@ function applyStagger(){
         }catch{}
       };
     }catch{}
-    // fallback-poll
   }
 
   (async()=>{ await render(); startSSE(); })();

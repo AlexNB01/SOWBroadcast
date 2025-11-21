@@ -7,12 +7,10 @@
 <meta http-equiv="Expires" content="0"/>
 <title>Duo Single Cam</title>
 <style>
-  /* Fonts */
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
   @font-face{font-family:'FontAwesome';src:url("fonts/Font Awesome/Font Awesome 5 Brands-Regular-400.otf") format('OpenType')}
 
-  /* Base */
   html,body{
     margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden;
     font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
@@ -21,36 +19,30 @@
   }
 
   :root{
-    /* Värit (General/colors.txt + tiimivärit JS:stä) */
-    --primary:#0f1114;         /* korttien tausta */
-    --secondary:#ffffff;       /* tekstit */
-    --tertiary:#3a3a90;        /* korostuslaatikot */
-    --quaternary:#2f3a43;      /* score-tausta */
+    --primary:#0f1114;
+    --secondary:#ffffff;
+    --tertiary:#3a3a90; 
+    --quaternary:#2f3a43;
     --t1:#27AAE1;
     --t2:#C80013;
 
-    /* Mitat & tyyli */
     --radius:12px;
     --radius-sm:8px;
     --gap:16px;
     --shadow:0 8px 22px rgba(0,0,0,.25);
     --shadow-iso:0 10px 26px rgba(0,0,0,.28);
 
-    /* Scoreboard-mitat */
     --sb-w:1620px;
     --sb-h:100px;
 
-    /* Caster-alapalkki */
     --caster-h:120px;
   }
 
-/* -------- Scoreboard yläreunaan -------- */
 .scoreboardwrapper{
   position:absolute; left:0; top:40px; width:1920px; height:calc(var(--sb-h) + 10px);
   display:flex; align-items:center; justify-content:center; pointer-events:none;
 }
 
-/* Yksi yhtenäinen kortti, jonka sisällä 1fr | auto | 1fr */
 .scorebar{
   width:var(--sb-w); height:var(--sb-h);
   background:var(--primary); color:var(--tertiary);
@@ -58,19 +50,17 @@
   position:relative; display:grid; grid-template-columns:1fr auto 1fr;
   align-items:center;padding:0 16px;
 }
-/* Tiimiväriset kylkiraidat */
 .scorebar::before, .scorebar::after{
   content:""; position:absolute; top:0; bottom:0; width:8px;
 }
 .scorebar::before{ left:0;  background:var(--t1); border-radius:var(--radius) 0 0 var(--radius); }
 .scorebar::after { right:0; background:var(--t2); border-radius:0 var(--radius) var(--radius) 0; }
 
-/* Segmentit: läpinäkyvät, ei omia varjoja/bordereita */
 .team{
   height:100%; display:flex; align-items:center; gap:16px;
   background:transparent; border:0; box-shadow:none;
 }
-.team2{ flex-direction:row-reverse; }       /* score | logo | nimi oikealle */
+.team2{ flex-direction:row-reverse; }
 .team2 .teamname{ text-align:center; }
 
 .teamlogo{
@@ -84,30 +74,25 @@
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--secondary); text-align:center;
 }
 
-/* Score-palat pysyvät pystyyn koko kortin korkeudelle */
 .scorebox{
-  flex:0 0 105px; height:100%;       /* hieman matalampi kuin koko kortti */
+  flex:0 0 105px; height:100%;
   display:flex; align-items:center; justify-content:center;
   background:var(--quaternary);
 }
 .teamscore{ font-size:68px; font-weight:900; line-height:1; color:#ffffff;}
 
-/* Keskellä pillinä oleva VS */
 .vs{
   height:100%; display:flex; align-items:center; justify-content:center;
   padding:0 30px; background:var(--tertiary); color:var(--primary);
   font-size:68px; font-weight:900;
 }
 
-
-/* -------- Casterit alalaitaan -------- */
 .wrapper{
   position:absolute; left:0; bottom:0; width:1920px; height:125px;
   display:flex; align-items:center; justify-content:center;
 }
 .row{ display:flex; gap:50px; }
 
-/* Kehikko pois, tumma kortti + vasen accent kuten scoreboardissa */
 .camerabox{
   width:500px; height:66px; pointer-events:none;
   background:transparent; border:0; box-shadow:none;
@@ -116,7 +101,7 @@
   width:100%; height:100%;
   background:var(--primary);
   border-left:8px solid var(--tertiary);
-  border-right:8px solid var(--tertiary);   /* <-- lisätty */
+  border-right:8px solid var(--tertiary);
   border-radius:12px;
   display:flex; align-items:center; justify-content:center;
   box-shadow:0 8px 22px rgba(0,0,0,.25);
@@ -133,7 +118,6 @@
   font-size:40px; letter-spacing:.6px; color:var(--secondary);
 }
 
-/* @handle hillittynä badgena, ei caps */
 .twitter{
   font-size:26px; color:var(--secondary); text-transform:none; letter-spacing:.3px;
   padding:6px 10px; border-radius:8px;
@@ -143,7 +127,6 @@
   font-family:'FontAwesome'; content:"\f099"; margin-right:8px; opacity:.9;
 }
 
-/* -------- Footer-logot -------- */
 .footer{
   position:absolute; left:0; bottom:0; width:1920px; height:80px;
   display:flex; align-items:center; justify-content:space-between; padding:0 25px; pointer-events:none;
@@ -158,8 +141,6 @@
 
 </head>
 <body>
-
-  <!-- Scoreboard -->
 <div class="scoreboardwrapper">
   <div class="scorebar">
     <div class="team team1">
@@ -177,9 +158,6 @@
     </div>
   </div>
 </div>
-
-
-  <!-- Casters -->
   <div class="wrapper">
     <div class="row">
       <div class="camerabox">
@@ -201,14 +179,12 @@
     </div>
   </div>
 <script>
-  // ---------- Polut ----------
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
   async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
   async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
   const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
   const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
 
-  // ---------- Värit ----------
   async function applyColors(){
     const kv={};
     (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
@@ -221,7 +197,6 @@
     document.documentElement.style.setProperty("--quaternary",q);
   }
 
-  // ---------- Tiimit ----------
   async function upT1(){
     document.getElementById("t1name").textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
     document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0";
@@ -246,7 +221,6 @@
     document.getElementById("t2scorebox").style.display=show?"flex":"none";
   }
 
-  // ---------- Casters ----------
   function parseHandle(line){
     const n=(line||"").trim();
     if(!n) return {name:"", handle:""};
@@ -262,7 +236,6 @@
     document.getElementById("caster2tw").textContent=c2.handle; document.getElementById("caster2tw").style.display=c2.handle?"inline-block":"none";
   }
 
-  // ---------- Footer-logot ----------
 	async function upFooter(){
 	  const leftEl  = document.getElementById("logoLeft");
 	  const rightEl = document.getElementById("logoRight");
@@ -283,8 +256,6 @@
 	  }
 	}
 
-
-  // ---------- Init + SSE ----------
   async function renderAll(){
     await applyColors();
     await Promise.all([upT1(), upT2(), upCasters(), upFooter()]);
@@ -305,7 +276,6 @@
         }catch{}
       };
     }catch{}
-    // fallback-poll
   }
 
 	(async()=>{

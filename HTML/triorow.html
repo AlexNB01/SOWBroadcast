@@ -21,11 +21,11 @@
   }
 
   :root{
-    --primary:#0f1114;        /* korttien/plate-tausta */
-    --secondary:#ffffff;      /* tekstit */
-    --tertiary:#3a3a90;       /* korostus */
-    --quaternary:#2f3a43;     /* score-tausta */
-    --t1:#27AAE1;             /* tiimivärit */
+    --primary:#0f1114;        
+    --secondary:#ffffff;      
+    --tertiary:#3a3a90;       
+    --quaternary:#2f3a43;     
+    --t1:#27AAE1;             
     --t2:#C80013;
 
     --radius:12px;
@@ -36,7 +36,6 @@
     --sb-h:100px;
   }
 
-  /* ===== Scoreboard (sama kuin singlecam) ===== */
   .scoreboardwrapper{
     position:absolute; left:0; top:40px; width:1920px; height:calc(var(--sb-h) + 10px);
     display:flex; align-items:center; justify-content:center; pointer-events:none;
@@ -65,35 +64,31 @@
   .vs{ height:100%; display:flex; align-items:center; justify-content:center;
        padding:0 30px; background:var(--tertiary); color:var(--primary); font-size:68px; font-weight:900; }
 
-  /* ===== Trio Cam Row ===== */
   .trio {
     position:absolute; left:0; top:220px; width:1920px; height:770px;
     display:flex; align-items:center; justify-content:center; gap:36px; pointer-events:none;
   }
-  /* kolmen kehyksen koot: 596x336 (16:9) mahtuu keskelle */
   .frame{
     position:relative; width:596px; height:505px; background:transparent;
     box-sizing:border-box;
     box-shadow:
-      inset 6px 0 0 var(--tertiary),   /* vasen korostus */
-      inset -6px 0 0 var(--tertiary),  /* oikea korostus */
-      inset 0 -6px 0 var(--tertiary),  /* ala-korostus */
-      0 12px 28px rgba(0,0,0,.35);     /* ulkovarjo */
+      inset 6px 0 0 var(--tertiary),   
+      inset -6px 0 0 var(--tertiary),  
+      inset 0 -6px 0 var(--tertiary),  
+      0 12px 28px rgba(0,0,0,.35);     
   }
   .frame::before,.frame::after{content:none;}
 
-  /* Nimiplanssi koko leveydelle, ilman reunoja/pyöristystä */
   .plate{
     position:absolute; left:0; right:0; bottom:0; height:64px;
     background:var(--primary); border:0; border-radius:0; box-shadow:none;
     display:flex; align-items:center; justify-content:center; gap:14px; padding:0 16px;
   }
   .staffname{ font-size:34px; letter-spacing:.5px; color:var(--secondary); }
-  /* Status – caster-tyyli */
 #status{
   position:absolute;
   left:50%; bottom:6%; transform:translateX(-50%);
-  display:none;                  /* näkyy vain kun on sisältöä */
+  display:none;                  
   max-width:80vw;
   padding:14px 28px;
   line-height:1.2;
@@ -109,14 +104,12 @@
   text-align:center; text-transform:uppercase;
 
   white-space:pre-wrap; word-break:break-word;
-  pointer-events:none;           /* ettei vie klikkauksia */
+  pointer-events:none;           
 }
 
 </style>
 </head>
 <body>
-
-  <!-- Scoreboard -->
   <div class="scoreboardwrapper">
     <div class="scorebar">
       <div class="team team1">
@@ -132,8 +125,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Trio cam frames -->
   <div class="trio">
     <div class="frame">
       <div class="plate">
@@ -153,7 +144,6 @@
   </div>
 <div id="status"></div>
 <script>
-  // ---------- Polut ----------
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
   async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
   async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
@@ -168,7 +158,6 @@ async function upStatus(){
   el.style.display = txt ? "inline-block" : "none";
 }
 
-  // ---------- Värit ----------
   async function applyColors(){
     const kv={};
     (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
@@ -181,7 +170,6 @@ async function upStatus(){
     document.documentElement.style.setProperty("--quaternary",q);
   }
 
-  // ---------- Tiimit ----------
   async function upT1(){
     document.getElementById("t1name").textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
     document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0";
@@ -206,7 +194,6 @@ async function upStatus(){
     document.getElementById("t2scorebox").style.display=show?"flex":"none";
   }
 
-  // ---------- Casters & Host ----------
   function parseHandle(line){
     const n=(line||"").trim(); if(!n) return {name:"",handle:""};
     const m=n.match(/\s+@([A-Za-z0-9_]+)/);
@@ -222,7 +209,6 @@ async function upStatus(){
     document.getElementById("hostname").textContent=h.name.toUpperCase();
   }
 
-  // ---------- Init + SSE ----------
   async function renderAll(){
     await applyColors();
     await Promise.all([upT1(), upT2(), upStaff()]);
