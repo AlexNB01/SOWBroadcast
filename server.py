@@ -1,20 +1,12 @@
-# server.py  — Static + SSE push + /notify
 import os, sys, json, time, argparse, http.server, threading, socketserver
 
-# --- Silent server: don't print tracebacks on client aborts ---
 class SilentHTTPServer(http.server.ThreadingHTTPServer):
     daemon_threads = True
     def handle_error(self, request, client_address):
-        # swallow ConnectionAborted/Reset etc.
         return
 
 
 def _default_base():
-    """
-    Kun paketoituna (--onefile), sys.executable voi osoittaa _MEI-temp-kansioon.
-    Käytä silloin prosessin CWD:tä (launcher.bat tekee pushd {app})
-    tai, varalla, alkuperäisen EXE:n kansiota sys.argv[0]:sta.
-    """
     if getattr(sys, "frozen", False):
         try:
             return os.getcwd()
@@ -23,13 +15,11 @@ def _default_base():
         return os.path.dirname(os.path.abspath(sys.argv[0]))
     return os.path.dirname(os.path.abspath(__file__))
 
-# ---- SSE -tila ----
 _event_id = 0
-_last_payload = ""          # JSON-merkkijono
-_cv = threading.Condition() # ilmoitetaan kun uusi viesti on valmis
+_last_payload = ""
+_cv = threading.Condition()
 
 class PushHandler(http.server.SimpleHTTPRequestHandler):
-    # estä välimuisti staattisillekin pyynnöille
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.send_header("Pragma", "no-cache")
@@ -42,7 +32,6 @@ class PushHandler(http.server.SimpleHTTPRequestHandler):
     def log_error(self, fmt, *args):
         return
 
-    # SSE-virta
     def _handle_events(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -50,7 +39,6 @@ class PushHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Connection", "keep-alive")
         self.end_headers()
 
-        # initial comment line to open stream
         try:
             self.wfile.write(b": connected\n\n")
             self.wfile.flush()
@@ -60,7 +48,6 @@ class PushHandler(http.server.SimpleHTTPRequestHandler):
         last_sent = -1
         while True:
             try:
-                # wait for change or send heartbeat every 15s
                 with _cv:
                     if _event_id == last_sent:
                         _cv.wait(timeout=15.0)
@@ -77,11 +64,8 @@ class PushHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.flush()
                 last_sent = _event_id
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError, Exception):
-                # client closed the connection -> exit quietly
                 break
-
-
-    # POST /notify  — GUI kutsuu tätä ja antaa {"changed":[...]}
+                
     def _handle_notify(self):
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length) if length > 0 else b"{}"
@@ -89,7 +73,6 @@ class PushHandler(http.server.SimpleHTTPRequestHandler):
             data = json.loads(body.decode("utf-8"))
             if not isinstance(data, dict) or "changed" not in data:
                 raise ValueError("missing 'changed'")
-            # talteen ja ilmoitus
             global _event_id, _last_payload
             with _cv:
                 _event_id += 1
@@ -119,7 +102,6 @@ def main():
     p.add_argument("--root", default=None, help="Serve files from this directory")
     args = p.parse_args()
 
-    # *** TÄSSÄ MUUTOS: käytä --root tai _default_base()a ***
     base = os.path.abspath(args.root.strip('"')) if args.root else _default_base()
     os.chdir(base)
 
