@@ -54,13 +54,15 @@
   border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,.28);
   display:block;
 }
-.card.left  { left:43px; padding-left:56px;  }
-.card.right { right:43px; padding-right:56px; }
+.card.left  { left:43px; padding-left:78px;  }
+.card.right { right:43px; padding-right:78px; }
 
 .card .inner{
   position:relative;
   height:100%;
-  display:flex; align-items:center; gap:12px;
+  display:flex;
+  align-items:center;
+  gap:12px;
 }
 .card .inner.left  { justify-content:flex-start; text-align:right; }
 .card .inner.left .name { text-align:right; }
@@ -68,18 +70,30 @@
 .card .inner.right { justify-content:flex-end; }
 
 .card .name{
-  flex:1 1 auto;
-  font-size:40px; font-weight:800;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-transform: uppercase;
+  flex:1 1 0%;
+  min-width:0;
+  font-size:40px;
+  font-weight:800;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-transform:uppercase;
 }
 .card .logo{
-  flex:0 0 56px; width:56px; height:100%;
-  background-size:contain; background-repeat:no-repeat; background-position:center; 
+  flex:0 0 56px;
+  flex-shrink:0;
+  width:56px;
+  height:100%;
+  background-size:contain;
+  background-repeat:no-repeat;
+  background-position:center;
 }
 .card.left  .logo{  background-color: var(--t1); }
 .card.right .logo{  background-color: var(--t2); }
 
 .card .score{
+  flex:0 0 30px;
+  flex-shrink:0;
   width:30px;
   height:100%;
   padding:0;
@@ -88,9 +102,7 @@
   justify-content:center;
   font-size:40px;
   font-weight:900;
-  border-radius:0;
   background:transparent;
-  color:#00000;            
   text-align:center;
 }
 

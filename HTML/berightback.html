@@ -384,9 +384,11 @@ function autoScaleSocials(){
   const chips = Array.from(wrap.querySelectorAll(".social-chip"));
   if (!chips.length) return;
 
+  root.style.setProperty("--social-extra-pad", "0px");
+
   const cs = getComputedStyle(root);
   const min = parseInt(cs.getPropertyValue("--social-font-min")) || 16;
-  const max = parseInt(cs.getPropertyValue("--social-font-max")) || 72;
+  const max = parseInt(cs.getPropertyValue("--social-font-max")) || 40;
   const gapPx = parseFloat(getComputedStyle(wrap).gap) || 0;
   const wrapWidth = wrap.clientWidth;
 
@@ -407,6 +409,7 @@ function autoScaleSocials(){
   const perSide = remaining / (chips.length * 2);
   root.style.setProperty("--social-extra-pad", perSide.toFixed(2) + "px");
 }
+
 
 window.addEventListener("resize", autoScaleSocials);
 document.fonts && document.fonts.ready && document.fonts.ready.then(autoScaleSocials);
@@ -542,7 +545,7 @@ function startSSE(){
   startSSE();
 
   setInterval(upTimer, 500);
-  setInterval(upTicker, 15000);
+  setInterval(upTicker, 1500);
   setInterval(upBrbText, 1500); 
 })();
 

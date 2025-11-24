@@ -3,5 +3,5 @@ T1=0
 T2=0
 Completed=0
 Pick=—
-T1Ban=
-T2Ban=
+T1Ban=Ashe
+T2Ban=Brigitte

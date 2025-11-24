@@ -597,8 +597,6 @@ class GeneralTab(QWidget):
         status_lay.addWidget(self.status_text)
         root.addWidget(status_box)
 
-        self.status_text.textChanged.connect(self._emit_update)
-
         for key, label in self.COLOR_FIELDS:
             row = QHBoxLayout()
             row.addWidget(QLabel(label))
@@ -825,8 +823,6 @@ class WaitingTab(QWidget):
         self.text_starting = QLineEdit("STARTING SOON!")
         self.text_brb      = QLineEdit("BE RIGHT BACK!")
         self.text_end      = QLineEdit("THANK YOU FOR WATCHING")
-        for w in (self.text_starting, self.text_brb, self.text_end):
-            w.textChanged.connect(self.updated.emit)
         grid.addRow("StartingSoon.html:", self.text_starting)
         grid.addRow("BeRightBack.html:",  self.text_brb)
         grid.addRow("EndScreen.html:",    self.text_end)
@@ -837,7 +833,6 @@ class WaitingTab(QWidget):
         self.ticker_override_edit = QLineEdit()
         self.ticker_override_edit.setPlaceholderText("Custom ticker text…")
         self.ticker_override_chk = QCheckBox("Overwrite default ticker text")
-        self.ticker_override_edit.textChanged.connect(self.updated.emit)
         self.ticker_override_chk.toggled.connect(self._on_ticker_override_toggled)
         lay_o.addWidget(self.ticker_override_edit, 1)
         lay_o.addWidget(self.ticker_override_chk)
@@ -852,9 +847,6 @@ class WaitingTab(QWidget):
         self.s_instagram = QLineEdit(); self.s_instagram.setPlaceholderText("@user")
         self.s_discord = QLineEdit(); self.s_discord.setPlaceholderText("/invite")
         self.s_website = QLineEdit(); self.s_website.setPlaceholderText("domain.com")
-
-        for w in (self.s_twitch, self.s_twitter, self.s_youtube, self.s_instagram, self.s_discord, self.s_website):
-            w.textChanged.connect(self.updated.emit)
 
         form_s.addRow("Twitch",   self.s_twitch)
         form_s.addRow("Twitter/X",self.s_twitter)
@@ -902,7 +894,6 @@ class WaitingTab(QWidget):
 
     def _on_ticker_override_toggled(self, checked: bool):
         self.ticker_override_edit.setEnabled(checked)
-        self.updated.emit()
 
     def _reset_timer_clicked(self):
         self._qtimer.stop()
@@ -1871,6 +1862,7 @@ class TournamentApp(QMainWindow):
                 "t1.name","t1.score","t1.color","t1.logo","t1.ban","t1.abbr","t1.players",
                 "t2.name","t2.score","t2.color","t2.logo","t2.ban","t2.abbr","t2.players",
                 "general.caster1","general.caster2","general.host",
+                "waiting.texts","waiting.timer","waiting.videos","waiting.socials",
                 "maps"
             ]
 
@@ -1899,6 +1891,23 @@ class TournamentApp(QMainWindow):
 
         if (og.get("colors") or {}) != (ng.get("colors") or {}):
             keys.append("general.colors")
+
+        ow, nw = old.get("waiting", {}) or {}, new.get("waiting", {}) or {}
+
+        if ((ow.get("text_starting") or "").strip() != (nw.get("text_starting") or "").strip() or
+            (ow.get("text_brb")      or "").strip() != (nw.get("text_brb")      or "").strip() or
+            (ow.get("text_end")      or "").strip() != (nw.get("text_end")      or "").strip()):
+            keys.append("waiting.texts")
+
+        if ((ow.get("timer_seconds") or 0) != (nw.get("timer_seconds") or 0) or
+            bool(ow.get("timer_running")) != bool(nw.get("timer_running"))):
+            keys.append("waiting.timer")
+
+        if (ow.get("videos_dir") or "").strip() != (nw.get("videos_dir") or "").strip():
+            keys.append("waiting.videos")
+            
+        if (ow.get("socials") or {}) != (nw.get("socials") or {}):
+            keys.append("waiting.socials")
 
         def cmp_team(prefix, o, n):
             if o.get("name") != n.get("name"): keys.append(f"{prefix}.name")
