@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Brackets</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+
+  html,body{
+    margin:0; padding:0; width:1920px; height:1080px; overflow:hidden;
+    font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    font-weight:700; color:#ffffff; background:#0f1114;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+  :root{
+    --primary:#0f1114; --secondary:#ffffff; --tertiary:#3a3a90; --quaternary:#006ea1;
+    --panel:#151922; --border:#2b2e35; --accent:#8de1ff;
+  }
+
+  .wrap{ padding:24px; box-sizing:border-box; width:100%; height:100%; }
+  .title{
+    font-size:48px; font-weight:900; letter-spacing:.5px; text-transform:uppercase;
+    margin:0 0 18px 0;
+  }
+  .grid{
+    display:grid; grid-template-columns:1fr;
+    gap:16px; width:100%; height:calc(100% - 72px); overflow:hidden;
+  }
+  .section{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:14px; display:flex; flex-direction:column; gap:10px; min-height:0;
+  }
+  .section h2{
+    margin:0; font-size:22px; font-weight:800; text-transform:uppercase;
+    color:var(--secondary); border-bottom:1px solid var(--border); padding-bottom:6px;
+  }
+  .matches{ overflow:auto; padding-right:6px; }
+  .match{
+    display:grid; grid-template-columns:140px 1fr 60px 60px 1fr 220px;
+    gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid #242833;
+  }
+  .match:last-child{ border-bottom:none; }
+  .label{ color:#9aa4b1; font-weight:700; text-transform:uppercase; }
+  .team{ display:flex; align-items:center; gap:8px; font-weight:800; text-transform:uppercase; }
+  .logo{ width:28px; height:28px; object-fit:contain; }
+  .score{ text-align:center; font-weight:900; font-size:22px; }
+  .winner{ color:var(--accent); font-weight:800; }
+  .bracket-stage{
+    display:flex; flex-direction:column; gap:10px; height:100%;
+  }
+  .bracket-canvas{
+    flex:1 1 auto; position:relative; background:#0b0d13; border:1px solid #232733;
+    border-radius:10px; overflow:hidden;
+  }
+  svg{ width:100%; height:100%; display:block; }
+  .bracket-text{ fill:#ffffff; font-size:16px; font-weight:700; }
+  .bracket-score{ fill:var(--accent); font-weight:900; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title" id="bracket-title">Brackets</h1>
+  <div class="grid" id="bracket-root">Loading…</div>
+</div>
+
+<script>
+  const ROOT="..", SB=ROOT+"/Scoreboard", BRACKETS=SB+"/Brackets";
+
+  function teamLabel(teams, id) {
+    if (id === null || id === undefined) return "TBD";
+    const t = teams[id];
+    if (!t) return "TBD";
+    return t.name || t.abbr || `Team ${id + 1}`;
+  }
+
+  function makeSection(title) {
+    const section = document.createElement("div");
+    section.className = "section";
+    const h2 = document.createElement("h2");
+    h2.textContent = title;
+    const matches = document.createElement("div");
+    matches.className = "matches";
+    section.appendChild(h2);
+    section.appendChild(matches);
+    return { section, matches };
+  }
+
+  function renderPlayoffs(root, data, settings) {
+    const stage = document.createElement("div");
+    stage.className = "section bracket-stage";
+    const header = document.createElement("h2");
+    header.textContent = "Playoffs";
+    stage.appendChild(header);
+
+    const canvas = document.createElement("div");
+    canvas.className = "bracket-canvas";
+    stage.appendChild(canvas);
+    root.appendChild(stage);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    canvas.appendChild(svg);
+
+    const matches = (data.matches || []).filter(m => m.bracket === "WB");
+    if (!matches.length) {
+      const note = document.createElement("div");
+      note.textContent = "No playoffs generated.";
+      note.style.padding = "8px";
+      canvas.appendChild(note);
+      return;
+    }
+    const teams = data.teams || [];
+
+    const roundFilter = (settings.display_round || "All");
+    const roundMatches = roundFilter === "All"
+      ? matches
+      : matches.filter(m => `Round ${m.round}` === roundFilter);
+
+    const rounds = Array.from(new Set(roundMatches.map(m => m.round))).sort((a,b) => a-b);
+    if (!rounds.length) {
+      const note = document.createElement("div");
+      note.textContent = "No playoffs for selected round.";
+      note.style.padding = "8px";
+      canvas.appendChild(note);
+      return;
+    }
+
+    const baseGap = 30;
+    const roundGap = 220;
+    const lineLen = 90;
+    const textOffset = 6;
+    const stroke = "#5561ff";
+
+    const roundsMap = new Map();
+    for (const r of rounds) roundsMap.set(r, roundMatches.filter(m => m.round === r).sort((a,b)=>a.slot-b.slot));
+
+    const maxMatches = Math.max(...roundsMap.values().map(list => list.length));
+    const height = Math.max(600, maxMatches * baseGap * 2);
+    svg.setAttribute("viewBox", `0 0 ${rounds.length * roundGap + 320} ${height}`);
+
+    rounds.forEach((round, rIndex) => {
+      const list = roundsMap.get(round);
+      const step = baseGap * Math.pow(2, rIndex + 1);
+      const startY = step / 2;
+      const x = 40 + rIndex * roundGap;
+      list.forEach((match, mIndex) => {
+        const centerY = startY + mIndex * step;
+        const topY = centerY - baseGap / 1.2;
+        const bottomY = centerY + baseGap / 1.2;
+
+        const lineTop = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        lineTop.setAttribute("x1", x);
+        lineTop.setAttribute("y1", topY);
+        lineTop.setAttribute("x2", x + lineLen);
+        lineTop.setAttribute("y2", topY);
+        lineTop.setAttribute("stroke", stroke);
+        lineTop.setAttribute("stroke-width", "2");
+        svg.appendChild(lineTop);
+
+        const lineBottom = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        lineBottom.setAttribute("x1", x);
+        lineBottom.setAttribute("y1", bottomY);
+        lineBottom.setAttribute("x2", x + lineLen);
+        lineBottom.setAttribute("y2", bottomY);
+        lineBottom.setAttribute("stroke", stroke);
+        lineBottom.setAttribute("stroke-width", "2");
+        svg.appendChild(lineBottom);
+
+        const join = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        join.setAttribute("x1", x + lineLen);
+        join.setAttribute("y1", topY);
+        join.setAttribute("x2", x + lineLen);
+        join.setAttribute("y2", bottomY);
+        join.setAttribute("stroke", stroke);
+        join.setAttribute("stroke-width", "2");
+        svg.appendChild(join);
+
+        const next = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        next.setAttribute("x1", x + lineLen);
+        next.setAttribute("y1", centerY);
+        next.setAttribute("x2", x + lineLen + 60);
+        next.setAttribute("y2", centerY);
+        next.setAttribute("stroke", stroke);
+        next.setAttribute("stroke-width", "2");
+        svg.appendChild(next);
+
+        const teamA = teamLabel(teams, match.teamA);
+        const teamB = teamLabel(teams, match.teamB);
+        const textA = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        textA.setAttribute("x", x - textOffset);
+        textA.setAttribute("y", topY - 4);
+        textA.setAttribute("text-anchor", "end");
+        textA.setAttribute("class", "bracket-text");
+        textA.textContent = teamA;
+        svg.appendChild(textA);
+
+        const textB = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        textB.setAttribute("x", x - textOffset);
+        textB.setAttribute("y", bottomY - 4);
+        textB.setAttribute("text-anchor", "end");
+        textB.setAttribute("class", "bracket-text");
+        textB.textContent = teamB;
+        svg.appendChild(textB);
+
+        const scoreA = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        scoreA.setAttribute("x", x - textOffset - 22);
+        scoreA.setAttribute("y", topY - 4);
+        scoreA.setAttribute("text-anchor", "end");
+        scoreA.setAttribute("class", "bracket-text bracket-score");
+        scoreA.textContent = match.scoreA ?? 0;
+        svg.appendChild(scoreA);
+
+        const scoreB = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        scoreB.setAttribute("x", x - textOffset - 22);
+        scoreB.setAttribute("y", bottomY - 4);
+        scoreB.setAttribute("text-anchor", "end");
+        scoreB.setAttribute("class", "bracket-text bracket-score");
+        scoreB.textContent = match.scoreB ?? 0;
+        svg.appendChild(scoreB);
+      });
+    });
+  }
+
+  function renderGroups(root, data, settings) {
+    const matches = (data.matches || []).filter(m => m.bracket === "RR" || m.bracket === "Swiss");
+    if (!matches.length) return;
+    const groupFilter = (settings.display_group || "All");
+    const teams = data.teams || [];
+    const sections = new Map();
+    for (const m of matches) {
+      const groupLabel = m.bracket === "RR" ? `Group ${m.group || "A"}` : "Swiss";
+      if (groupFilter !== "All" && groupLabel !== groupFilter) continue;
+      const key = `${groupLabel} - Round ${m.round}`;
+      if (!sections.has(key)) sections.set(key, []);
+      sections.get(key).push(m);
+    }
+    for (const [key, items] of sections.entries()) {
+      const { section, matches: list } = makeSection(key);
+      items.sort((a,b) => (a.slot||0) - (b.slot||0));
+      for (const m of items) {
+        const row = document.createElement("div");
+        row.className = "match";
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = `Match ${m.slot}`;
+        row.appendChild(label);
+
+        const teamA = document.createElement("div");
+        teamA.className = "team";
+        const tA = teams[m.teamA || m.teamA === 0 ? m.teamA : -1];
+        if (tA && tA.logo) {
+          const img = document.createElement("img");
+          img.src = BRACKETS + "/" + tA.logo;
+          img.className = "logo";
+          teamA.appendChild(img);
+        }
+        teamA.appendChild(document.createTextNode(teamLabel(teams, m.teamA)));
+        row.appendChild(teamA);
+
+        const scoreA = document.createElement("div");
+        scoreA.className = "score";
+        scoreA.textContent = m.scoreA ?? 0;
+        row.appendChild(scoreA);
+
+        const scoreB = document.createElement("div");
+        scoreB.className = "score";
+        scoreB.textContent = m.scoreB ?? 0;
+        row.appendChild(scoreB);
+
+        const teamB = document.createElement("div");
+        teamB.className = "team";
+        const tB = teams[m.teamB || m.teamB === 0 ? m.teamB : -1];
+        if (tB && tB.logo) {
+          const img = document.createElement("img");
+          img.src = BRACKETS + "/" + tB.logo;
+          img.className = "logo";
+          teamB.appendChild(img);
+        }
+        teamB.appendChild(document.createTextNode(teamLabel(teams, m.teamB)));
+        row.appendChild(teamB);
+
+        let winnerId = null;
+        if (m.teamA !== null && m.teamB === null) winnerId = m.teamA;
+        else if (m.teamB !== null && m.teamA === null) winnerId = m.teamB;
+        else if (m.scoreA > m.scoreB) winnerId = m.teamA;
+        else if (m.scoreB > m.scoreA) winnerId = m.teamB;
+
+        const winner = document.createElement("div");
+        winner.className = "winner";
+        winner.textContent = winnerId !== null ? `Winner: ${teamLabel(teams, winnerId)}` : "Winner: —";
+        row.appendChild(winner);
+        list.appendChild(row);
+      }
+      root.appendChild(section);
+    }
+  }
+
+  function render(data) {
+    const root = document.getElementById("bracket-root");
+    root.innerHTML = "";
+    if (!data) {
+      root.textContent = "No bracket data available.";
+      return;
+    }
+    const settings = data.settings || {};
+    document.getElementById("bracket-title").textContent = settings.bracket_type || "Brackets";
+
+    const stage = settings.display_stage || "All";
+    if (stage === "All" || stage === "Playoffs only") {
+      renderPlayoffs(root, data, settings);
+    }
+    if (stage === "All" || stage === "Groups only") {
+      renderGroups(root, data, settings);
+    }
+    if (!root.children.length) {
+      root.textContent = "No matches generated.";
+    }
+  }
+
+  async function loadData() {
+    try {
+      const resp = await fetch(BRACKETS + "/bracket.json?_=" + Date.now());
+      if (!resp.ok) throw new Error("fetch failed");
+      const data = await resp.json();
+      render(data);
+    } catch (err) {
+      render(null);
+    }
+  }
+
+  loadData();
+  setInterval(loadData, 2000);
+</script>
+</body>
+</html>
