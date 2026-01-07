@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Brackets</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+
+  html,body{
+    margin:0; padding:0; width:1920px; height:1080px; overflow:hidden;
+    font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    font-weight:700; color:#ffffff; background:#0f1114;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+  :root{
+    --primary:#0f1114; --secondary:#ffffff; --tertiary:#3a3a90; --quaternary:#006ea1;
+    --panel:#151922; --border:#2b2e35; --accent:#8de1ff;
+  }
+
+  .wrap{ padding:24px; box-sizing:border-box; width:100%; height:100%; }
+  .title{
+    font-size:48px; font-weight:900; letter-spacing:.5px; text-transform:uppercase;
+    margin:0 0 18px 0;
+  }
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(520px,1fr));
+    gap:16px; width:100%; height:calc(100% - 72px); overflow:hidden;
+  }
+  .section{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:14px; display:flex; flex-direction:column; gap:10px; min-height:0;
+  }
+  .section h2{
+    margin:0; font-size:22px; font-weight:800; text-transform:uppercase;
+    color:var(--secondary); border-bottom:1px solid var(--border); padding-bottom:6px;
+  }
+  .matches{ overflow:auto; padding-right:6px; }
+  .match{
+    display:grid; grid-template-columns:140px 1fr 60px 60px 1fr 220px;
+    gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid #242833;
+  }
+  .match:last-child{ border-bottom:none; }
+  .label{ color:#9aa4b1; font-weight:700; text-transform:uppercase; }
+  .team{ display:flex; align-items:center; gap:8px; font-weight:800; text-transform:uppercase; }
+  .logo{ width:28px; height:28px; object-fit:contain; }
+  .score{ text-align:center; font-weight:900; font-size:22px; }
+  .winner{ color:var(--accent); font-weight:800; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title" id="bracket-title">Brackets</h1>
+  <div class="grid" id="bracket-root">Loading…</div>
+</div>
+
+<script>
+  const ROOT="..", SB=ROOT+"/Scoreboard", BRACKETS=SB+"/Brackets";
+
+  function teamLabel(teams, id) {
+    if (id === null || id === undefined) return "TBD";
+    const t = teams[id];
+    if (!t) return "TBD";
+    return t.name || t.abbr || `Team ${id + 1}`;
+  }
+
+  function makeSection(title) {
+    const section = document.createElement("div");
+    section.className = "section";
+    const h2 = document.createElement("h2");
+    h2.textContent = title;
+    const matches = document.createElement("div");
+    matches.className = "matches";
+    section.appendChild(h2);
+    section.appendChild(matches);
+    return { section, matches };
+  }
+
+  function render(data) {
+    const root = document.getElementById("bracket-root");
+    root.innerHTML = "";
+    if (!data) {
+      root.textContent = "No bracket data available.";
+      return;
+    }
+    const settings = data.settings || {};
+    const teams = data.teams || [];
+    const matches = data.matches || [];
+    document.getElementById("bracket-title").textContent = settings.bracket_type || "Brackets";
+
+    if (!matches.length) {
+      root.textContent = "No matches generated.";
+      return;
+    }
+
+    const sections = new Map();
+    for (const m of matches) {
+      let key = "";
+      if (m.bracket === "RR") key = `${m.group || "Group"} - Round ${m.round}`;
+      else if (m.bracket === "Swiss") key = `Swiss - Round ${m.round}`;
+      else key = `${m.bracket || "Bracket"} - Round ${m.round}`;
+      if (!sections.has(key)) sections.set(key, []);
+      sections.get(key).push(m);
+    }
+
+    for (const [key, items] of sections.entries()) {
+      const { section, matches: list } = makeSection(key);
+      items.sort((a,b) => (a.slot||0) - (b.slot||0));
+      for (const m of items) {
+        const row = document.createElement("div");
+        row.className = "match";
+
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = `Match ${m.slot}`;
+        row.appendChild(label);
+
+        const teamA = document.createElement("div");
+        teamA.className = "team";
+        const tA = teams[m.teamA || m.teamA === 0 ? m.teamA : -1];
+        if (tA && tA.logo) {
+          const img = document.createElement("img");
+          img.src = BRACKETS + "/" + tA.logo;
+          img.className = "logo";
+          teamA.appendChild(img);
+        }
+        teamA.appendChild(document.createTextNode(teamLabel(teams, m.teamA)));
+        row.appendChild(teamA);
+
+        const scoreA = document.createElement("div");
+        scoreA.className = "score";
+        scoreA.textContent = m.scoreA ?? 0;
+        row.appendChild(scoreA);
+
+        const scoreB = document.createElement("div");
+        scoreB.className = "score";
+        scoreB.textContent = m.scoreB ?? 0;
+        row.appendChild(scoreB);
+
+        const teamB = document.createElement("div");
+        teamB.className = "team";
+        const tB = teams[m.teamB || m.teamB === 0 ? m.teamB : -1];
+        if (tB && tB.logo) {
+          const img = document.createElement("img");
+          img.src = BRACKETS + "/" + tB.logo;
+          img.className = "logo";
+          teamB.appendChild(img);
+        }
+        teamB.appendChild(document.createTextNode(teamLabel(teams, m.teamB)));
+        row.appendChild(teamB);
+
+        let winnerId = null;
+        if (m.teamA !== null && m.teamB === null) winnerId = m.teamA;
+        else if (m.teamB !== null && m.teamA === null) winnerId = m.teamB;
+        else if (m.scoreA > m.scoreB) winnerId = m.teamA;
+        else if (m.scoreB > m.scoreA) winnerId = m.teamB;
+
+        const winner = document.createElement("div");
+        winner.className = "winner";
+        winner.textContent = winnerId !== null ? `Winner: ${teamLabel(teams, winnerId)}` : "Winner: —";
+        row.appendChild(winner);
+
+        list.appendChild(row);
+      }
+      root.appendChild(section);
+    }
+  }
+
+  async function loadData() {
+    try {
+      const resp = await fetch(BRACKETS + "/bracket.json?_=" + Date.now());
+      if (!resp.ok) throw new Error("fetch failed");
+      const data = await resp.json();
+      render(data);
+    } catch (err) {
+      render(null);
+    }
+  }
+
+  loadData();
+  setInterval(loadData, 2000);
+</script>
+</body>
+</html>

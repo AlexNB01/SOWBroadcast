@@ -84,6 +84,41 @@ class Team:
         if self.players is None:
             self.players = [Player() for _ in range(8)]
 
+# ---- Brackets data ----
+@dataclass
+class BracketTeam:
+    name: str = ""
+    abbr: str = ""
+    logo_path: Optional[str] = None
+
+@dataclass
+class BracketMatch:
+    id: int
+    round: int
+    slot: int
+    teamA: Optional[int] = None
+    teamB: Optional[int] = None
+    scoreA: int = 0
+    scoreB: int = 0
+    winnerToMatchId: Optional[int] = None
+    loserToMatchId: Optional[int] = None
+    winnerToSlot: Optional[str] = None
+    loserToSlot: Optional[str] = None
+    bracket: str = ""
+    group: Optional[str] = None
+    seedA: Optional[int] = None
+    seedB: Optional[int] = None
+
+@dataclass
+class BracketSettings:
+    bracket_type: str = "4 team single elimination"
+
+@dataclass
+class BracketState:
+    settings: BracketSettings
+    teams: List[BracketTeam]
+    matches: List[BracketMatch]
+
 # ---- General tab data ----
 @dataclass
 class GeneralSettings:
@@ -742,7 +777,8 @@ def _app_base():
 def _ensure_scoreboard_tree(root):
     subdirs = [
         "General", "Match", "Heroes", "Maps", "Gametypes",
-        "Replay", "Replay\\Playlist", "Roles", "Teams", "Temp", "Waiting"
+        "Replay", "Replay\\Playlist", "Roles", "Teams", "Temp", "Waiting",
+        "Brackets", "Brackets\\Logos"
     ]
     os.makedirs(root, exist_ok=True)
     for d in subdirs:
@@ -1105,6 +1141,728 @@ class DraftTab(QWidget):
         self.updated.emit()
 
 
+class BracketTeamRow(QWidget):
+    changed = pyqtSignal()
+    move_up = pyqtSignal(object)
+    move_down = pyqtSignal(object)
+    remove_row = pyqtSignal(object)
+
+    def __init__(self, team: Optional[BracketTeam] = None):
+        super().__init__()
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+
+        self.name_edit = QLineEdit()
+        self.abbr_edit = QLineEdit()
+        self.abbr_edit.setFixedWidth(80)
+
+        self.logo_edit = QLineEdit()
+        self.logo_edit.setReadOnly(True)
+        self.logo_btn = QPushButton("Browse…")
+        self.logo_btn.setFixedWidth(90)
+
+        self.up_btn = QPushButton("↑")
+        self.down_btn = QPushButton("↓")
+        self.remove_btn = QPushButton("Remove")
+        self.up_btn.setFixedWidth(30)
+        self.down_btn.setFixedWidth(30)
+
+        row.addWidget(QLabel("Name:"), 0)
+        row.addWidget(self.name_edit, 2)
+        row.addWidget(QLabel("Abbr:"), 0)
+        row.addWidget(self.abbr_edit, 0)
+        row.addWidget(QLabel("Logo:"), 0)
+        row.addWidget(self.logo_edit, 2)
+        row.addWidget(self.logo_btn, 0)
+        row.addWidget(self.up_btn, 0)
+        row.addWidget(self.down_btn, 0)
+        row.addWidget(self.remove_btn, 0)
+
+        self.logo_btn.clicked.connect(self._pick_logo)
+        self.up_btn.clicked.connect(lambda *_: self.move_up.emit(self))
+        self.down_btn.clicked.connect(lambda *_: self.move_down.emit(self))
+        self.remove_btn.clicked.connect(lambda *_: self.remove_row.emit(self))
+
+        self.name_edit.textChanged.connect(lambda *_: self.changed.emit())
+        self.abbr_edit.textChanged.connect(lambda *_: self.changed.emit())
+
+        self._logo_path = None
+        if team:
+            self.from_team(team)
+
+    def _pick_logo(self):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        start_dir = os.path.join(base, "Scoreboard", "Teams")
+        os.makedirs(start_dir, exist_ok=True)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select team logo",
+            start_dir,
+            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
+        )
+        if path:
+            self._logo_path = path
+            self.logo_edit.setText(path)
+            self.changed.emit()
+
+    def to_team(self) -> BracketTeam:
+        return BracketTeam(
+            name=self.name_edit.text().strip(),
+            abbr=self.abbr_edit.text().strip(),
+            logo_path=self._logo_path
+        )
+
+    def from_team(self, team: BracketTeam):
+        self.name_edit.setText(team.name or "")
+        self.abbr_edit.setText(team.abbr or "")
+        self._logo_path = team.logo_path
+        self.logo_edit.setText(team.logo_path or "")
+
+
+class BracketMatchRow(QWidget):
+    score_changed = pyqtSignal(int, int)
+
+    def __init__(self, match: BracketMatch, label: str):
+        super().__init__()
+        self.match_id = match.id
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+
+        self.label = QLabel(label)
+        self.label.setMinimumWidth(160)
+        self.teamA_label = QLabel("TBD")
+        self.teamB_label = QLabel("TBD")
+        self.teamA_label.setMinimumWidth(180)
+        self.teamB_label.setMinimumWidth(180)
+
+        self.scoreA = QSpinBox()
+        self.scoreB = QSpinBox()
+        self.scoreA.setRange(0, 99)
+        self.scoreB.setRange(0, 99)
+        self.scoreA.setFixedWidth(60)
+        self.scoreB.setFixedWidth(60)
+
+        self.winner_label = QLabel("Winner: —")
+
+        row.addWidget(self.label, 0)
+        row.addWidget(self.teamA_label, 1)
+        row.addWidget(self.scoreA, 0)
+        row.addWidget(QLabel("vs"), 0)
+        row.addWidget(self.scoreB, 0)
+        row.addWidget(self.teamB_label, 1)
+        row.addWidget(self.winner_label, 1)
+
+        self.scoreA.valueChanged.connect(self._emit_score)
+        self.scoreB.valueChanged.connect(self._emit_score)
+
+    def _emit_score(self, *_):
+        self.score_changed.emit(self.scoreA.value(), self.scoreB.value())
+
+    def set_team_labels(self, name_a: str, name_b: str):
+        self.teamA_label.setText(name_a)
+        self.teamB_label.setText(name_b)
+        enable = bool(name_a) and bool(name_b) and name_a != "TBD" and name_b != "TBD"
+        self.scoreA.setEnabled(enable)
+        self.scoreB.setEnabled(enable)
+
+    def set_scores(self, a: int, b: int):
+        self.scoreA.blockSignals(True)
+        self.scoreB.blockSignals(True)
+        self.scoreA.setValue(a)
+        self.scoreB.setValue(b)
+        self.scoreA.blockSignals(False)
+        self.scoreB.blockSignals(False)
+
+    def set_winner(self, name: str):
+        self.winner_label.setText(f"Winner: {name or '—'}")
+
+
+class BracketTab(QWidget):
+    updated = pyqtSignal()
+
+    BRACKET_TYPES = [
+        "4 team single elimination",
+        "4 team double elimination",
+        "6 team single elimination",
+        "6 team double elimination",
+        "8 team single elimination",
+        "8 team double elimination",
+        "16 team single elimination",
+        "16 team double elimination",
+        "swiss",
+        "round robin group stage",
+    ]
+
+    def __init__(self):
+        super().__init__()
+        self.matches: List[BracketMatch] = []
+        self.match_rows: Dict[int, BracketMatchRow] = {}
+        self._loading_state = False
+
+        root = QVBoxLayout(self)
+
+        settings_box = QGroupBox("Bracket Settings")
+        settings_layout = QHBoxLayout(settings_box)
+        self.bracket_type_combo = QComboBox()
+        for t in self.BRACKET_TYPES:
+            self.bracket_type_combo.addItem(t)
+        settings_layout.addWidget(QLabel("Bracket type:"))
+        settings_layout.addWidget(self.bracket_type_combo, 1)
+        settings_layout.addStretch(1)
+        root.addWidget(settings_box)
+
+        team_box = QGroupBox("Teams")
+        team_layout = QVBoxLayout(team_box)
+
+        self.team_container = QVBoxLayout()
+        team_scroll_root = QWidget()
+        team_scroll_root.setLayout(self.team_container)
+        team_scroll = QScrollArea()
+        team_scroll.setWidgetResizable(True)
+        team_scroll.setWidget(team_scroll_root)
+
+        team_layout.addWidget(team_scroll, 1)
+
+        team_buttons = QHBoxLayout()
+        self.add_team_btn = QPushButton("Add Team")
+        self.generate_btn = QPushButton("Generate Bracket")
+        team_buttons.addWidget(self.add_team_btn)
+        team_buttons.addStretch(1)
+        team_buttons.addWidget(self.generate_btn)
+        team_layout.addLayout(team_buttons)
+        root.addWidget(team_box, 3)
+
+        matches_box = QGroupBox("Matches")
+        matches_layout = QVBoxLayout(matches_box)
+
+        self.matches_container = QVBoxLayout()
+        matches_scroll_root = QWidget()
+        matches_scroll_root.setLayout(self.matches_container)
+        matches_scroll = QScrollArea()
+        matches_scroll.setWidgetResizable(True)
+        matches_scroll.setWidget(matches_scroll_root)
+        matches_layout.addWidget(matches_scroll, 1)
+        root.addWidget(matches_box, 5)
+
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        self.update_btn = QPushButton("Update (Brackets)")
+        btns.addWidget(self.update_btn)
+        root.addLayout(btns)
+
+        self.add_team_btn.clicked.connect(self._add_team_row)
+        self.generate_btn.clicked.connect(self._generate_bracket)
+        self.update_btn.clicked.connect(lambda *_: self.updated.emit())
+        self.bracket_type_combo.currentTextChanged.connect(self._on_bracket_type_changed)
+
+        self._add_team_row()
+        self._last_bracket_type = self.bracket_type_combo.currentText()
+        self._last_team_count = len(self._collect_teams())
+
+    def _add_team_row(self, team: Optional[BracketTeam] = None):
+        row = BracketTeamRow(team)
+        row.changed.connect(self._on_teams_changed)
+        row.move_up.connect(self._move_team_up)
+        row.move_down.connect(self._move_team_down)
+        row.remove_row.connect(self._remove_team_row)
+        self.team_container.addWidget(row)
+        self._on_teams_changed()
+
+    def _iter_team_rows(self) -> List[BracketTeamRow]:
+        rows = []
+        for i in range(self.team_container.count()):
+            w = self.team_container.itemAt(i).widget()
+            if isinstance(w, BracketTeamRow):
+                rows.append(w)
+        return rows
+
+    def _remove_team_row(self, row: BracketTeamRow):
+        row.setParent(None)
+        row.deleteLater()
+        self._on_teams_changed()
+
+    def _move_team_up(self, row: BracketTeamRow):
+        rows = self._iter_team_rows()
+        idx = rows.index(row)
+        if idx <= 0:
+            return
+        self.team_container.insertWidget(idx - 1, row)
+        self._on_teams_changed()
+
+    def _move_team_down(self, row: BracketTeamRow):
+        rows = self._iter_team_rows()
+        idx = rows.index(row)
+        if idx >= len(rows) - 1:
+            return
+        self.team_container.insertWidget(idx + 1, row)
+        self._on_teams_changed()
+
+    def _on_teams_changed(self):
+        if self._loading_state:
+            return
+        current_count = len(self._collect_teams())
+        if self.matches and current_count != self._last_team_count:
+            QMessageBox.information(
+                self,
+                "Teams changed",
+                "Team count changed. Please regenerate the bracket to update matches."
+            )
+            self.matches = []
+            self._rebuild_matches_ui()
+        self._last_team_count = current_count
+        self._refresh_match_rows()
+        self.updated.emit()
+
+    def _on_bracket_type_changed(self, *_):
+        if self.matches:
+            ans = QMessageBox.question(
+                self,
+                "Regenerate bracket?",
+                "Changing bracket type will regenerate matches and reset scores. Continue?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if ans != QMessageBox.Yes:
+                self.bracket_type_combo.blockSignals(True)
+                self.bracket_type_combo.setCurrentText(self._last_bracket_type)
+                self.bracket_type_combo.blockSignals(False)
+                return
+        self._generate_bracket()
+        self._last_bracket_type = self.bracket_type_combo.currentText()
+
+    def _validate_team_count(self, count: int) -> bool:
+        btype = self.bracket_type_combo.currentText()
+        fixed_counts = {
+            "4 team single elimination": 4,
+            "4 team double elimination": 4,
+            "6 team single elimination": 6,
+            "6 team double elimination": 6,
+            "8 team single elimination": 8,
+            "8 team double elimination": 8,
+            "16 team single elimination": 16,
+            "16 team double elimination": 16,
+        }
+        if btype in fixed_counts:
+            required = fixed_counts[btype]
+            if count != required:
+                QMessageBox.warning(self, "Team count mismatch",
+                                    f"{btype} requires exactly {required} teams.")
+                return False
+            return True
+        if btype == "swiss":
+            if count < 2:
+                QMessageBox.warning(self, "Team count mismatch",
+                                    "Swiss requires at least 2 teams.")
+                return False
+            return True
+        if btype == "round robin group stage":
+            if count < 2 or count > 32:
+                QMessageBox.warning(self, "Team count mismatch",
+                                    "Round robin group stage supports 2 to 32 teams.")
+                return False
+            return True
+        return True
+
+    def _generate_bracket(self):
+        teams = self._collect_teams()
+        if not self._validate_team_count(len(teams)):
+            return
+        self._last_team_count = len(teams)
+        btype = self.bracket_type_combo.currentText()
+        if btype.endswith("single elimination"):
+            matches = self._generate_single_elimination(teams)
+        elif btype.endswith("double elimination"):
+            matches = self._generate_double_elimination(teams)
+        elif btype == "swiss":
+            matches = self._generate_swiss(teams)
+        else:
+            matches = self._generate_round_robin(teams)
+        self.matches = matches
+        self._rebuild_matches_ui()
+        self._apply_progression()
+        self.updated.emit()
+
+    def _collect_teams(self) -> List[BracketTeam]:
+        return [row.to_team() for row in self._iter_team_rows()]
+
+    def _rebuild_matches_ui(self):
+        while self.matches_container.count():
+            item = self.matches_container.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.setParent(None)
+                widget.deleteLater()
+        self.match_rows.clear()
+        for m in self.matches:
+            label = self._match_label(m)
+            row = BracketMatchRow(m, label)
+            row.score_changed.connect(lambda a, b, mid=m.id: self._on_score_changed(mid, a, b))
+            self.matches_container.addWidget(row)
+            self.match_rows[m.id] = row
+        self._refresh_match_rows()
+
+    def _refresh_match_rows(self):
+        teams = self._collect_teams()
+        for match in self.matches:
+            row = self.match_rows.get(match.id)
+            if not row:
+                continue
+            name_a = self._team_label(match.teamA, teams)
+            name_b = self._team_label(match.teamB, teams)
+            row.set_team_labels(name_a, name_b)
+            row.set_scores(match.scoreA, match.scoreB)
+            winner = self._winner_team_id(match)
+            row.set_winner(self._team_label(winner, teams) if winner is not None else "")
+
+    def _on_score_changed(self, match_id: int, score_a: int, score_b: int):
+        match = next((m for m in self.matches if m.id == match_id), None)
+        if not match:
+            return
+        match.scoreA = score_a
+        match.scoreB = score_b
+        self._apply_progression()
+        self.updated.emit()
+
+    def _apply_progression(self):
+        if not self.matches:
+            return
+        teams = self._collect_teams()
+        for m in self.matches:
+            m.teamA = m.seedA
+            m.teamB = m.seedB
+
+        match_map = {m.id: m for m in self.matches}
+        ordered = sorted(self.matches, key=lambda m: (m.round, m.id))
+        for m in ordered:
+            winner = self._winner_team_id(m)
+            loser = self._loser_team_id(m)
+            if m.winnerToMatchId and m.winnerToSlot:
+                target = match_map.get(m.winnerToMatchId)
+                if target:
+                    self._assign_team(target, m.winnerToSlot, winner)
+            if m.loserToMatchId and m.loserToSlot:
+                target = match_map.get(m.loserToMatchId)
+                if target:
+                    self._assign_team(target, m.loserToSlot, loser)
+
+        for m in self.matches:
+            row = self.match_rows.get(m.id)
+            if not row:
+                continue
+            row.set_team_labels(self._team_label(m.teamA, teams),
+                                self._team_label(m.teamB, teams))
+            row.set_scores(m.scoreA, m.scoreB)
+            winner = self._winner_team_id(m)
+            row.set_winner(self._team_label(winner, teams) if winner is not None else "")
+
+    def _assign_team(self, match: BracketMatch, slot: str, team_id: Optional[int]):
+        if slot == "A":
+            if match.teamA != team_id:
+                match.teamA = team_id
+                match.scoreA = 0
+                match.scoreB = 0
+        elif slot == "B":
+            if match.teamB != team_id:
+                match.teamB = team_id
+                match.scoreA = 0
+                match.scoreB = 0
+
+    def _team_label(self, team_id: Optional[int], teams: List[BracketTeam]) -> str:
+        if team_id is None:
+            return "TBD"
+        if team_id < 0 or team_id >= len(teams):
+            return "TBD"
+        team = teams[team_id]
+        return team.name or team.abbr or f"Team {team_id + 1}"
+
+    def _winner_team_id(self, match: BracketMatch) -> Optional[int]:
+        if match.teamA is None and match.teamB is None:
+            return None
+        if match.teamA is None:
+            return match.teamB
+        if match.teamB is None:
+            return match.teamA
+        if match.scoreA > match.scoreB:
+            return match.teamA
+        if match.scoreB > match.scoreA:
+            return match.teamB
+        return None
+
+    def _loser_team_id(self, match: BracketMatch) -> Optional[int]:
+        if match.teamA is None or match.teamB is None:
+            return None
+        if match.scoreA > match.scoreB:
+            return match.teamB
+        if match.scoreB > match.scoreA:
+            return match.teamA
+        return None
+
+    def _match_label(self, match: BracketMatch) -> str:
+        if match.bracket == "Swiss":
+            return f"Swiss R{match.round} M{match.slot}"
+        if match.bracket == "RR":
+            group = f"{match.group} " if match.group else ""
+            return f"{group}R{match.round} M{match.slot}"
+        prefix = match.bracket or "Bracket"
+        return f"{prefix} R{match.round} M{match.slot}"
+
+    def _next_power_of_two(self, n: int) -> int:
+        p = 1
+        while p < n:
+            p *= 2
+        return p
+
+    def _generate_single_elimination(self, teams: List[BracketTeam]) -> List[BracketMatch]:
+        n = len(teams)
+        slots = self._next_power_of_two(n)
+        seeds = list(range(n)) + [None] * (slots - n)
+        matches: List[BracketMatch] = []
+        match_id = 1
+        round_matches: List[List[BracketMatch]] = []
+
+        round_count = int(round(slots.bit_length() - 1))
+        current_count = slots // 2
+        for r in range(1, round_count + 1):
+            round_list = []
+            for i in range(current_count):
+                team_a = seeds[2 * i] if r == 1 else None
+                team_b = seeds[2 * i + 1] if r == 1 else None
+                match = BracketMatch(
+                    id=match_id,
+                    round=r,
+                    slot=i + 1,
+                    teamA=team_a,
+                    teamB=team_b,
+                    seedA=team_a,
+                    seedB=team_b,
+                    bracket="WB"
+                )
+                round_list.append(match)
+                matches.append(match)
+                match_id += 1
+            round_matches.append(round_list)
+            current_count //= 2
+
+        for r, round_list in enumerate(round_matches[:-1], start=1):
+            next_round = round_matches[r]
+            for i, match in enumerate(round_list):
+                target = next_round[i // 2]
+                match.winnerToMatchId = target.id
+                match.winnerToSlot = "A" if i % 2 == 0 else "B"
+
+        return matches
+
+    def _generate_double_elimination(self, teams: List[BracketTeam]) -> List[BracketMatch]:
+        n = len(teams)
+        slots = self._next_power_of_two(n)
+        seeds = list(range(n)) + [None] * (slots - n)
+        match_id = 1
+        matches: List[BracketMatch] = []
+
+        wb_rounds: List[List[BracketMatch]] = []
+        round_count = int(round(slots.bit_length() - 1))
+        current_count = slots // 2
+        for r in range(1, round_count + 1):
+            round_list = []
+            for i in range(current_count):
+                team_a = seeds[2 * i] if r == 1 else None
+                team_b = seeds[2 * i + 1] if r == 1 else None
+                match = BracketMatch(
+                    id=match_id,
+                    round=r,
+                    slot=i + 1,
+                    teamA=team_a,
+                    teamB=team_b,
+                    seedA=team_a,
+                    seedB=team_b,
+                    bracket="WB"
+                )
+                round_list.append(match)
+                matches.append(match)
+                match_id += 1
+            wb_rounds.append(round_list)
+            current_count //= 2
+
+        for r, round_list in enumerate(wb_rounds[:-1], start=1):
+            next_round = wb_rounds[r]
+            for i, match in enumerate(round_list):
+                target = next_round[i // 2]
+                match.winnerToMatchId = target.id
+                match.winnerToSlot = "A" if i % 2 == 0 else "B"
+
+        lb_rounds: List[List[BracketMatch]] = []
+        lb_round_count = max(1, 2 * (round_count - 1))
+        for r in range(1, lb_round_count + 1):
+            if r == 1:
+                count = max(1, len(wb_rounds[0]) // 2)
+            elif r % 2 == 0:
+                count = len(wb_rounds[r // 2])
+            else:
+                count = max(1, len(lb_rounds[-1]) // 2)
+            round_list = []
+            for i in range(count):
+                match = BracketMatch(
+                    id=match_id,
+                    round=r,
+                    slot=i + 1,
+                    bracket="LB"
+                )
+                round_list.append(match)
+                matches.append(match)
+                match_id += 1
+            lb_rounds.append(round_list)
+
+        if wb_rounds:
+            for i, wb_match in enumerate(wb_rounds[0]):
+                lb_match = lb_rounds[0][i // 2]
+                wb_match.loserToMatchId = lb_match.id
+                wb_match.loserToSlot = "A" if i % 2 == 0 else "B"
+
+        for r in range(2, lb_round_count + 1, 2):
+            wb_round = wb_rounds[r // 2]
+            lb_round = lb_rounds[r - 1]
+            for i, wb_match in enumerate(wb_round):
+                lb_match = lb_round[i]
+                wb_match.loserToMatchId = lb_match.id
+                wb_match.loserToSlot = "B"
+                prev_lb_match = lb_rounds[r - 2][i]
+                prev_lb_match.winnerToMatchId = lb_match.id
+                prev_lb_match.winnerToSlot = "A"
+
+        for r in range(2, lb_round_count, 2):
+            lb_round = lb_rounds[r - 1]
+            next_round = lb_rounds[r]
+            for i, lb_match in enumerate(lb_round):
+                target = next_round[i // 2]
+                lb_match.winnerToMatchId = target.id
+                lb_match.winnerToSlot = "A" if i % 2 == 0 else "B"
+
+        grand_final = BracketMatch(
+            id=match_id,
+            round=round_count + 1,
+            slot=1,
+            bracket="GF"
+        )
+        matches.append(grand_final)
+        match_id += 1
+
+        wb_final = wb_rounds[-1][0]
+        wb_final.winnerToMatchId = grand_final.id
+        wb_final.winnerToSlot = "A"
+        if lb_rounds:
+            lb_final = lb_rounds[-1][0]
+            lb_final.winnerToMatchId = grand_final.id
+            lb_final.winnerToSlot = "B"
+            wb_final.loserToMatchId = lb_final.id
+            wb_final.loserToSlot = "B"
+
+        return matches
+
+    def _generate_swiss(self, teams: List[BracketTeam]) -> List[BracketMatch]:
+        n = len(teams)
+        if n <= 8:
+            rounds = 3
+        elif n <= 16:
+            rounds = 4
+        else:
+            rounds = 5
+        matches: List[BracketMatch] = []
+        match_id = 1
+        for r in range(1, rounds + 1):
+            slots = list(range(n))
+            for i in range(0, len(slots), 2):
+                team_a = slots[i]
+                team_b = slots[i + 1] if i + 1 < len(slots) else None
+                match = BracketMatch(
+                    id=match_id,
+                    round=r,
+                    slot=(i // 2) + 1,
+                    teamA=team_a,
+                    teamB=team_b,
+                    scoreA=0,
+                    scoreB=0,
+                    seedA=team_a,
+                    seedB=team_b,
+                    bracket="Swiss"
+                )
+                matches.append(match)
+                match_id += 1
+        return matches
+
+    def _generate_round_robin(self, teams: List[BracketTeam]) -> List[BracketMatch]:
+        n = len(teams)
+        groups = []
+        group_size = 4
+        for i in range(0, n, group_size):
+            groups.append(list(range(i, min(i + group_size, n))))
+        matches: List[BracketMatch] = []
+        match_id = 1
+        for g_index, group in enumerate(groups):
+            group_name = chr(ord("A") + g_index)
+            group_matches = self._round_robin_pairings(group)
+            for round_num, round_pairs in enumerate(group_matches, start=1):
+                for slot, (team_a, team_b) in enumerate(round_pairs, start=1):
+                    match = BracketMatch(
+                        id=match_id,
+                        round=round_num,
+                        slot=slot,
+                        teamA=team_a,
+                        teamB=team_b,
+                        seedA=team_a,
+                        seedB=team_b,
+                        bracket="RR",
+                        group=f"Group {group_name}"
+                    )
+                    matches.append(match)
+                    match_id += 1
+        return matches
+
+    def _round_robin_pairings(self, team_ids: List[int]) -> List[List[tuple]]:
+        ids = team_ids[:]
+        if len(ids) % 2 == 1:
+            ids.append(None)
+        n = len(ids)
+        rounds = n - 1
+        schedule = []
+        for r in range(rounds):
+            pairs = []
+            for i in range(n // 2):
+                a = ids[i]
+                b = ids[n - 1 - i]
+                if a is None or b is None:
+                    continue
+                pairs.append((a, b))
+            schedule.append(pairs)
+            ids = [ids[0]] + [ids[-1]] + ids[1:-1]
+        return schedule
+
+    def to_state(self) -> BracketState:
+        return BracketState(
+            settings=BracketSettings(bracket_type=self.bracket_type_combo.currentText()),
+            teams=self._collect_teams(),
+            matches=self.matches[:]
+        )
+
+    def from_state(self, state: BracketState):
+        self._loading_state = True
+        self.bracket_type_combo.setCurrentText(state.settings.bracket_type or self.BRACKET_TYPES[0])
+        self._last_bracket_type = self.bracket_type_combo.currentText()
+        for row in self._iter_team_rows():
+            row.setParent(None)
+            row.deleteLater()
+        for team in state.teams:
+            self._add_team_row(team)
+        self._last_team_count = len(state.teams)
+        self.matches = state.matches[:]
+        for m in self.matches:
+            if m.seedA is None:
+                m.seedA = m.teamA
+            if m.seedB is None:
+                m.seedB = m.teamB
+        self._rebuild_matches_ui()
+        self._apply_progression()
+        self._loading_state = False
+
+
 class BulkImportRow(QWidget):
     """Yksi rivi import-listassa."""
     def __init__(self, kind: str, file_path: str, name_guess: str, mode_names=None):
@@ -1281,6 +2039,11 @@ class TournamentApp(QMainWindow):
         self.draft_tab = DraftTab(self._maps_by_mode)
         self.draft_tab.updated.connect(self._update)
         tabs.addTab(self.draft_tab, "Draft")
+
+        # --- BRACKETS TAB ---
+        self.brackets_tab = BracketTab()
+        self.brackets_tab.updated.connect(self._update_brackets_only)
+        tabs.addTab(self.brackets_tab, "Brackets")
         
         self._ensure_default_assets_installed()
         self._auto_discover_assets()  
@@ -1863,7 +2626,8 @@ class TournamentApp(QMainWindow):
                 "t2.name","t2.score","t2.color","t2.logo","t2.ban","t2.abbr","t2.players",
                 "general.caster1","general.caster2","general.host",
                 "waiting.texts","waiting.timer","waiting.videos","waiting.socials",
-                "maps"
+                "maps",
+                "brackets"
             ]
 
         o1, n1 = old.get("team1", {}), new.get("team1", {})
@@ -1955,6 +2719,10 @@ class TournamentApp(QMainWindow):
                     b.get("t1_ban"), b.get("t2_ban")):
                     keys.append("maps"); break
 
+        ob = old.get("brackets") or {}
+        nb = new.get("brackets") or {}
+        if ob != nb:
+            keys.append("brackets")
 
         return keys
 
@@ -2206,8 +2974,9 @@ class TournamentApp(QMainWindow):
             t1s = int(m.get("t1", 0)) if str(m.get("t1", "")).isdigit() else 0
             t2s = int(m.get("t2", 0)) if str(m.get("t2", "")).isdigit() else 0
             comp = 1 if m.get("completed", False) else 0
+            map_name = (m.get("map") or "").replace("\n", " ").strip()
             body = (
-                f"Name={(m.get('map') or '').replace('\n', ' ').strip()}\n"
+                f"Name={map_name}\n"
                 f"T1={t1s}\n"
                 f"T2={t2s}\n"
                 f"Completed={comp}\n"
@@ -2236,6 +3005,211 @@ class TournamentApp(QMainWindow):
             self._write_txt(os.path.join(match_dir, f"T2P{i+1}Hero.txt"), (p.get("hero") or "").strip())
             
         self._export_map_pool_to_match(state)
+
+    def _export_brackets(self, state: dict):
+        root = self._scoreboard_root()
+        bdir = os.path.join(root, "Brackets")
+        logos_dir = os.path.join(bdir, "Logos")
+        os.makedirs(bdir, exist_ok=True)
+        os.makedirs(logos_dir, exist_ok=True)
+
+        bracket = state.get("brackets") or {}
+        settings = bracket.get("settings") or {}
+        teams = bracket.get("teams") or []
+        matches = bracket.get("matches") or []
+
+        out_teams = []
+        for idx, t in enumerate(teams):
+            name = (t.get("name") or "").strip()
+            abbr = (t.get("abbr") or "").strip()
+            logo_path = t.get("logo_path")
+            logo_rel = None
+            if logo_path:
+                slug = self._slugify(name or abbr or f"team-{idx+1}")
+                out_png = os.path.join(logos_dir, f"{slug}.png")
+                self._save_pixmap_as_png(logo_path, out_png, force=True)
+                logo_rel = f"Logos/{slug}.png"
+            out_teams.append({
+                "name": name,
+                "abbr": abbr,
+                "logo": logo_rel
+            })
+
+        payload = {
+            "settings": settings,
+            "teams": out_teams,
+            "matches": matches,
+        }
+
+        json_path = os.path.join(bdir, "bracket.json")
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+        html_path = os.path.join(bdir, "brackets.html")
+        html = self._brackets_html_template(payload)
+        self._write_txt(html_path, html)
+
+    def _brackets_html_template(self, payload: dict) -> str:
+        inline_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
+        template = """<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Brackets</title>
+<style>
+  html,body{margin:0;padding:0;background:#0f1114;color:#fff;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;}
+  .wrap{padding:24px;}
+  h1{margin:0 0 12px 0;font-size:32px;}
+  .section{margin:18px 0; padding:12px; border:1px solid #2b2e35; border-radius:8px; background:#151922;}
+  .section h2{margin:0 0 10px 0; font-size:20px;}
+  .match{display:flex; gap:12px; align-items:center; padding:6px 0; border-bottom:1px solid #242833;}
+  .match:last-child{border-bottom:none;}
+  .label{font-weight:600; min-width:160px; color:#9aa4b1;}
+  .team{flex:1;}
+  .score{width:46px; text-align:center; font-weight:700;}
+  .winner{font-weight:700; color:#8de1ff;}
+  .logo{width:24px; height:24px; object-fit:contain; margin-right:6px;}
+  .teamline{display:flex; align-items:center; gap:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="bracket-title">Brackets</h1>
+  <div id="bracket-root">Loading…</div>
+</div>
+<script id="bracket-inline" type="application/json">__INLINE_JSON__</script>
+<script>
+const inlineNode = document.getElementById('bracket-inline');
+const root = document.getElementById('bracket-root');
+
+function teamLabel(teams, id) {
+  if (id === null || id === undefined) return 'TBD';
+  const t = teams[id];
+  if (!t) return 'TBD';
+  return t.name || t.abbr || `Team ${id + 1}`;
+}
+
+function render(data) {
+  root.innerHTML = '';
+  if (!data) {
+    root.textContent = 'No bracket data available.';
+    return;
+  }
+  const settings = data.settings || {};
+  const teams = data.teams || [];
+  const matches = data.matches || [];
+  document.getElementById('bracket-title').textContent = settings.bracket_type || 'Brackets';
+  if (!matches.length) {
+    root.textContent = 'No matches generated.';
+    return;
+  }
+  const sections = new Map();
+  for (const m of matches) {
+    let key = '';
+    if (m.bracket === 'RR') {
+      key = `${m.group || 'Group'} - Round ${m.round}`;
+    } else if (m.bracket === 'Swiss') {
+      key = `Swiss - Round ${m.round}`;
+    } else {
+      key = `${m.bracket || 'Bracket'} - Round ${m.round}`;
+    }
+    if (!sections.has(key)) sections.set(key, []);
+    sections.get(key).push(m);
+  }
+  for (const [key, items] of sections.entries()) {
+    const section = document.createElement('div');
+    section.className = 'section';
+    const h2 = document.createElement('h2');
+    h2.textContent = key;
+    section.appendChild(h2);
+    items.sort((a,b) => (a.slot||0) - (b.slot||0));
+    for (const m of items) {
+      const row = document.createElement('div');
+      row.className = 'match';
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = `Match ${m.slot}`;
+      row.appendChild(label);
+
+      const teamA = document.createElement('div');
+      teamA.className = 'team';
+      const teamALine = document.createElement('div');
+      teamALine.className = 'teamline';
+      const tA = teams[m.teamA || m.teamA === 0 ? m.teamA : -1];
+      if (tA && tA.logo) {
+        const img = document.createElement('img');
+        img.src = tA.logo;
+        img.className = 'logo';
+        teamALine.appendChild(img);
+      }
+      teamALine.appendChild(document.createTextNode(teamLabel(teams, m.teamA)));
+      teamA.appendChild(teamALine);
+      row.appendChild(teamA);
+
+      const scoreA = document.createElement('div');
+      scoreA.className = 'score';
+      scoreA.textContent = m.scoreA ?? 0;
+      row.appendChild(scoreA);
+
+      const scoreB = document.createElement('div');
+      scoreB.className = 'score';
+      scoreB.textContent = m.scoreB ?? 0;
+      row.appendChild(scoreB);
+
+      const teamB = document.createElement('div');
+      teamB.className = 'team';
+      const teamBLine = document.createElement('div');
+      teamBLine.className = 'teamline';
+      const tB = teams[m.teamB || m.teamB === 0 ? m.teamB : -1];
+      if (tB && tB.logo) {
+        const img = document.createElement('img');
+        img.src = tB.logo;
+        img.className = 'logo';
+        teamBLine.appendChild(img);
+      }
+      teamBLine.appendChild(document.createTextNode(teamLabel(teams, m.teamB)));
+      teamB.appendChild(teamBLine);
+      row.appendChild(teamB);
+
+      let winnerId = null;
+      if (m.teamA !== null && m.teamB === null) winnerId = m.teamA;
+      else if (m.teamB !== null && m.teamA === null) winnerId = m.teamB;
+      else if (m.scoreA > m.scoreB) winnerId = m.teamA;
+      else if (m.scoreB > m.scoreA) winnerId = m.teamB;
+      const winner = document.createElement('div');
+      winner.className = 'winner';
+      winner.textContent = winnerId !== null ? `Winner: ${teamLabel(teams, winnerId)}` : 'Winner: —';
+      row.appendChild(winner);
+      section.appendChild(row);
+    }
+    root.appendChild(section);
+  }
+}
+
+async function loadData() {
+  try {
+    const resp = await fetch('bracket.json', {cache: 'no-store'});
+    if (!resp.ok) throw new Error('fetch failed');
+    const data = await resp.json();
+    render(data);
+  } catch (err) {
+    try {
+      const inline = inlineNode?.textContent?.trim();
+      render(inline ? JSON.parse(inline) : null);
+    } catch (e) {
+      render(null);
+    }
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>"""
+        return template.replace("__INLINE_JSON__", inline_json)
 
     # ---------------------
     # Actions: Reset & Swap
@@ -2341,6 +3315,8 @@ class TournamentApp(QMainWindow):
         state["general"] = asdict(general)
         waiting = self.waiting_tab.to_settings()
         state["waiting"] = asdict(waiting)
+        if hasattr(self, "brackets_tab"):
+            state["brackets"] = asdict(self.brackets_tab.to_state())
         return state
 
 
@@ -2406,6 +3382,36 @@ class TournamentApp(QMainWindow):
         if hasattr(self, "draft_tab"):
             self.draft_tab.set_pool(pool)
 
+        bdata = state.get("brackets") or {}
+        if hasattr(self, "brackets_tab") and bdata:
+            settings = bdata.get("settings") or {}
+            teams = [BracketTeam(**t) for t in bdata.get("teams", [])]
+            matches = []
+            for m in bdata.get("matches", []):
+                match = BracketMatch(
+                    id=int(m.get("id", 0)),
+                    round=int(m.get("round", 1)),
+                    slot=int(m.get("slot", 1)),
+                    teamA=m.get("teamA"),
+                    teamB=m.get("teamB"),
+                    scoreA=int(m.get("scoreA", 0)),
+                    scoreB=int(m.get("scoreB", 0)),
+                    winnerToMatchId=m.get("winnerToMatchId"),
+                    loserToMatchId=m.get("loserToMatchId"),
+                    winnerToSlot=m.get("winnerToSlot"),
+                    loserToSlot=m.get("loserToSlot"),
+                    bracket=m.get("bracket", ""),
+                    group=m.get("group"),
+                    seedA=m.get("seedA", m.get("teamA")),
+                    seedB=m.get("seedB", m.get("teamB"))
+                )
+                matches.append(match)
+            self.brackets_tab.from_state(BracketState(
+                settings=BracketSettings(bracket_type=settings.get("bracket_type", "swiss")),
+                teams=teams,
+                matches=matches
+            ))
+
     def _update(self):
         state = self._collect_state()
 
@@ -2426,6 +3432,7 @@ class TournamentApp(QMainWindow):
         self._export_match(state)
         
         self._export_waiting(state)
+        self._export_brackets(state)
 
         self._export_status_text(state)
         self._notify_overlays(changed)
@@ -2469,6 +3476,23 @@ class TournamentApp(QMainWindow):
             "current_map": None,
             "general": g,
             "waiting": w,
+            "assets": {"heroes":{}, "maps":{}, "modes":{}},
+        }
+        old = getattr(self, "_last_state_for_diff", None)
+        changed = self._diff_for_scoreboard(old, full)
+        self._last_state_for_diff = full
+        self._notify_overlays(changed)
+
+    def _update_brackets_only(self):
+        b = asdict(self.brackets_tab.to_state()) if hasattr(self, "brackets_tab") else {}
+        self._export_brackets({"brackets": b})
+        self._autosave(self._collect_state())
+        full = {
+            "team1": {}, "team2": {}, "maps": [],
+            "current_map": None,
+            "general": {},
+            "waiting": {},
+            "brackets": b,
             "assets": {"heroes":{}, "maps":{}, "modes":{}},
         }
         old = getattr(self, "_last_state_for_diff", None)
