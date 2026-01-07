@@ -90,7 +90,6 @@ class BracketTeam:
     name: str = ""
     abbr: str = ""
     logo_path: Optional[str] = None
-    group: str = ""
 
 @dataclass
 class BracketMatch:
@@ -113,10 +112,6 @@ class BracketMatch:
 @dataclass
 class BracketSettings:
     bracket_type: str = "4 team single elimination"
-    team_count: int = 4
-    display_stage: str = "All"
-    display_group: str = "All"
-    display_round: str = "All"
 
 @dataclass
 class BracketState:
@@ -1166,9 +1161,6 @@ class BracketTeamRow(QWidget):
         self.logo_btn = QPushButton("Browse…")
         self.logo_btn.setFixedWidth(90)
 
-        self.group_edit = QLineEdit()
-        self.group_edit.setFixedWidth(80)
-
         self.up_btn = QPushButton("↑")
         self.down_btn = QPushButton("↓")
         self.remove_btn = QPushButton("Remove")
@@ -1182,8 +1174,6 @@ class BracketTeamRow(QWidget):
         row.addWidget(QLabel("Logo:"), 0)
         row.addWidget(self.logo_edit, 2)
         row.addWidget(self.logo_btn, 0)
-        row.addWidget(QLabel("Group:"), 0)
-        row.addWidget(self.group_edit, 0)
         row.addWidget(self.up_btn, 0)
         row.addWidget(self.down_btn, 0)
         row.addWidget(self.remove_btn, 0)
@@ -1195,7 +1185,6 @@ class BracketTeamRow(QWidget):
 
         self.name_edit.textChanged.connect(lambda *_: self.changed.emit())
         self.abbr_edit.textChanged.connect(lambda *_: self.changed.emit())
-        self.group_edit.textChanged.connect(lambda *_: self.changed.emit())
 
         self._logo_path = None
         if team:
@@ -1220,8 +1209,7 @@ class BracketTeamRow(QWidget):
         return BracketTeam(
             name=self.name_edit.text().strip(),
             abbr=self.abbr_edit.text().strip(),
-            logo_path=self._logo_path,
-            group=self.group_edit.text().strip()
+            logo_path=self._logo_path
         )
 
     def from_team(self, team: BracketTeam):
@@ -1229,7 +1217,6 @@ class BracketTeamRow(QWidget):
         self.abbr_edit.setText(team.abbr or "")
         self._logo_path = team.logo_path
         self.logo_edit.setText(team.logo_path or "")
-        self.group_edit.setText(team.group or "")
 
 
 class BracketMatchRow(QWidget):
@@ -1321,28 +1308,6 @@ class BracketTab(QWidget):
             self.bracket_type_combo.addItem(t)
         settings_layout.addWidget(QLabel("Bracket type:"))
         settings_layout.addWidget(self.bracket_type_combo, 1)
-
-        self.team_count_spin = QSpinBox()
-        self.team_count_spin.setRange(2, 32)
-        self.team_count_spin.setValue(4)
-        settings_layout.addWidget(QLabel("Team count:"))
-        settings_layout.addWidget(self.team_count_spin)
-
-        self.display_stage_combo = QComboBox()
-        self.display_stage_combo.addItems(["All", "Groups only", "Playoffs only"])
-        settings_layout.addWidget(QLabel("Display:"))
-        settings_layout.addWidget(self.display_stage_combo)
-
-        self.display_group_combo = QComboBox()
-        self.display_group_combo.addItems(["All"])
-        settings_layout.addWidget(QLabel("Group:"))
-        settings_layout.addWidget(self.display_group_combo)
-
-        self.display_round_combo = QComboBox()
-        self.display_round_combo.addItems(["All"])
-        settings_layout.addWidget(QLabel("Round:"))
-        settings_layout.addWidget(self.display_round_combo)
-
         settings_layout.addStretch(1)
         root.addWidget(settings_box)
 
@@ -1389,15 +1354,10 @@ class BracketTab(QWidget):
         self.generate_btn.clicked.connect(self._generate_bracket)
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
         self.bracket_type_combo.currentTextChanged.connect(self._on_bracket_type_changed)
-        self.team_count_spin.valueChanged.connect(self._on_team_count_changed)
-        self.display_stage_combo.currentTextChanged.connect(self._on_display_changed)
-        self.display_group_combo.currentTextChanged.connect(lambda *_: self.updated.emit())
-        self.display_round_combo.currentTextChanged.connect(lambda *_: self.updated.emit())
 
         self._add_team_row()
         self._last_bracket_type = self.bracket_type_combo.currentText()
         self._last_team_count = len(self._collect_teams())
-        self._update_team_count_state()
 
     def _add_team_row(self, team: Optional[BracketTeam] = None):
         row = BracketTeamRow(team)
@@ -1450,7 +1410,6 @@ class BracketTab(QWidget):
             self.matches = []
             self._rebuild_matches_ui()
         self._last_team_count = current_count
-        self._update_display_filters()
         self._refresh_match_rows()
         self.updated.emit()
 
@@ -1469,7 +1428,6 @@ class BracketTab(QWidget):
                 return
         self._generate_bracket()
         self._last_bracket_type = self.bracket_type_combo.currentText()
-        self._update_team_count_state()
 
     def _validate_team_count(self, count: int) -> bool:
         btype = self.bracket_type_combo.currentText()
@@ -1504,81 +1462,6 @@ class BracketTab(QWidget):
             return True
         return True
 
-    def _update_team_count_state(self):
-        btype = self.bracket_type_combo.currentText()
-        fixed_counts = {
-            "4 team single elimination": 4,
-            "4 team double elimination": 4,
-            "6 team single elimination": 6,
-            "6 team double elimination": 6,
-            "8 team single elimination": 8,
-            "8 team double elimination": 8,
-            "16 team single elimination": 16,
-            "16 team double elimination": 16,
-        }
-        if btype in fixed_counts:
-            required = fixed_counts[btype]
-            self.team_count_spin.blockSignals(True)
-            self.team_count_spin.setValue(required)
-            self.team_count_spin.blockSignals(False)
-            self.team_count_spin.setEnabled(False)
-        else:
-            self.team_count_spin.setEnabled(True)
-            if self.team_count_spin.value() < 2:
-                self.team_count_spin.setValue(max(2, self._last_team_count))
-        self._sync_team_rows_with_count()
-        allow_groups = btype in {"swiss", "round robin group stage"}
-        for row in self._iter_team_rows():
-            row.group_edit.setEnabled(allow_groups)
-        self._update_display_filters()
-
-    def _on_team_count_changed(self, *_):
-        if self._loading_state:
-            return
-        self._sync_team_rows_with_count()
-        self.updated.emit()
-
-    def _sync_team_rows_with_count(self):
-        desired = self.team_count_spin.value()
-        rows = self._iter_team_rows()
-        if len(rows) < desired:
-            for _ in range(desired - len(rows)):
-                self._add_team_row()
-        elif len(rows) > desired:
-            for row in rows[desired:]:
-                row.setParent(None)
-                row.deleteLater()
-        self._last_team_count = desired
-
-    def _on_display_changed(self, *_):
-        self._update_display_filters()
-        self.updated.emit()
-
-    def _update_display_filters(self):
-        teams = self._collect_teams()
-        groups = sorted({(t.group or "").strip() for t in teams if (t.group or "").strip()})
-        self.display_group_combo.blockSignals(True)
-        current = self.display_group_combo.currentText()
-        self.display_group_combo.clear()
-        self.display_group_combo.addItem("All")
-        for g in groups:
-            self.display_group_combo.addItem(f"Group {g}")
-        if current in [f"Group {g}" for g in groups]:
-            self.display_group_combo.setCurrentText(current)
-        self.display_group_combo.blockSignals(False)
-
-        round_labels = ["All"]
-        if self.matches:
-            rounds = sorted({m.round for m in self.matches})
-            round_labels += [f"Round {r}" for r in rounds]
-        self.display_round_combo.blockSignals(True)
-        current_round = self.display_round_combo.currentText()
-        self.display_round_combo.clear()
-        self.display_round_combo.addItems(round_labels)
-        if current_round in round_labels:
-            self.display_round_combo.setCurrentText(current_round)
-        self.display_round_combo.blockSignals(False)
-
     def _generate_bracket(self):
         teams = self._collect_teams()
         if not self._validate_team_count(len(teams)):
@@ -1596,7 +1479,6 @@ class BracketTab(QWidget):
         self.matches = matches
         self._rebuild_matches_ui()
         self._apply_progression()
-        self._update_display_filters()
         self.updated.emit()
 
     def _collect_teams(self) -> List[BracketTeam]:
@@ -1907,16 +1789,16 @@ class BracketTab(QWidget):
         return matches
 
     def _generate_round_robin(self, teams: List[BracketTeam]) -> List[BracketMatch]:
+        n = len(teams)
+        groups = []
+        group_size = 4
+        for i in range(0, n, group_size):
+            groups.append(list(range(i, min(i + group_size, n))))
         matches: List[BracketMatch] = []
         match_id = 1
-        groups: Dict[str, List[int]] = {}
-        for idx, team in enumerate(teams):
-            group = (team.group or "").strip() or "A"
-            groups.setdefault(group, []).append(idx)
-
-        for group_name in sorted(groups.keys()):
-            group_team_ids = groups[group_name]
-            group_matches = self._round_robin_pairings(group_team_ids)
+        for g_index, group in enumerate(groups):
+            group_name = chr(ord("A") + g_index)
+            group_matches = self._round_robin_pairings(group)
             for round_num, round_pairs in enumerate(group_matches, start=1):
                 for slot, (team_a, team_b) in enumerate(round_pairs, start=1):
                     match = BracketMatch(
@@ -1928,7 +1810,7 @@ class BracketTab(QWidget):
                         seedA=team_a,
                         seedB=team_b,
                         bracket="RR",
-                        group=group_name
+                        group=f"Group {group_name}"
                     )
                     matches.append(match)
                     match_id += 1
@@ -1955,13 +1837,7 @@ class BracketTab(QWidget):
 
     def to_state(self) -> BracketState:
         return BracketState(
-            settings=BracketSettings(
-                bracket_type=self.bracket_type_combo.currentText(),
-                team_count=int(self.team_count_spin.value()),
-                display_stage=self.display_stage_combo.currentText(),
-                display_group=self.display_group_combo.currentText(),
-                display_round=self.display_round_combo.currentText()
-            ),
+            settings=BracketSettings(bracket_type=self.bracket_type_combo.currentText()),
             teams=self._collect_teams(),
             matches=self.matches[:]
         )
@@ -1970,8 +1846,6 @@ class BracketTab(QWidget):
         self._loading_state = True
         self.bracket_type_combo.setCurrentText(state.settings.bracket_type or self.BRACKET_TYPES[0])
         self._last_bracket_type = self.bracket_type_combo.currentText()
-        self.team_count_spin.setValue(int(getattr(state.settings, "team_count", 0) or 0) or len(state.teams) or 2)
-        self.display_stage_combo.setCurrentText(getattr(state.settings, "display_stage", "All") or "All")
         for row in self._iter_team_rows():
             row.setParent(None)
             row.deleteLater()
@@ -1986,10 +1860,6 @@ class BracketTab(QWidget):
                 m.seedB = m.teamB
         self._rebuild_matches_ui()
         self._apply_progression()
-        self._update_team_count_state()
-        self._update_display_filters()
-        self.display_group_combo.setCurrentText(getattr(state.settings, "display_group", "All") or "All")
-        self.display_round_combo.setCurrentText(getattr(state.settings, "display_round", "All") or "All")
         self._loading_state = False
 
 
@@ -3152,7 +3022,6 @@ class TournamentApp(QMainWindow):
         for idx, t in enumerate(teams):
             name = (t.get("name") or "").strip()
             abbr = (t.get("abbr") or "").strip()
-            group = (t.get("group") or "").strip()
             logo_path = t.get("logo_path")
             logo_rel = None
             if logo_path:
@@ -3163,7 +3032,6 @@ class TournamentApp(QMainWindow):
             out_teams.append({
                 "name": name,
                 "abbr": abbr,
-                "group": group,
                 "logo": logo_rel
             })
 
@@ -3182,21 +3050,166 @@ class TournamentApp(QMainWindow):
         self._write_txt(html_path, html)
 
     def _brackets_html_template(self, payload: dict) -> str:
-        base = os.environ.get("SOWB_ROOT") or _app_base()
-        template_path = os.path.join(base, "HTML", "brackets.html")
-        try:
-            with open(template_path, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception:
-            inline_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
-            fallback = (
-                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
-                "<title>Brackets</title></head><body>"
-                "<pre id=\"inline\"></pre>"
-                "<script>document.getElementById('inline').textContent="
-                f"{json.dumps(inline_json)};</script></body></html>"
-            )
-            return fallback
+        inline_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
+        template = """<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Brackets</title>
+<style>
+  html,body{margin:0;padding:0;background:#0f1114;color:#fff;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;}
+  .wrap{padding:24px;}
+  h1{margin:0 0 12px 0;font-size:32px;}
+  .section{margin:18px 0; padding:12px; border:1px solid #2b2e35; border-radius:8px; background:#151922;}
+  .section h2{margin:0 0 10px 0; font-size:20px;}
+  .match{display:flex; gap:12px; align-items:center; padding:6px 0; border-bottom:1px solid #242833;}
+  .match:last-child{border-bottom:none;}
+  .label{font-weight:600; min-width:160px; color:#9aa4b1;}
+  .team{flex:1;}
+  .score{width:46px; text-align:center; font-weight:700;}
+  .winner{font-weight:700; color:#8de1ff;}
+  .logo{width:24px; height:24px; object-fit:contain; margin-right:6px;}
+  .teamline{display:flex; align-items:center; gap:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="bracket-title">Brackets</h1>
+  <div id="bracket-root">Loading…</div>
+</div>
+<script id="bracket-inline" type="application/json">__INLINE_JSON__</script>
+<script>
+const inlineNode = document.getElementById('bracket-inline');
+const root = document.getElementById('bracket-root');
+
+function teamLabel(teams, id) {
+  if (id === null || id === undefined) return 'TBD';
+  const t = teams[id];
+  if (!t) return 'TBD';
+  return t.name || t.abbr || `Team ${id + 1}`;
+}
+
+function render(data) {
+  root.innerHTML = '';
+  if (!data) {
+    root.textContent = 'No bracket data available.';
+    return;
+  }
+  const settings = data.settings || {};
+  const teams = data.teams || [];
+  const matches = data.matches || [];
+  document.getElementById('bracket-title').textContent = settings.bracket_type || 'Brackets';
+  if (!matches.length) {
+    root.textContent = 'No matches generated.';
+    return;
+  }
+  const sections = new Map();
+  for (const m of matches) {
+    let key = '';
+    if (m.bracket === 'RR') {
+      key = `${m.group || 'Group'} - Round ${m.round}`;
+    } else if (m.bracket === 'Swiss') {
+      key = `Swiss - Round ${m.round}`;
+    } else {
+      key = `${m.bracket || 'Bracket'} - Round ${m.round}`;
+    }
+    if (!sections.has(key)) sections.set(key, []);
+    sections.get(key).push(m);
+  }
+  for (const [key, items] of sections.entries()) {
+    const section = document.createElement('div');
+    section.className = 'section';
+    const h2 = document.createElement('h2');
+    h2.textContent = key;
+    section.appendChild(h2);
+    items.sort((a,b) => (a.slot||0) - (b.slot||0));
+    for (const m of items) {
+      const row = document.createElement('div');
+      row.className = 'match';
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = `Match ${m.slot}`;
+      row.appendChild(label);
+
+      const teamA = document.createElement('div');
+      teamA.className = 'team';
+      const teamALine = document.createElement('div');
+      teamALine.className = 'teamline';
+      const tA = teams[m.teamA || m.teamA === 0 ? m.teamA : -1];
+      if (tA && tA.logo) {
+        const img = document.createElement('img');
+        img.src = tA.logo;
+        img.className = 'logo';
+        teamALine.appendChild(img);
+      }
+      teamALine.appendChild(document.createTextNode(teamLabel(teams, m.teamA)));
+      teamA.appendChild(teamALine);
+      row.appendChild(teamA);
+
+      const scoreA = document.createElement('div');
+      scoreA.className = 'score';
+      scoreA.textContent = m.scoreA ?? 0;
+      row.appendChild(scoreA);
+
+      const scoreB = document.createElement('div');
+      scoreB.className = 'score';
+      scoreB.textContent = m.scoreB ?? 0;
+      row.appendChild(scoreB);
+
+      const teamB = document.createElement('div');
+      teamB.className = 'team';
+      const teamBLine = document.createElement('div');
+      teamBLine.className = 'teamline';
+      const tB = teams[m.teamB || m.teamB === 0 ? m.teamB : -1];
+      if (tB && tB.logo) {
+        const img = document.createElement('img');
+        img.src = tB.logo;
+        img.className = 'logo';
+        teamBLine.appendChild(img);
+      }
+      teamBLine.appendChild(document.createTextNode(teamLabel(teams, m.teamB)));
+      teamB.appendChild(teamBLine);
+      row.appendChild(teamB);
+
+      let winnerId = null;
+      if (m.teamA !== null && m.teamB === null) winnerId = m.teamA;
+      else if (m.teamB !== null && m.teamA === null) winnerId = m.teamB;
+      else if (m.scoreA > m.scoreB) winnerId = m.teamA;
+      else if (m.scoreB > m.scoreA) winnerId = m.teamB;
+      const winner = document.createElement('div');
+      winner.className = 'winner';
+      winner.textContent = winnerId !== null ? `Winner: ${teamLabel(teams, winnerId)}` : 'Winner: —';
+      row.appendChild(winner);
+      section.appendChild(row);
+    }
+    root.appendChild(section);
+  }
+}
+
+async function loadData() {
+  try {
+    const resp = await fetch('bracket.json', {cache: 'no-store'});
+    if (!resp.ok) throw new Error('fetch failed');
+    const data = await resp.json();
+    render(data);
+  } catch (err) {
+    try {
+      const inline = inlineNode?.textContent?.trim();
+      render(inline ? JSON.parse(inline) : null);
+    } catch (e) {
+      render(null);
+    }
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>"""
+        return template.replace("__INLINE_JSON__", inline_json)
 
     # ---------------------
     # Actions: Reset & Swap
