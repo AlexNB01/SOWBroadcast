@@ -11,10 +11,10 @@
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
 
   :root{
-    --primary:#f3f3f6; --secondary:#11131a; --tertiary:#6f74ff; --quaternary:#c9c9ff;
-    --accent:#6f74ff; --accent-soft:rgba(111,116,255,.35);
-    --panel:#ffffff; --panel-soft:#f2f2f6; --line:#dadbe5;
-    --title-size:62px; --sub-title:22px;
+    --primary:#0f1114; --secondary:#ffffff; --tertiary:#c99b36; --quaternary:#2a2a2a;
+    --accent:#c99b36; --accent-soft:rgba(201,155,54,.35);
+    --panel:#1a1b20; --panel-soft:#24262d; --line:#3b3d44;
+    --title-size:64px; --sub-title:26px;
   }
 
   html,body{
@@ -22,24 +22,23 @@
     font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
     font-weight:800; text-transform:uppercase;
     -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-    background:#efeff4; color:var(--secondary);
+    background:#0b0b0d; color:var(--secondary);
   }
 
   body::before{
     content:""; position:absolute; inset:0;
     background:
-      radial-gradient(circle at 70% 20%, rgba(145,150,255,.25), transparent 50%),
-      radial-gradient(circle at 10% 80%, rgba(255,255,255,.8), transparent 55%),
-      linear-gradient(180deg, rgba(255,255,255,.9), rgba(235,236,245,.9));
-    opacity:1;
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,.08), transparent 45%),
+      radial-gradient(circle at 85% 0%, rgba(201,155,54,.14), transparent 50%),
+      linear-gradient(135deg, rgba(255,255,255,.04), transparent 40%),
+      linear-gradient(210deg, rgba(0,0,0,.55), rgba(0,0,0,.95));
+    opacity:.85;
   }
 
   body::after{
     content:""; position:absolute; inset:-20%;
-    background:
-      radial-gradient(circle, rgba(120,125,255,.25), transparent 45%),
-      radial-gradient(circle, rgba(255,255,255,.7), transparent 40%);
-    opacity:.22; mix-blend-mode:soft-light; pointer-events:none;
+    background:radial-gradient(circle, rgba(255,255,255,.04), transparent 40%);
+    opacity:.08; mix-blend-mode:screen; pointer-events:none;
   }
 
   .frame{
@@ -50,28 +49,28 @@
 
   .header{
     display:flex; align-items:flex-end; justify-content:space-between;
-    border-bottom:2px solid rgba(0,0,0,.08); padding-bottom:18px;
+    border-bottom:2px solid var(--accent-soft); padding-bottom:18px;
   }
 
   .header-title{
-    font-size:var(--title-size); letter-spacing:1.6px; color:var(--secondary);
+    font-size:var(--title-size); letter-spacing:2px; color:var(--secondary);
   }
 
   .header-subtitle{
-    font-size:var(--sub-title); color:#5b5f6d; letter-spacing:1px;
+    font-size:var(--sub-title); color:var(--accent); letter-spacing:1px;
   }
 
   .event-card{
     display:flex; align-items:center; gap:18px;
-    background:rgba(255,255,255,.8);
-    border:1px solid rgba(0,0,0,.08);
+    background:linear-gradient(135deg, rgba(255,255,255,.06), rgba(0,0,0,.4));
+    border:1px solid rgba(255,255,255,.08);
     padding:14px 20px; border-radius:14px;
-    box-shadow:0 12px 24px rgba(55,60,95,.12);
+    box-shadow:0 12px 32px rgba(0,0,0,.35);
   }
 
   .event-logo{
     width:56px; height:56px; border-radius:14px;
-    background:rgba(111,116,255,.18); display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center;
     font-weight:900; color:var(--accent);
   }
 
@@ -90,7 +89,7 @@
 
   .section-title{
     display:inline-flex; align-items:center; gap:12px;
-    font-size:28px; color:var(--secondary);
+    font-size:28px; color:var(--accent);
     border-left:6px solid var(--accent); padding-left:14px;
     letter-spacing:1.2px;
   }
@@ -105,15 +104,15 @@
   }
 
   .round-title{
-    font-size:18px; color:#5b5f6d;
+    font-size:18px; color:var(--secondary); opacity:.8;
     letter-spacing:.9px; padding:6px 10px; border-radius:8px;
-    border:1px solid rgba(0,0,0,.08); background:rgba(255,255,255,.75);
+    border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.45);
   }
 
   .match-card{
     position:relative; background:linear-gradient(135deg, var(--panel), var(--panel-soft));
     border:1px solid var(--line); border-radius:14px; overflow:hidden;
-    box-shadow:0 10px 22px rgba(60,65,90,.15);
+    box-shadow:0 10px 26px rgba(0,0,0,.45);
   }
 
   .match-card.has-next::after{
@@ -124,26 +123,26 @@
   .match-header{
     display:flex; justify-content:space-between; align-items:center;
     padding:8px 12px; font-size:14px; letter-spacing:.8px;
-    background:rgba(111,116,255,.16); color:#40445a;
-    border-bottom:1px solid rgba(0,0,0,.06);
+    background:rgba(0,0,0,.55); color:var(--accent);
+    border-bottom:1px solid rgba(255,255,255,.08);
   }
 
   .team-row{
     display:grid; grid-template-columns:46px 1fr 50px; align-items:center;
     gap:12px; padding:10px 12px; font-size:22px;
-    border-top:1px solid rgba(0,0,0,.06);
+    border-top:1px solid rgba(255,255,255,.05);
   }
 
   .team-row:first-of-type{ border-top:none; }
 
   .team-row.winner{
-    background:linear-gradient(90deg, rgba(111,116,255,.22), rgba(255,255,255,0));
+    background:linear-gradient(90deg, rgba(201,155,54,.25), rgba(0,0,0,0));
     color:var(--secondary);
   }
 
   .team-logo{
     width:38px; height:38px; border-radius:10px; background:#fff center/contain no-repeat;
-    box-shadow:0 6px 14px rgba(60,65,90,.2);
+    box-shadow:0 6px 14px rgba(0,0,0,.3);
   }
 
   .team-name{
@@ -152,7 +151,7 @@
 
   .team-score{
     text-align:center; font-size:22px; font-weight:900;
-    background:var(--quaternary); color:#1d1f2b; border-radius:8px; padding:6px 0;
+    background:rgba(0,0,0,.35); border-radius:8px; padding:6px 0;
   }
 
   .team-row.bye{
@@ -165,8 +164,8 @@
 
   .footer{
     display:flex; align-items:center; justify-content:center; gap:12px;
-    font-size:16px; letter-spacing:2px; color:rgba(30,32,44,.6);
-    padding-top:18px; border-top:1px solid rgba(0,0,0,.08);
+    font-size:16px; letter-spacing:2px; color:rgba(255,255,255,.6);
+    padding-top:18px; border-top:1px solid rgba(255,255,255,.08);
   }
 
   .hidden{ display:none !important; }
