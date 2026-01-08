@@ -3,7 +3,7 @@ import server as _sb__force_include
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 
-from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal
+from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal, QSignalBlocker
 from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -525,6 +525,471 @@ class MapRow(QWidget):
         self.t2ban.setCurrentIndex(0)
 
         
+class BracketMatch:
+    def __init__(self, round_name: str, bracket_name: str, match_index: int, team1=None, team2=None):
+        self.round_name = round_name
+        self.bracket_name = bracket_name
+        self.match_index = match_index
+        self.team1 = team1
+        self.team2 = team2
+        self.score1 = 0
+        self.score2 = 0
+        self.win_target = None
+        self.loss_target = None
+
+    def determine_winner(self):
+        if self.team1 is None and self.team2 is None:
+            return None
+        if self.team1 is None:
+            return "team2"
+        if self.team2 is None:
+            return "team1"
+        if self.score1 == self.score2:
+            return None
+        return "team1" if self.score1 > self.score2 else "team2"
+
+
+class BracketMatchWidget(QWidget):
+    changed = pyqtSignal()
+
+    def __init__(self, match: BracketMatch):
+        super().__init__()
+        self.match = match
+
+        root = QGridLayout(self)
+        root.setColumnStretch(1, 1)
+        root.setColumnStretch(5, 1)
+
+        self.team1_name = QLineEdit()
+        self.team1_logo = QLineEdit()
+        self.team1_logo.setPlaceholderText("Logo path")
+        self.team1_logo_btn = QPushButton("Logo…")
+        self.team1_logo_btn.clicked.connect(lambda *_: self._pick_logo(1))
+        self.team1_score = QSpinBox()
+        self.team1_score.setRange(0, 99)
+
+        self.team2_name = QLineEdit()
+        self.team2_logo = QLineEdit()
+        self.team2_logo.setPlaceholderText("Logo path")
+        self.team2_logo_btn = QPushButton("Logo…")
+        self.team2_logo_btn.clicked.connect(lambda *_: self._pick_logo(2))
+        self.team2_score = QSpinBox()
+        self.team2_score.setRange(0, 99)
+
+        self.winner_label = QLabel("")
+
+        self.team1_name.textChanged.connect(self.changed.emit)
+        self.team1_logo.textChanged.connect(self.changed.emit)
+        self.team1_score.valueChanged.connect(self.changed.emit)
+        self.team2_name.textChanged.connect(self.changed.emit)
+        self.team2_logo.textChanged.connect(self.changed.emit)
+        self.team2_score.valueChanged.connect(self.changed.emit)
+
+        root.addWidget(QLabel("Team A"), 0, 0)
+        root.addWidget(self.team1_name, 0, 1)
+        logo1_row = QHBoxLayout()
+        logo1_row.addWidget(self.team1_logo)
+        logo1_row.addWidget(self.team1_logo_btn)
+        root.addLayout(logo1_row, 0, 2, 1, 2)
+        root.addWidget(QLabel("Score"), 0, 4)
+        root.addWidget(self.team1_score, 0, 5)
+
+        root.addWidget(QLabel("Team B"), 1, 0)
+        root.addWidget(self.team2_name, 1, 1)
+        logo2_row = QHBoxLayout()
+        logo2_row.addWidget(self.team2_logo)
+        logo2_row.addWidget(self.team2_logo_btn)
+        root.addLayout(logo2_row, 1, 2, 1, 2)
+        root.addWidget(QLabel("Score"), 1, 4)
+        root.addWidget(self.team2_score, 1, 5)
+        root.addWidget(self.winner_label, 0, 6, 2, 1)
+
+    def _pick_logo(self, slot: int):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        start_dir = os.path.join(base, "Scoreboard", "Teams")
+        os.makedirs(start_dir, exist_ok=True)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Valitse logo",
+            start_dir,
+            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
+        )
+        if not path:
+            return
+        if slot == 1:
+            self.team1_logo.setText(path)
+        else:
+            self.team2_logo.setText(path)
+
+    def set_team(self, slot: int, team: Optional[dict]):
+        if slot == 1:
+            name_edit = self.team1_name
+            logo_edit = self.team1_logo
+            logo_btn = self.team1_logo_btn
+        else:
+            name_edit = self.team2_name
+            logo_edit = self.team2_logo
+            logo_btn = self.team2_logo_btn
+
+        if team is None:
+            with QSignalBlocker(name_edit), QSignalBlocker(logo_edit):
+                name_edit.setText("")
+                logo_edit.setText("")
+            name_edit.setPlaceholderText("BYE")
+            name_edit.setEnabled(False)
+            logo_edit.setEnabled(False)
+            logo_btn.setEnabled(False)
+        else:
+            with QSignalBlocker(name_edit), QSignalBlocker(logo_edit):
+                name_edit.setText(team.get("name", ""))
+                logo_edit.setText(team.get("logo_path", "") or "")
+            name_edit.setPlaceholderText("Team name")
+            name_edit.setEnabled(True)
+            logo_edit.setEnabled(True)
+            logo_btn.setEnabled(True)
+
+    def set_scores(self, s1: int, s2: int):
+        with QSignalBlocker(self.team1_score), QSignalBlocker(self.team2_score):
+            self.team1_score.setValue(s1)
+            self.team2_score.setValue(s2)
+
+    def set_winner_text(self, text: str):
+        self.winner_label.setText(text)
+
+    def team_data(self, slot: int):
+        if slot == 1:
+            if not self.team1_name.isEnabled():
+                return None
+            return {"name": self.team1_name.text().strip(), "logo_path": self.team1_logo.text().strip()}
+        if not self.team2_name.isEnabled():
+            return None
+        return {"name": self.team2_name.text().strip(), "logo_path": self.team2_logo.text().strip()}
+
+
+class BracketsTab(QWidget):
+    updated = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._suspend_updates = False
+        self._match_widgets: Dict[BracketMatch, BracketMatchWidget] = {}
+        self._winners_rounds: List[List[BracketMatch]] = []
+        self._losers_rounds: List[List[BracketMatch]] = []
+        self._grand_final: Optional[BracketMatch] = None
+
+        root = QVBoxLayout(self)
+
+        controls = QHBoxLayout()
+        self.format_combo = QComboBox()
+        self.format_combo.addItems(["Single Elimination", "Double Elimination"])
+        self.team_count = QSpinBox()
+        self.team_count.setRange(2, 64)
+        self.team_count.setValue(8)
+        self.generate_btn = QPushButton("Generate bracket")
+        self.generate_btn.clicked.connect(self._generate_bracket)
+        self.update_btn = QPushButton("Update (Brackets)")
+        self.update_btn.clicked.connect(lambda *_: self.updated.emit())
+        controls.addWidget(QLabel("Format:"))
+        controls.addWidget(self.format_combo)
+        controls.addWidget(QLabel("Teams:"))
+        controls.addWidget(self.team_count)
+        controls.addWidget(self.generate_btn)
+        controls.addStretch(1)
+        controls.addWidget(self.update_btn)
+        root.addLayout(controls)
+
+        note = QLabel("Non power-of-two team counts get byes into round two.")
+        note.setStyleSheet("color: #666;")
+        root.addWidget(note)
+
+        self.bracket_scroll = QScrollArea()
+        self.bracket_scroll.setWidgetResizable(True)
+        self.bracket_container = QWidget()
+        self.bracket_layout = QVBoxLayout(self.bracket_container)
+        self.bracket_layout.addStretch(1)
+        self.bracket_scroll.setWidget(self.bracket_container)
+        root.addWidget(self.bracket_scroll)
+
+        self._generate_bracket()
+
+    def _clear_bracket_ui(self):
+        while self.bracket_layout.count():
+            item = self.bracket_layout.takeAt(0)
+            if widget := item.widget():
+                widget.deleteLater()
+
+    def _next_power_of_two(self, n: int) -> int:
+        power = 1
+        while power < n:
+            power *= 2
+        return power
+
+    def _team_placeholder(self):
+        return {"name": "", "logo_path": ""}
+
+    def _generate_bracket(self):
+        self._suspend_updates = True
+        self._match_widgets.clear()
+        self._winners_rounds.clear()
+        self._losers_rounds.clear()
+        self._grand_final = None
+        self._clear_bracket_ui()
+
+        total_teams = int(self.team_count.value())
+        slots = self._next_power_of_two(total_teams)
+        round_count = int(slots).bit_length() - 1
+        teams = [self._team_placeholder() for _ in range(total_teams)]
+        teams.extend([None] * (slots - total_teams))
+
+        format_key = self.format_combo.currentText()
+        is_double = format_key.startswith("Double")
+
+        self._winners_rounds = self._build_winners_rounds(round_count, teams)
+        winners_group = self._build_rounds_group("Winners Bracket", self._winners_rounds)
+        self.bracket_layout.addWidget(winners_group)
+
+        if is_double:
+            self._losers_rounds = self._build_losers_rounds(round_count)
+            losers_group = self._build_rounds_group("Losers Bracket", self._losers_rounds)
+            self.bracket_layout.addWidget(losers_group)
+
+            self._grand_final = BracketMatch("Grand Final", "grand", 0, self._team_placeholder(), self._team_placeholder())
+            final_box = QGroupBox("Grand Final")
+            final_layout = QVBoxLayout(final_box)
+            final_widget = self._create_match_widget(self._grand_final)
+            final_layout.addWidget(final_widget)
+            self.bracket_layout.addWidget(final_box)
+
+        self.bracket_layout.addStretch(1)
+        self._wire_bracket_targets(is_double=is_double)
+        self._suspend_updates = False
+        self._refresh_all_results()
+        self.updated.emit()
+
+    def _build_winners_rounds(self, round_count: int, teams: List[Optional[dict]]):
+        rounds = []
+        current_teams = teams
+        for r in range(round_count):
+            match_count = len(current_teams) // 2
+            round_matches = []
+            for i in range(match_count):
+                t1 = current_teams[i * 2]
+                t2 = current_teams[i * 2 + 1]
+                match = BracketMatch(f"Winners Round {r + 1}", "winners", i, t1, t2)
+                round_matches.append(match)
+            rounds.append(round_matches)
+            current_teams = [self._team_placeholder() for _ in range(match_count)]
+        return rounds
+
+    def _build_losers_rounds(self, round_count: int):
+        rounds = []
+        if round_count <= 1:
+            return rounds
+        for i in range(round_count - 1):
+            match_count = 2 ** (round_count - i - 2)
+            round_matches_odd = []
+            round_matches_even = []
+            for m in range(match_count):
+                round_matches_odd.append(BracketMatch(f"Losers Round {len(rounds) + 1}", "losers", m, self._team_placeholder(), self._team_placeholder()))
+            rounds.append(round_matches_odd)
+            for m in range(match_count):
+                round_matches_even.append(BracketMatch(f"Losers Round {len(rounds) + 1}", "losers", m, self._team_placeholder(), self._team_placeholder()))
+            rounds.append(round_matches_even)
+        return rounds
+
+    def _build_rounds_group(self, title: str, rounds: List[List[BracketMatch]]):
+        box = QGroupBox(title)
+        layout = QVBoxLayout(box)
+        for round_matches in rounds:
+            if not round_matches:
+                continue
+            round_box = QGroupBox(round_matches[0].round_name)
+            round_layout = QVBoxLayout(round_box)
+            for match in round_matches:
+                round_layout.addWidget(self._create_match_widget(match))
+            layout.addWidget(round_box)
+        return box
+
+    def _create_match_widget(self, match: BracketMatch):
+        widget = BracketMatchWidget(match)
+        widget.changed.connect(lambda m=match: self._on_match_changed(m))
+        self._match_widgets[match] = widget
+        widget.set_team(1, match.team1)
+        widget.set_team(2, match.team2)
+        return widget
+
+    def _wire_bracket_targets(self, is_double: bool):
+        for r_index, round_matches in enumerate(self._winners_rounds):
+            for m_index, match in enumerate(round_matches):
+                if r_index + 1 < len(self._winners_rounds):
+                    next_match = self._winners_rounds[r_index + 1][m_index // 2]
+                    target_slot = 1 if m_index % 2 == 0 else 2
+                    match.win_target = (next_match, target_slot)
+                if is_double:
+                    if r_index == 0 and self._losers_rounds:
+                        loss_round = self._losers_rounds[0]
+                        match.loss_target = (loss_round[m_index // 2], 1 if m_index % 2 == 0 else 2)
+                    elif r_index >= 1 and self._losers_rounds:
+                        loss_round_index = 2 * r_index - 1
+                        if loss_round_index < len(self._losers_rounds):
+                            loss_round = self._losers_rounds[loss_round_index]
+                            match.loss_target = (loss_round[m_index], 2)
+
+        if not is_double:
+            return
+
+        for r_index, round_matches in enumerate(self._losers_rounds):
+            for m_index, match in enumerate(round_matches):
+                if r_index + 1 >= len(self._losers_rounds):
+                    if self._grand_final:
+                        match.win_target = (self._grand_final, 2)
+                    continue
+                next_round = self._losers_rounds[r_index + 1]
+                if r_index % 2 == 0:
+                    match.win_target = (next_round[m_index], 1)
+                else:
+                    match.win_target = (next_round[m_index // 2], 1 if m_index % 2 == 0 else 2)
+
+        if self._winners_rounds and self._grand_final:
+            winners_final = self._winners_rounds[-1][0]
+            winners_final.win_target = (self._grand_final, 1)
+            winners_final.loss_target = (self._losers_rounds[-1][0], 2)
+
+    def _on_match_changed(self, match: BracketMatch):
+        if self._suspend_updates:
+            return
+        widget = self._match_widgets.get(match)
+        if not widget:
+            return
+        match.team1 = widget.team_data(1)
+        match.team2 = widget.team_data(2)
+        match.score1 = widget.team1_score.value()
+        match.score2 = widget.team2_score.value()
+        self._apply_match_result(match)
+        self.updated.emit()
+
+    def _apply_match_result(self, match: BracketMatch):
+        winner_slot = match.determine_winner()
+        widget = self._match_widgets.get(match)
+        if widget:
+            if winner_slot == "team1":
+                widget.set_winner_text("Winner: Team A")
+            elif winner_slot == "team2":
+                widget.set_winner_text("Winner: Team B")
+            else:
+                widget.set_winner_text("")
+
+        winner_team = None
+        loser_team = None
+        if winner_slot == "team1":
+            winner_team = match.team1
+            loser_team = match.team2
+        elif winner_slot == "team2":
+            winner_team = match.team2
+            loser_team = match.team1
+
+        if match.win_target:
+            self._assign_team_to_target(match.win_target, winner_team)
+        if match.loss_target:
+            self._assign_team_to_target(match.loss_target, loser_team)
+
+    def _assign_team_to_target(self, target, team: Optional[dict]):
+        target_match, slot = target
+        if target_match is None:
+            return
+        if team is None:
+            team = self._team_placeholder()
+        self._suspend_updates = True
+        if slot == 1:
+            target_match.team1 = team
+        else:
+            target_match.team2 = team
+        widget = self._match_widgets.get(target_match)
+        if widget:
+            widget.set_team(slot, team)
+        self._suspend_updates = False
+        self._apply_match_result(target_match)
+
+    def _refresh_all_results(self):
+        for rounds in self._winners_rounds:
+            for match in rounds:
+                self._apply_match_result(match)
+        for rounds in self._losers_rounds:
+            for match in rounds:
+                self._apply_match_result(match)
+        if self._grand_final:
+            self._apply_match_result(self._grand_final)
+
+    def to_state(self):
+        def serialize_match(match: BracketMatch):
+            return {
+                "team1": match.team1,
+                "team2": match.team2,
+                "score1": match.score1,
+                "score2": match.score2,
+                "winner": match.determine_winner() or ""
+            }
+
+        return {
+            "format": self.format_combo.currentText(),
+            "team_count": int(self.team_count.value()),
+            "winners_rounds": [
+                {
+                    "name": round_matches[0].round_name if round_matches else "",
+                    "matches": [serialize_match(m) for m in round_matches]
+                }
+                for round_matches in self._winners_rounds
+            ],
+            "losers_rounds": [
+                {
+                    "name": round_matches[0].round_name if round_matches else "",
+                    "matches": [serialize_match(m) for m in round_matches]
+                }
+                for round_matches in self._losers_rounds
+            ],
+            "grand_final": serialize_match(self._grand_final) if self._grand_final else None
+        }
+
+    def from_state(self, data: dict):
+        if not data:
+            return
+        format_name = data.get("format") or "Single Elimination"
+        team_count = int(data.get("team_count") or 2)
+        self.format_combo.setCurrentText(format_name)
+        self.team_count.setValue(team_count)
+        self._generate_bracket()
+
+        def apply_rounds(saved_rounds: List[dict], target_rounds: List[List[BracketMatch]]):
+            for s_round, t_round in zip(saved_rounds or [], target_rounds or []):
+                for s_match, t_match in zip(s_round.get("matches", []), t_round):
+                    t_match.team1 = s_match.get("team1")
+                    t_match.team2 = s_match.get("team2")
+                    t_match.score1 = int(s_match.get("score1") or 0)
+                    t_match.score2 = int(s_match.get("score2") or 0)
+                    widget = self._match_widgets.get(t_match)
+                    if widget:
+                        widget.set_team(1, t_match.team1)
+                        widget.set_team(2, t_match.team2)
+                        widget.set_scores(t_match.score1, t_match.score2)
+
+        self._suspend_updates = True
+        apply_rounds(data.get("winners_rounds"), self._winners_rounds)
+        apply_rounds(data.get("losers_rounds"), self._losers_rounds)
+        if self._grand_final and data.get("grand_final"):
+            gf = data.get("grand_final")
+            self._grand_final.team1 = gf.get("team1")
+            self._grand_final.team2 = gf.get("team2")
+            self._grand_final.score1 = int(gf.get("score1") or 0)
+            self._grand_final.score2 = int(gf.get("score2") or 0)
+            widget = self._match_widgets.get(self._grand_final)
+            if widget:
+                widget.set_team(1, self._grand_final.team1)
+                widget.set_team(2, self._grand_final.team2)
+                widget.set_scores(self._grand_final.score1, self._grand_final.score2)
+        self._suspend_updates = False
+        self._refresh_all_results()
+
+
 class GeneralTab(QWidget):
     updated = pyqtSignal()
     COLOR_FIELDS = [
@@ -1281,6 +1746,11 @@ class TournamentApp(QMainWindow):
         self.draft_tab = DraftTab(self._maps_by_mode)
         self.draft_tab.updated.connect(self._update)
         tabs.addTab(self.draft_tab, "Draft")
+
+        # --- BRACKETS TAB ---
+        self.brackets_tab = BracketsTab()
+        self.brackets_tab.updated.connect(self._update)
+        tabs.addTab(self.brackets_tab, "Brackets")
         
         self._ensure_default_assets_installed()
         self._auto_discover_assets()  
@@ -1863,7 +2333,8 @@ class TournamentApp(QMainWindow):
                 "t2.name","t2.score","t2.color","t2.logo","t2.ban","t2.abbr","t2.players",
                 "general.caster1","general.caster2","general.host",
                 "waiting.texts","waiting.timer","waiting.videos","waiting.socials",
-                "maps"
+                "maps",
+                "brackets"
             ]
 
         o1, n1 = old.get("team1", {}), new.get("team1", {})
@@ -1954,6 +2425,8 @@ class TournamentApp(QMainWindow):
                    (b.get("map"), b.get("t1"), b.get("t2"), b.get("completed"), b.get("pick"),
                     b.get("t1_ban"), b.get("t2_ban")):
                     keys.append("maps"); break
+        if (old.get("brackets") or {}) != (new.get("brackets") or {}):
+            keys.append("brackets")
 
 
         return keys
@@ -2207,7 +2680,7 @@ class TournamentApp(QMainWindow):
             t2s = int(m.get("t2", 0)) if str(m.get("t2", "")).isdigit() else 0
             comp = 1 if m.get("completed", False) else 0
             body = (
-                f"Name={(m.get('map') or '').replace('\n', ' ').strip()}\n"
+                f"Name={name}\n"
                 f"T1={t1s}\n"
                 f"T2={t2s}\n"
                 f"Completed={comp}\n"
@@ -2341,6 +2814,8 @@ class TournamentApp(QMainWindow):
         state["general"] = asdict(general)
         waiting = self.waiting_tab.to_settings()
         state["waiting"] = asdict(waiting)
+        if hasattr(self, "brackets_tab"):
+            state["brackets"] = self.brackets_tab.to_state()
         return state
 
 
@@ -2405,6 +2880,9 @@ class TournamentApp(QMainWindow):
         pool = state.get("map_pool") or []
         if hasattr(self, "draft_tab"):
             self.draft_tab.set_pool(pool)
+
+        if hasattr(self, "brackets_tab"):
+            self.brackets_tab.from_state(state.get("brackets") or {})
 
     def _update(self):
         state = self._collect_state()

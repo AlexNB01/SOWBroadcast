@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Brackets</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+
+  :root{
+    --primary:#0f1114; --secondary:#ffffff; --tertiary:#c99b36; --quaternary:#2a2a2a;
+    --accent:#c99b36; --accent-soft:rgba(201,155,54,.35);
+    --panel:#1a1b20; --panel-soft:#24262d; --line:#3b3d44;
+    --title-size:64px; --sub-title:26px;
+  }
+
+  html,body{
+    margin:0; padding:0; width:1920px; height:1080px; overflow:hidden;
+    font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    font-weight:800; text-transform:uppercase;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    background:#0b0b0d; color:var(--secondary);
+  }
+
+  body::before{
+    content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,.08), transparent 45%),
+      radial-gradient(circle at 85% 0%, rgba(201,155,54,.14), transparent 50%),
+      linear-gradient(135deg, rgba(255,255,255,.04), transparent 40%),
+      linear-gradient(210deg, rgba(0,0,0,.55), rgba(0,0,0,.95));
+    opacity:.85;
+  }
+
+  body::after{
+    content:""; position:absolute; inset:-20%;
+    background:radial-gradient(circle, rgba(255,255,255,.04), transparent 40%);
+    opacity:.08; mix-blend-mode:screen; pointer-events:none;
+  }
+
+  .frame{
+    position:relative; z-index:2; width:100%; height:100%;
+    display:flex; flex-direction:column; padding:32px 40px 24px;
+    box-sizing:border-box;
+  }
+
+  .header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    border-bottom:2px solid var(--accent-soft); padding-bottom:18px;
+  }
+
+  .header-title{
+    font-size:var(--title-size); letter-spacing:2px; color:var(--secondary);
+  }
+
+  .header-subtitle{
+    font-size:var(--sub-title); color:var(--accent); letter-spacing:1px;
+  }
+
+  .event-card{
+    display:flex; align-items:center; gap:18px;
+    background:linear-gradient(135deg, rgba(255,255,255,.06), rgba(0,0,0,.4));
+    border:1px solid rgba(255,255,255,.08);
+    padding:14px 20px; border-radius:14px;
+    box-shadow:0 12px 32px rgba(0,0,0,.35);
+  }
+
+  .event-logo{
+    width:56px; height:56px; border-radius:14px;
+    background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center;
+    font-weight:900; color:var(--accent);
+  }
+
+  .event-name{
+    font-size:24px; color:var(--secondary); letter-spacing:.8px;
+  }
+
+  .brackets{
+    flex:1 1 auto; display:grid; grid-template-rows:auto auto; gap:32px;
+    padding-top:22px;
+  }
+
+  .bracket-section{
+    display:flex; flex-direction:column; gap:18px;
+  }
+
+  .section-title{
+    display:inline-flex; align-items:center; gap:12px;
+    font-size:28px; color:var(--accent);
+    border-left:6px solid var(--accent); padding-left:14px;
+    letter-spacing:1.2px;
+  }
+
+  .rounds{
+    display:flex; gap:30px; align-items:flex-start;
+  }
+
+  .round-col{
+    display:flex; flex-direction:column; gap:20px;
+    min-width:290px;
+  }
+
+  .round-title{
+    font-size:18px; color:var(--secondary); opacity:.8;
+    letter-spacing:.9px; padding:6px 10px; border-radius:8px;
+    border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.45);
+  }
+
+  .match-card{
+    position:relative; background:linear-gradient(135deg, var(--panel), var(--panel-soft));
+    border:1px solid var(--line); border-radius:14px; overflow:hidden;
+    box-shadow:0 10px 26px rgba(0,0,0,.45);
+  }
+
+  .match-card.has-next::after{
+    content:""; position:absolute; right:-22px; top:50%; width:22px; height:2px;
+    background:var(--accent);
+  }
+
+  .match-header{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 12px; font-size:14px; letter-spacing:.8px;
+    background:rgba(0,0,0,.55); color:var(--accent);
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+
+  .team-row{
+    display:grid; grid-template-columns:46px 1fr 50px; align-items:center;
+    gap:12px; padding:10px 12px; font-size:22px;
+    border-top:1px solid rgba(255,255,255,.05);
+  }
+
+  .team-row:first-of-type{ border-top:none; }
+
+  .team-row.winner{
+    background:linear-gradient(90deg, rgba(201,155,54,.25), rgba(0,0,0,0));
+    color:var(--secondary);
+  }
+
+  .team-logo{
+    width:38px; height:38px; border-radius:10px; background:#fff center/contain no-repeat;
+    box-shadow:0 6px 14px rgba(0,0,0,.3);
+  }
+
+  .team-name{
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  }
+
+  .team-score{
+    text-align:center; font-size:22px; font-weight:900;
+    background:rgba(0,0,0,.35); border-radius:8px; padding:6px 0;
+  }
+
+  .team-row.bye{
+    opacity:.55; font-style:italic;
+  }
+
+  .grand-final{
+    align-self:flex-end; min-width:320px;
+  }
+
+  .footer{
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    font-size:16px; letter-spacing:2px; color:rgba(255,255,255,.6);
+    padding-top:18px; border-top:1px solid rgba(255,255,255,.08);
+  }
+
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div>
+        <div class="header-title" id="bracketTitle">BRACKETS</div>
+        <div class="header-subtitle" id="bracketSubtitle">TOURNAMENT STAGE</div>
+      </div>
+      <div class="event-card">
+        <div class="event-logo">OW</div>
+        <div>
+          <div class="event-name" id="eventName">SOW BROADCAST</div>
+          <div class="header-subtitle" id="eventTag">LIVE</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="brackets">
+      <section class="bracket-section" id="upperSection">
+        <div class="section-title">UPPER BRACKET</div>
+        <div class="rounds" id="upperRounds"></div>
+      </section>
+
+      <section class="bracket-section" id="lowerSection">
+        <div class="section-title">LOWER BRACKET</div>
+        <div class="rounds" id="lowerRounds"></div>
+      </section>
+    </div>
+
+    <div class="footer" id="footerText">SOW BROADCAST TOURNAMENT BRACKET</div>
+  </div>
+
+<script>
+const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
+async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
+async function readJSON(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.json():{}; }catch{ return {}; } }
+async function ok(p){ try{ const r=await fetch(p,{method:"HEAD"}); return r.ok; }catch{ return false; } }
+function hex(h){ return (/^#/.test(h||"")?h: h?"#"+h:""); }
+
+const sampleBracket={
+  format:"Double Elimination",
+  winners_rounds:[
+    {name:"Upper Round 1",matches:[
+      {team1:{name:"TL"},team2:{name:"PEP"},score1:2,score2:0},
+      {team1:{name:"T1"},team2:{name:"GK"},score1:2,score2:1}
+    ]},
+    {name:"Upper Round 2",matches:[
+      {team1:{name:"TL"},team2:{name:"T1"},score1:0,score2:3}
+    ]}
+  ],
+  losers_rounds:[
+    {name:"Lower Round 1",matches:[
+      {team1:{name:"WBG"},team2:{name:"TCC"},score1:2,score2:0},
+      {team1:{name:"SSG"},team2:{name:"VL"},score1:2,score2:0}
+    ]},
+    {name:"Lower Round 2",matches:[
+      {team1:{name:"WBG"},team2:{name:"SSG"},score1:3,score2:0}
+    ]},
+    {name:"Lower Round 3",matches:[
+      {team1:{name:"CR"},team2:{name:"T1"},score1:3,score2:0}
+    ]}
+  ],
+  grand_final:{team1:{name:"T1"},team2:{name:"CR"},score1:0,score2:0}
+};
+
+async function applyColors(){
+  const kv={};
+  (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
+    const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim()]=m[2].trim();
+  });
+  const p=hex(kv.primary)||"#0f1114", s=hex(kv.secondary)||"#ffffff", t=hex(kv.tertiary)||"#c99b36";
+  document.documentElement.style.setProperty("--primary",p);
+  document.documentElement.style.setProperty("--secondary",s);
+  document.documentElement.style.setProperty("--accent",t);
+  document.documentElement.style.setProperty("--accent-soft",`${t}55`);
+}
+
+function matchWinner(match){
+  if(!match) return null;
+  const a=Number(match.score1||0), b=Number(match.score2||0);
+  if(a===b) return null;
+  return a>b?"team1":"team2";
+}
+
+function renderRounds(container, rounds){
+  container.innerHTML="";
+  rounds.forEach((round, index)=>{
+    const col=document.createElement("div");
+    col.className="round-col";
+
+    const title=document.createElement("div");
+    title.className="round-title";
+    title.textContent=(round.name||`ROUND ${index+1}`).toUpperCase();
+    col.appendChild(title);
+
+    (round.matches||[]).forEach(match=>{
+      const card=document.createElement("div");
+      card.className="match-card";
+      if(index < rounds.length-1) card.classList.add("has-next");
+
+      const header=document.createElement("div");
+      header.className="match-header";
+      header.innerHTML=`<span>${round.name||"Match"}</span><span>FT${Math.max(Number(match.score1||0), Number(match.score2||0), 3)}</span>`;
+      card.appendChild(header);
+
+      const winner=matchWinner(match);
+
+      const rowA=buildTeamRow(match.team1, match.score1, winner==="team1");
+      const rowB=buildTeamRow(match.team2, match.score2, winner==="team2");
+      card.appendChild(rowA);
+      card.appendChild(rowB);
+
+      col.appendChild(card);
+    });
+
+    container.appendChild(col);
+  });
+}
+
+function buildTeamRow(team, score, isWinner){
+  const row=document.createElement("div");
+  row.className="team-row";
+  if(isWinner) row.classList.add("winner");
+  if(!team){ row.classList.add("bye"); }
+
+  const logo=document.createElement("div");
+  logo.className="team-logo";
+  if(team?.logo_path){
+    const path=team.logo_path;
+    logo.style.backgroundImage=`url('${path}')`;
+  } else {
+    logo.style.background="rgba(255,255,255,.08)";
+  }
+
+  const name=document.createElement("div");
+  name.className="team-name";
+  name.textContent=(team?.name||"BYE").toUpperCase();
+
+  const scoreBox=document.createElement("div");
+  scoreBox.className="team-score";
+  scoreBox.textContent=(score ?? 0);
+
+  row.append(logo, name, scoreBox);
+  return row;
+}
+
+async function renderBracket(){
+  const qs=new URLSearchParams(location.search);
+  const useMock=qs.get("mock") === "1";
+  const state=useMock ? {brackets:sampleBracket} : await readJSON(MATCH+"/match.json");
+  const brackets=state.brackets || {};
+
+  const status=(await read(MATCH+"/status.txt")).trim();
+  if(status){
+    document.getElementById("eventName").textContent=status.toUpperCase();
+    document.getElementById("footerText").textContent=status.toUpperCase();
+  }
+
+  const format=(brackets.format||"Brackets").toUpperCase();
+  document.getElementById("bracketTitle").textContent=format;
+
+  const winners=brackets.winners_rounds || [];
+  const losers=brackets.losers_rounds || [];
+
+  const upperSection=document.getElementById("upperSection");
+  const lowerSection=document.getElementById("lowerSection");
+
+  if(winners.length){
+    renderRounds(document.getElementById("upperRounds"), winners);
+    upperSection.classList.remove("hidden");
+  } else {
+    upperSection.classList.add("hidden");
+  }
+
+  if(losers.length){
+    renderRounds(document.getElementById("lowerRounds"), losers);
+    lowerSection.classList.remove("hidden");
+  } else {
+    lowerSection.classList.add("hidden");
+  }
+}
+
+async function initial(){
+  await applyColors();
+  await renderBracket();
+}
+
+function startSSE(){
+  const es=new EventSource("/events");
+  es.onmessage=async ev=>{
+    try{
+      const d=JSON.parse(ev.data||"{}");
+      const ch=Array.isArray(d.changed)?d.changed:[];
+      if(ch.includes("general.colors")) await applyColors();
+      if(ch.includes("brackets")) await renderBracket();
+    }catch{}
+  };
+}
+
+(async()=>{ await initial(); startSSE(); })();
+</script>
+</body>
+</html>
