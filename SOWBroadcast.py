@@ -2333,7 +2333,8 @@ class TournamentApp(QMainWindow):
                 "t2.name","t2.score","t2.color","t2.logo","t2.ban","t2.abbr","t2.players",
                 "general.caster1","general.caster2","general.host",
                 "waiting.texts","waiting.timer","waiting.videos","waiting.socials",
-                "maps"
+                "maps",
+                "brackets"
             ]
 
         o1, n1 = old.get("team1", {}), new.get("team1", {})
@@ -2424,6 +2425,8 @@ class TournamentApp(QMainWindow):
                    (b.get("map"), b.get("t1"), b.get("t2"), b.get("completed"), b.get("pick"),
                     b.get("t1_ban"), b.get("t2_ban")):
                     keys.append("maps"); break
+        if (old.get("brackets") or {}) != (new.get("brackets") or {}):
+            keys.append("brackets")
 
 
         return keys
