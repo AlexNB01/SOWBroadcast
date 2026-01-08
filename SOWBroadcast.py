@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QComboBox, QSpinBox, QCheckBox,
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
-    QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea
+    QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
+    QStackedWidget
 )
 
 # -----------------------------
@@ -1105,6 +1106,350 @@ class DraftTab(QWidget):
         self.updated.emit()
 
 
+class BracketMatchWidget(QGroupBox):
+    result_changed = pyqtSignal()
+
+    def __init__(self, title: str, editable: bool = True):
+        super().__init__(title)
+        self._editable = editable
+        self._team_widgets = []
+        self._logo_paths = [None, None]
+        root = QVBoxLayout(self)
+
+        for i in range(2):
+            row = QHBoxLayout()
+            name_edit = QLineEdit()
+            name_edit.setPlaceholderText("Team name")
+            name_edit.setReadOnly(not editable)
+
+            logo_preview = QLabel()
+            logo_preview.setFixedSize(40, 40)
+            logo_preview.setAlignment(Qt.AlignCenter)
+            logo_preview.setStyleSheet("QLabel{border:1px solid #DDD;border-radius:6px;background:#FFF}")
+
+            logo_btn = QPushButton("Logo…")
+            logo_btn.setEnabled(editable)
+            logo_btn.clicked.connect(lambda _, idx=i: self._select_logo(idx))
+
+            score = QSpinBox()
+            score.setRange(0, 200)
+            score.valueChanged.connect(self.result_changed.emit)
+
+            row.addWidget(name_edit, 3)
+            row.addWidget(logo_preview, 0)
+            row.addWidget(logo_btn, 0)
+            row.addWidget(QLabel("Score"))
+            row.addWidget(score, 0)
+            root.addLayout(row)
+            self._team_widgets.append((name_edit, logo_preview, logo_btn, score))
+
+        time_row = QHBoxLayout()
+        time_row.addWidget(QLabel("Start time"))
+        self.start_time = QLineEdit()
+        self.start_time.setPlaceholderText("HH:MM")
+        self.start_time.setReadOnly(not editable)
+        time_row.addWidget(self.start_time)
+        root.addLayout(time_row)
+
+    def _select_logo(self, idx: int):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        start_dir = os.path.join(base, "Scoreboard", "Temp", "Team Logos")
+        os.makedirs(start_dir, exist_ok=True)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Valitse tiimin logo",
+            start_dir,
+            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
+        )
+        if path:
+            self.set_team(idx, self.team_name(idx), path, editable=True)
+
+    def set_team(self, idx: int, name: str, logo_path: Optional[str], editable: bool = False):
+        name_edit, logo_preview, logo_btn, _score = self._team_widgets[idx]
+        name_edit.setText(name)
+        if not editable:
+            name_edit.setReadOnly(True)
+        self._logo_paths[idx] = logo_path
+        if logo_path:
+            pix = QPixmap(logo_path)
+            if not pix.isNull():
+                logo_preview.setPixmap(pix.scaled(logo_preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            logo_preview.setPixmap(QPixmap())
+        if editable:
+            logo_btn.setEnabled(True)
+            name_edit.setReadOnly(False)
+
+    def clear_team(self, idx: int):
+        name_edit, logo_preview, logo_btn, score = self._team_widgets[idx]
+        name_edit.setText("")
+        logo_preview.setPixmap(QPixmap())
+        score.setValue(0)
+        self._logo_paths[idx] = None
+        logo_btn.setEnabled(self._editable)
+        name_edit.setReadOnly(not self._editable)
+
+    def team_name(self, idx: int) -> str:
+        return self._team_widgets[idx][0].text().strip()
+
+    def team_logo(self, idx: int) -> Optional[str]:
+        return self._logo_paths[idx]
+
+    def score(self, idx: int) -> int:
+        return self._team_widgets[idx][3].value()
+
+    def winner(self) -> Optional[int]:
+        name1 = self.team_name(0)
+        name2 = self.team_name(1)
+        if not name1 or not name2:
+            return None
+        score1 = self.score(0)
+        score2 = self.score(1)
+        if score1 > score2:
+            return 0
+        if score2 > score1:
+            return 1
+        return None
+
+
+class BracketsTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        root = QVBoxLayout(self)
+
+        header = QHBoxLayout()
+        header.addWidget(QLabel("Bracket type"))
+        self.bracket_type = QComboBox()
+        self.bracket_type.addItems(["Single elimination", "Double elimination", "Group stage"])
+        self.bracket_type.currentIndexChanged.connect(self._on_type_changed)
+        header.addWidget(self.bracket_type, 1)
+        header.addStretch(1)
+        root.addLayout(header)
+
+        self.stack = QStackedWidget()
+        root.addWidget(self.stack, 1)
+
+        self.playoff_view = QWidget()
+        playoff_root = QVBoxLayout(self.playoff_view)
+        controls = QHBoxLayout()
+        controls.addWidget(QLabel("Teams"))
+        self.team_count = QSpinBox()
+        self.team_count.setRange(2, 64)
+        self.team_count.setValue(8)
+        controls.addWidget(self.team_count)
+        self.generate_btn = QPushButton("Generate bracket")
+        self.generate_btn.clicked.connect(self._generate_playoff_bracket)
+        controls.addWidget(self.generate_btn)
+        controls.addStretch(1)
+        playoff_root.addLayout(controls)
+
+        self.bracket_scroll = QScrollArea()
+        self.bracket_scroll.setWidgetResizable(True)
+        self.bracket_container = QWidget()
+        self.bracket_layout = QHBoxLayout(self.bracket_container)
+        self.bracket_scroll.setWidget(self.bracket_container)
+        playoff_root.addWidget(self.bracket_scroll, 1)
+        self.stack.addWidget(self.playoff_view)
+
+        self.group_view = QWidget()
+        group_root = QVBoxLayout(self.group_view)
+        group_controls = QHBoxLayout()
+        group_controls.addWidget(QLabel("Teams"))
+        self.group_team_count = QSpinBox()
+        self.group_team_count.setRange(2, 64)
+        self.group_team_count.setValue(8)
+        group_controls.addWidget(self.group_team_count)
+        group_controls.addWidget(QLabel("Groups"))
+        self.group_count = QSpinBox()
+        self.group_count.setRange(1, 16)
+        self.group_count.setValue(2)
+        group_controls.addWidget(self.group_count)
+        self.group_generate_btn = QPushButton("Set groups")
+        self.group_generate_btn.clicked.connect(self._generate_groups)
+        group_controls.addWidget(self.group_generate_btn)
+        group_controls.addStretch(1)
+        group_root.addLayout(group_controls)
+
+        self.group_team_scroll = QScrollArea()
+        self.group_team_scroll.setWidgetResizable(True)
+        self.group_team_container = QWidget()
+        self.group_team_layout = QVBoxLayout(self.group_team_container)
+        self.group_team_scroll.setWidget(self.group_team_container)
+        group_root.addWidget(self.group_team_scroll, 1)
+
+        self.group_tree = QTreeWidget()
+        self.group_tree.setHeaderLabels(["Group", "Team"])
+        group_root.addWidget(self.group_tree, 1)
+
+        self.stack.addWidget(self.group_view)
+
+        self._playoff_rounds: List[List[BracketMatchWidget]] = []
+        self._loser_rounds: List[List[BracketMatchWidget]] = []
+        self._group_rows: List[QWidget] = []
+        self._group_selects: List[QComboBox] = []
+
+        self._on_type_changed()
+
+    def _on_type_changed(self):
+        is_group = self.bracket_type.currentText() == "Group stage"
+        self.stack.setCurrentWidget(self.group_view if is_group else self.playoff_view)
+
+    def _clear_layout(self, layout: QHBoxLayout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def _clear_v_layout(self, layout: QVBoxLayout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def _generate_playoff_bracket(self):
+        team_count = self.team_count.value()
+        while team_count & (team_count - 1) != 0:
+            team_count += 1
+
+        self._playoff_rounds = []
+        self._loser_rounds = []
+        self._clear_layout(self.bracket_layout)
+
+        rounds = 0
+        tmp = team_count
+        while tmp > 1:
+            rounds += 1
+            tmp //= 2
+
+        for round_index in range(rounds):
+            round_box = QGroupBox(f"Round {round_index + 1}")
+            round_layout = QVBoxLayout(round_box)
+            match_count = team_count // (2 ** (round_index + 1))
+            round_matches = []
+            for match_index in range(match_count):
+                editable = round_index == 0
+                match = BracketMatchWidget(f"Match {match_index + 1}", editable=editable)
+                match.result_changed.connect(self._update_playoff_progression)
+                round_layout.addWidget(match)
+                round_matches.append(match)
+            round_layout.addStretch(1)
+            self.bracket_layout.addWidget(round_box)
+            self._playoff_rounds.append(round_matches)
+
+        if self.bracket_type.currentText() == "Double elimination":
+            loser_box = QGroupBox("Losers bracket")
+            loser_layout = QVBoxLayout(loser_box)
+            for round_index in range(rounds):
+                round_group = QGroupBox(f"Round {round_index + 1}")
+                round_layout = QVBoxLayout(round_group)
+                match_count = max(1, team_count // (2 ** (round_index + 1)))
+                round_matches = []
+                for match_index in range(match_count):
+                    match = BracketMatchWidget(f"Match {match_index + 1}", editable=False)
+                    match.result_changed.connect(self._update_playoff_progression)
+                    round_layout.addWidget(match)
+                    round_matches.append(match)
+                round_layout.addStretch(1)
+                loser_layout.addWidget(round_group)
+                self._loser_rounds.append(round_matches)
+            loser_layout.addStretch(1)
+            self.bracket_layout.addWidget(loser_box)
+
+        self._update_playoff_progression()
+
+    def _update_playoff_progression(self):
+        for round_index, matches in enumerate(self._playoff_rounds):
+            if round_index == 0:
+                continue
+            for match in matches:
+                match.clear_team(0)
+                match.clear_team(1)
+
+        for matches in self._loser_rounds:
+            for match in matches:
+                match.clear_team(0)
+                match.clear_team(1)
+
+        for round_index, matches in enumerate(self._playoff_rounds[:-1]):
+            for match_index, match in enumerate(matches):
+                winner_idx = match.winner()
+                if winner_idx is None:
+                    continue
+                next_round = self._playoff_rounds[round_index + 1]
+                next_match = next_round[match_index // 2]
+                slot = match_index % 2
+                next_match.set_team(slot, match.team_name(winner_idx), match.team_logo(winner_idx))
+
+                if self.bracket_type.currentText() == "Double elimination":
+                    loser_idx = 1 - winner_idx
+                    if self._loser_rounds:
+                        loser_round = min(round_index, len(self._loser_rounds) - 1)
+                        loser_matches = self._loser_rounds[loser_round]
+                        target = loser_matches[min(match_index, len(loser_matches) - 1)]
+                        if not target.team_name(0):
+                            target.set_team(0, match.team_name(loser_idx), match.team_logo(loser_idx))
+                        elif not target.team_name(1):
+                            target.set_team(1, match.team_name(loser_idx), match.team_logo(loser_idx))
+
+        for round_index, matches in enumerate(self._loser_rounds[:-1]):
+            for match_index, match in enumerate(matches):
+                winner_idx = match.winner()
+                if winner_idx is None:
+                    continue
+                next_round = self._loser_rounds[round_index + 1]
+                next_match = next_round[match_index // 2]
+                slot = match_index % 2
+                next_match.set_team(slot, match.team_name(winner_idx), match.team_logo(winner_idx))
+
+    def _generate_groups(self):
+        self._clear_v_layout(self.group_team_layout)
+        self._group_rows = []
+        self._group_selects = []
+        self.group_tree.clear()
+
+        team_count = self.group_team_count.value()
+        group_count = self.group_count.value()
+        group_names = [f"Group {chr(65 + i)}" for i in range(group_count)]
+
+        for idx in range(team_count):
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            team_name = QLineEdit()
+            team_name.setPlaceholderText(f"Team {idx + 1}")
+            group_select = QComboBox()
+            group_select.addItems(group_names)
+            group_select.currentIndexChanged.connect(self._update_group_view)
+            team_name.textChanged.connect(self._update_group_view)
+            row_layout.addWidget(team_name, 3)
+            row_layout.addWidget(group_select, 1)
+            self.group_team_layout.addWidget(row)
+            self._group_rows.append(row)
+            self._group_selects.append(group_select)
+
+        self.group_team_layout.addStretch(1)
+        self._update_group_view()
+
+    def _update_group_view(self):
+        self.group_tree.clear()
+        groups: Dict[str, List[str]] = {}
+        for row, group_select in zip(self._group_rows, self._group_selects):
+            name_edit = row.findChild(QLineEdit)
+            if not name_edit:
+                continue
+            name = name_edit.text().strip() or name_edit.placeholderText()
+            group_name = group_select.currentText()
+            groups.setdefault(group_name, []).append(name)
+
+        for group_name in sorted(groups.keys()):
+            group_item = QTreeWidgetItem([group_name, ""])
+            self.group_tree.addTopLevelItem(group_item)
+            for team in groups[group_name]:
+                team_item = QTreeWidgetItem(["", team])
+                group_item.addChild(team_item)
+
+
 class BulkImportRow(QWidget):
     """Yksi rivi import-listassa."""
     def __init__(self, kind: str, file_path: str, name_guess: str, mode_names=None):
@@ -1281,6 +1626,10 @@ class TournamentApp(QMainWindow):
         self.draft_tab = DraftTab(self._maps_by_mode)
         self.draft_tab.updated.connect(self._update)
         tabs.addTab(self.draft_tab, "Draft")
+
+        # --- BRACKETS TAB ---
+        self.brackets_tab = BracketsTab()
+        tabs.addTab(self.brackets_tab, "Brackets")
         
         self._ensure_default_assets_installed()
         self._auto_discover_assets()  
