@@ -543,10 +543,6 @@ function startSSE(){
   await Promise.all([upBrbText(), upTimer(), loadPlaylist(), upTicker(), upOverlayLogo(), positionOverlayLogo(), upSocials()]);
   fitBigText();
   startSSE();
-
-  setInterval(upTimer, 500);
-  setInterval(upTicker, 1500);
-  setInterval(upBrbText, 1500); 
 })();
 
 </script>

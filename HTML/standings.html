@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Standings</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#fff}
+  :root{
+    --bg:#0f1114;
+    --panel:#16191f;
+    --line:rgba(255,255,255,0.08);
+    --accent:#55aaff;
+    --qualified:#33d17a;
+    --eliminated:#ff5c5c;
+    --flash:rgba(255,255,255,0.3);
+  }
+  .canvas{width:1920px;height:1080px;transform:scale(min(calc(100vw / 1920), calc(100vh / 1080)));transform-origin:top left;}
+  .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
+  .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+  .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
+  .overlay-scale{transform:scale(var(--ui-scale, 1));transform-origin:top left;height:100%;width:100%;}
+  .tables{display:flex;flex-direction:column;gap:20px;flex:1;min-height:0;}
+  .tables.single .table{flex:1;}
+  .tables.single .rows{flex:1;}
+  .tables.single .row.body{flex:1;}
+  .tables.multi{display:grid;grid-auto-rows:auto;gap:24px;align-content:start;}
+  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;}
+  .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
+  .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
+  .row.header{font-size:20px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  .row.body{font-size:28px;font-weight:700;background:rgba(0,0,0,0.15);}
+  .rows{display:flex;flex-direction:column;gap:6px;}
+  .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rank{width:70px;text-align:center;}
+  .team{display:flex;align-items:center;gap:16px;min-width:0;}
+  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:#0b0d10;}
+  .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:center;text-align:center;}
+  .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
+  .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
+  .flash{animation:flash 1.2s ease;}
+  .flash-cell{animation:flashCell 1.2s ease;}
+  @keyframes flash{
+    0%{background:var(--flash);}100%{background:rgba(0,0,0,0.15);}
+  }
+  @keyframes flashCell{
+    0%{color:#fff;}50%{color:var(--accent);}100%{color:#fff;}
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="overlay-scale" id="overlay">
+      <div class="frame">
+        <div>
+          <div class="title" id="title">Standings</div>
+          <div class="subtitle" id="subtitle"></div>
+        </div>
+        <div class="tables" id="tables"></div>
+      </div>
+    </div>
+  </div>
+<script>
+  const SB = "../Scoreboard";
+  const STANDINGS_JSON = `${SB}/Standings/standings.json`;
+  let previous = null
+  
+  function getTeamName(row){
+  return (row && (row.team ?? row.team_name ?? "")) || "";
+  }
+  function getLogoPath(row){
+    return (row && (row.logo ?? row.logo_path ?? "")) || "";
+  }
+  function getAbbr(row){
+    return (row && (row.abbr ?? row.team_abbr ?? "")) || "";
+  }
+
+
+  function isAbsolute(path){
+    return /^(https?:|file:|data:)/i.test(path) || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("/") || path.startsWith("\\\\");
+  }
+  function logoUrl(path){
+    if(!path) return "";
+    if(isAbsolute(path)){
+      if(path.startsWith("file:") || path.startsWith("http")) return path;
+      return `file:///${path.replace(/\\/g,"/")}`;
+    }
+    return `${SB}/${path.replace(/\\/g,"/")}`;
+  }
+
+  function buildHeader(showStatus){
+    const header = document.createElement("div");
+    header.className = "row header";
+    const labels = ["Rank","Team","W","L","+/-","Points"];
+    if(showStatus){
+      labels.push("Status");
+    }
+    labels.forEach(label=>{
+      const div = document.createElement("div");
+      div.className = "cell";
+      div.textContent = label;
+      header.appendChild(div);
+    });
+    header.style.gridTemplateColumns = showStatus
+      ? "80px 1fr 80px 80px 90px 110px 160px"
+      : "80px 1fr 80px 80px 90px 110px";
+    return header;
+  }
+
+  function normalizeGroups(data){
+    if(Array.isArray(data.groups) && data.groups.length){
+      return data.groups.map((group, idx)=>({
+        key: String(group.key || group.id || group.name || `group_${idx + 1}`),
+        name: group.name || "",
+        rows: Array.isArray(group.rows) ? group.rows : []
+      }));
+    }
+    return [{
+      key: "group_1",
+      name: "",
+      rows: Array.isArray(data.rows) ? data.rows : []
+    }];
+  }
+
+  function rowKey(row, index){
+    const team = getTeamName(row);
+    const abbr = getAbbr(row);
+    const logo = getLogoPath(row);
+    return team || abbr || logo || String(index);
+  }
+
+
+  function render(data){
+    const title = document.getElementById("title");
+    const subtitle = document.getElementById("subtitle");
+    title.textContent = data.title || "Standings";
+    subtitle.textContent = data.subtitle || "";
+
+    const groups = normalizeGroups(data);
+    const displayGroup = data.display_group || data.displayGroup || "__all__";
+    let activeGroups = groups;
+    if(displayGroup && displayGroup !== "__all__"){
+      const match = groups.find(group=>group.key === displayGroup || group.name === displayGroup);
+      if(match){
+        activeGroups = [match];
+      }else if(groups.length){
+        activeGroups = [groups[0]];
+      }
+    }
+
+    const tablesWrap = document.getElementById("tables");
+    tablesWrap.innerHTML = "";
+    tablesWrap.className = "tables";
+    const overlay = document.getElementById("overlay");
+    if(overlay){
+      overlay.style.setProperty("--ui-scale", "1");
+    }
+    if(activeGroups.length === 1){
+      tablesWrap.classList.add("single");
+    }else{
+      tablesWrap.classList.add("multi");
+      tablesWrap.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+    }
+
+    const previousGroups = new Map();
+    if(previous){
+      normalizeGroups(previous).forEach(group=>{
+        previousGroups.set(group.key, group);
+      });
+    }
+
+    const showGroupTitles = activeGroups.length > 1;
+
+    activeGroups.forEach((group, groupIndex)=>{
+      const rows = group.rows || [];
+      const showStatus = rows.some(row=>String(row.status || "").trim());
+
+      const table = document.createElement("div");
+      table.className = "table";
+
+      const inner = document.createElement("div");
+      inner.className = "table-inner";
+
+      if(showGroupTitles){
+        const groupTitle = document.createElement("div");
+        groupTitle.className = "group-title";
+        groupTitle.textContent = group.name || `Group ${groupIndex + 1}`;
+        inner.appendChild(groupTitle);
+      }
+
+      inner.appendChild(buildHeader(showStatus));
+
+      const rowsWrap = document.createElement("div");
+      rowsWrap.className = "rows";
+      inner.appendChild(rowsWrap);
+      table.appendChild(inner);
+
+      const prevRows = new Map();
+      const prevOrder = new Map();
+      const prevGroup = previousGroups.get(group.key);
+      if(prevGroup && prevGroup.rows){
+        prevGroup.rows.forEach((row, idx)=>{
+          prevRows.set(rowKey(row, idx), row);
+          prevOrder.set(rowKey(row, idx), idx);
+        });
+      }
+
+      rows.forEach((row, idx)=>{
+      const key = rowKey(row, idx);
+      const prev = prevRows.get(key);
+      const changed = prev && (
+        (getTeamName(prev) !== getTeamName(row)) ||
+        (getLogoPath(prev) !== getLogoPath(row)) ||
+        ((prev.wins ?? 0) !== (row.wins ?? 0)) ||
+        ((prev.losses ?? 0) !== (row.losses ?? 0)) ||
+        ((prev.map_diff ?? 0) !== (row.map_diff ?? 0)) ||
+        ((prev.points ?? 0) !== (row.points ?? 0)) ||
+        ((prev.status ?? "") !== (row.status ?? ""))
+      );
+
+      const moved = prevOrder.has(key) && prevOrder.get(key) !== idx;
+
+      const rowEl = document.createElement("div");
+      rowEl.className = "row body" + ((changed || moved) ? " flash" : "");
+      rowEl.style.gridTemplateColumns = showStatus
+        ? "80px 1fr 80px 80px 90px 110px 160px"
+        : "80px 1fr 80px 80px 90px 110px";
+
+      const rank = document.createElement("div");
+      rank.className = "cell rank";
+      rank.textContent = row.rank || idx + 1;
+      rowEl.appendChild(rank);
+
+      const team = document.createElement("div");
+      team.className = "cell team";
+      const logo = document.createElement("div");
+      logo.className = "logo";
+      const logoPath = logoUrl(getLogoPath(row));
+      if(logoPath){
+        logo.style.backgroundImage = `url('${logoPath}?_=${Date.now()}')`;
+      }
+
+      const teamName = getTeamName(row);
+      const name = document.createElement("div");
+      name.textContent = teamName;
+      name.className = changed ? "flash-cell" : "";
+      team.appendChild(logo);
+      team.appendChild(name);
+      rowEl.appendChild(team);
+
+      const w = document.createElement("div");
+      w.className = "cell";
+      w.textContent = row.wins ?? 0;
+      if(prev && prev.wins !== row.wins) w.classList.add("flash-cell");
+      rowEl.appendChild(w);
+
+      const l = document.createElement("div");
+      l.className = "cell";
+      l.textContent = row.losses ?? 0;
+      if(prev && prev.losses !== row.losses) l.classList.add("flash-cell");
+      rowEl.appendChild(l);
+
+      const md = document.createElement("div");
+      md.className = "cell";
+      md.textContent = row.map_diff ?? 0;
+      if(prev && prev.map_diff !== row.map_diff) md.classList.add("flash-cell");
+      rowEl.appendChild(md);
+
+      const points = document.createElement("div");
+      points.className = "cell";
+      points.textContent = row.points ?? 0;
+      if(prev && prev.points !== row.points) points.classList.add("flash-cell");
+      rowEl.appendChild(points);
+
+      if(showStatus){
+        const status = document.createElement("div");
+        status.className = "cell status";
+        if(row.status){
+          status.textContent = row.status;
+          status.classList.add(row.status);
+        }
+        rowEl.appendChild(status);
+      }
+
+      rowsWrap.appendChild(rowEl);
+    });
+
+      tablesWrap.appendChild(table);
+    });
+
+    requestAnimationFrame(()=>{
+      const frame = document.querySelector(".frame");
+      const availableHeight = frame ? frame.clientHeight : 0;
+      const availableWidth = frame ? frame.clientWidth : 0;
+      const contentHeight = frame ? frame.scrollHeight : 0;
+      const contentWidth = frame ? frame.scrollWidth : 0;
+      if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
+        const maxScale = activeGroups.length === 1 ? 3 : 1;
+        const scale = Math.min(
+          availableHeight / contentHeight,
+          availableWidth / contentWidth,
+          maxScale
+        );
+        if(overlay){
+          overlay.style.setProperty("--ui-scale", scale.toFixed(3));
+        }
+      }
+    });
+    previous = data;
+  }
+
+  async function load(){
+    try{
+      const res = await fetch(`${STANDINGS_JSON}?_=${Date.now()}`);
+      if(!res.ok) return;
+      const data = await res.json();
+      render(data);
+    }catch(e){
+      // ignore
+    }
+  }
+
+  function startSSE(){
+    try{
+      const es=new EventSource("/events");
+      es.onmessage=async ev=>{
+        try{
+          const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+          if(ch.some(k=>k==="standings")) await load();
+        }catch{}
+      };
+    }catch{}
+  }
+
+  load();
+  startSSE();
+</script>
+</body>
+</html>
