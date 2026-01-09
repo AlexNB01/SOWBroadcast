@@ -23,18 +23,15 @@
   .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
   .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
+  .overlay-scale{transform:scale(var(--ui-scale, 1));transform-origin:top left;height:100%;width:100%;}
   .tables{display:flex;flex-direction:column;gap:20px;flex:1;min-height:0;}
   .tables.single .table{flex:1;}
   .tables.single .rows{flex:1;}
   .tables.single .row.body{flex:1;}
   .tables.multi{display:grid;grid-auto-rows:1fr;gap:24px;}
   .tables.multi .table{height:100%;}
-  .tables.grid{display:grid;grid-auto-rows:1fr;gap:20px;}
-  .tables.grid .table{height:100%;}
   .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
-  .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;transform-origin:top left;}
-  .tables.single .table-inner{transform:scale(var(--content-scale, 1));width:calc(100% / var(--content-scale, 1));height:calc(100% / var(--content-scale, 1));}
-  .tables.multi .table-inner{transform:scale(var(--content-scale, 1));width:calc(100% / var(--content-scale, 1));height:calc(100% / var(--content-scale, 1));}
+  .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;}
   .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
   .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
   .row.header{font-size:20px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:6px;border-bottom:1px solid var(--line);}
@@ -59,12 +56,14 @@
 </head>
 <body>
   <div class="canvas">
-    <div class="frame">
-      <div>
-        <div class="title" id="title">Standings</div>
-        <div class="subtitle" id="subtitle"></div>
+    <div class="overlay-scale" id="overlay">
+      <div class="frame">
+        <div>
+          <div class="title" id="title">Standings</div>
+          <div class="subtitle" id="subtitle"></div>
+        </div>
+        <div class="tables" id="tables"></div>
       </div>
-      <div class="tables" id="tables"></div>
     </div>
   </div>
 <script>
@@ -289,21 +288,26 @@
     });
 
       tablesWrap.appendChild(table);
-      requestAnimationFrame(()=>{
-        const availableHeight = table.clientHeight;
-        const availableWidth = table.clientWidth;
-        const contentHeight = inner.scrollHeight;
-        const contentWidth = inner.scrollWidth;
-        if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
-          const maxScale = activeGroups.length === 1 ? 2.6 : 1;
-          const scale = Math.min(
-            availableHeight / contentHeight,
-            availableWidth / contentWidth,
-            maxScale
-          );
-          inner.style.setProperty("--content-scale", scale.toFixed(3));
+    });
+
+    requestAnimationFrame(()=>{
+      const overlay = document.getElementById("overlay");
+      const frame = document.querySelector(".frame");
+      const availableHeight = frame ? frame.clientHeight : 0;
+      const availableWidth = frame ? frame.clientWidth : 0;
+      const contentHeight = frame ? frame.scrollHeight : 0;
+      const contentWidth = frame ? frame.scrollWidth : 0;
+      if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
+        const maxScale = activeGroups.length === 1 ? 2.6 : 1;
+        const scale = Math.min(
+          availableHeight / contentHeight,
+          availableWidth / contentWidth,
+          maxScale
+        );
+        if(overlay){
+          overlay.style.setProperty("--ui-scale", scale.toFixed(3));
         }
-      });
+      }
     });
     previous = data;
   }
