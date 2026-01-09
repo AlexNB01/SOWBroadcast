@@ -57,6 +57,7 @@
   </div>
 <script>
   const SB = "../Scoreboard";
+  const STANDINGS_JSON = `${SB}/Standings/standings.json`;
   let previous = null
   
   function getTeamName(row){
@@ -219,7 +220,7 @@
 
   async function load(){
     try{
-      const res = await fetch(`standings.json?_=${Date.now()}`);
+      const res = await fetch(`${STANDINGS_JSON}?_=${Date.now()}`);
       if(!res.ok) return;
       const data = await res.json();
       render(data);
