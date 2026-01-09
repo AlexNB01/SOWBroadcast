@@ -27,11 +27,13 @@
   .tables.single .table{flex:1;}
   .tables.single .rows{flex:1;}
   .tables.single .row.body{flex:1;}
-  .tables.stack{gap:24px;}
-  .tables.stack .table{flex:1;}
+  .tables.stack{display:grid;grid-auto-rows:1fr;gap:24px;}
+  .tables.stack .table{height:100%;}
   .tables.grid{display:grid;grid-auto-rows:1fr;gap:20px;}
   .tables.grid .table{height:100%;}
-  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;gap:12px;min-height:0;}
+  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;}
+  .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;transform-origin:top left;}
+  .tables.single .table-inner{transform:scale(var(--content-scale, 1));width:calc(100% / var(--content-scale, 1));height:calc(100% / var(--content-scale, 1));}
   .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
   .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
   .row.header{font-size:20px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:6px;border-bottom:1px solid var(--line);}
@@ -180,18 +182,22 @@
       const table = document.createElement("div");
       table.className = "table";
 
+      const inner = document.createElement("div");
+      inner.className = "table-inner";
+
       if(showGroupTitles){
         const groupTitle = document.createElement("div");
         groupTitle.className = "group-title";
         groupTitle.textContent = group.name || `Group ${groupIndex + 1}`;
-        table.appendChild(groupTitle);
+        inner.appendChild(groupTitle);
       }
 
-      table.appendChild(buildHeader(showStatus));
+      inner.appendChild(buildHeader(showStatus));
 
       const rowsWrap = document.createElement("div");
       rowsWrap.className = "rows";
-      table.appendChild(rowsWrap);
+      inner.appendChild(rowsWrap);
+      table.appendChild(inner);
 
       const prevRows = new Map();
       const prevOrder = new Map();
@@ -280,10 +286,20 @@
         rowEl.appendChild(status);
       }
 
-        rowsWrap.appendChild(rowEl);
-      });
+      rowsWrap.appendChild(rowEl);
+    });
 
       tablesWrap.appendChild(table);
+      if(activeGroups.length === 1){
+        requestAnimationFrame(()=>{
+          const availableHeight = table.clientHeight;
+          const contentHeight = inner.scrollHeight;
+          if(availableHeight > 0 && contentHeight > 0){
+            const scale = Math.min(availableHeight / contentHeight, 1.8);
+            inner.style.setProperty("--content-scale", scale.toFixed(3));
+          }
+        });
+      }
     });
     previous = data;
   }
