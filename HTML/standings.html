@@ -9,15 +9,21 @@
 <style>
   @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
-  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#fff}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text)}
   :root{
-    --bg:#0f1114;
-    --panel:#16191f;
+    --primary:#0f1114;
+    --secondary:#ffffff;
+    --tertiary:#55aaff;
+    --quaternary:#16191f;
+    --bg:var(--primary);
+    --panel:var(--quaternary);
+    --text:var(--secondary);
     --line:rgba(255,255,255,0.08);
-    --accent:#55aaff;
+    --accent:var(--tertiary);
     --qualified:#33d17a;
     --eliminated:#ff5c5c;
     --flash:rgba(255,255,255,0.3);
+    --row-bg:rgba(0,0,0,0.15);
   }
   .canvas{width:1920px;height:1080px;transform:scale(min(calc(100vw / 1920), calc(100vh / 1080)));transform-origin:top left;}
   .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
@@ -28,25 +34,25 @@
   .tables.single .table{flex:1;}
   .tables.single .rows{flex:1;min-height:0;}
   .tables.multi{display:grid;grid-auto-rows:minmax(0, 1fr);gap:24px;align-content:stretch;}
-  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  .table{background:var(--primary);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
   .table-scale{transform-origin:top left;width:100%;height:100%;}
   .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;}
-  .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
+  .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;margin-left:10px;}
   .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
-  .row.header{font-size:20px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:6px;border-bottom:1px solid var(--line);}
-  .row.body{font-size:28px;font-weight:700;background:rgba(0,0,0,0.15);}
+  .row.header{font-size:30px;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;border-bottom:1px solid var(--line);color:secondary;font-weight:600;}
+  .row.body{font-size:28px;background:var(--);}
   .rows{display:flex;flex-direction:column;gap:6px;}
   .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rank{width:70px;text-align:center;}
   .team{display:flex;align-items:center;gap:16px;min-width:0;}
-  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:#0b0d10;}
+  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:transparent;}
   .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:left;text-align:center;}
   .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
   .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
   .flash{animation:flash 1.2s ease;}
   .flash-cell{animation:flashCell 1.2s ease;}
   @keyframes flash{
-    0%{background:var(--flash);}100%{background:rgba(0,0,0,0.15);}
+    0%{background:var(--flash);}100%{background:var(--row-bg);}
   }
   @keyframes flashCell{
     0%{color:#fff;}50%{color:var(--accent);}100%{color:#fff;}
@@ -67,6 +73,7 @@
   </div>
 <script>
   const SB = "../Scoreboard";
+  const GENERAL = `${SB}/General`;
   const STANDINGS_JSON = `${SB}/Standings/standings.json`;
   let previous = null
   
@@ -91,6 +98,70 @@
       return `file:///${path.replace(/\\/g,"/")}`;
     }
     return `${SB}/${path.replace(/\\/g,"/")}`;
+  }
+
+  async function read(p){
+    try{
+      const r = await fetch(`${p}?_=${Date.now()}`);
+      return r.ok ? await r.text() : "";
+    }catch{
+      return "";
+    }
+  }
+
+  function hex(value, fallback){
+    const s = (value || "").trim();
+    if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s;
+    return fallback;
+  }
+
+  function hexToRgb(value){
+    const clean = (value || "").replace("#", "");
+    if(clean.length === 3){
+      return [
+        parseInt(clean[0] + clean[0], 16),
+        parseInt(clean[1] + clean[1], 16),
+        parseInt(clean[2] + clean[2], 16)
+      ];
+    }
+    if(clean.length === 6){
+      return [
+        parseInt(clean.slice(0, 2), 16),
+        parseInt(clean.slice(2, 4), 16),
+        parseInt(clean.slice(4, 6), 16)
+      ];
+    }
+    return null;
+  }
+
+  function rgbaFromHex(value, alpha, fallback){
+    const rgb = hexToRgb(value);
+    if(!rgb) return fallback;
+    return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
+  }
+
+  async function applyColors(){
+    const kv = {};
+    (await read(`${GENERAL}/colors.txt`)).split(/\r?\n/).forEach(line=>{
+      const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+      if(m) kv[m[1].trim().toLowerCase()] = m[2].trim();
+    });
+    const primary = hex(kv.primary, "#0f1114");
+    const secondary = hex(kv.secondary, "#ffffff");
+    const tertiary = hex(kv.tertiary, "#55aaff");
+    const quaternary = hex(kv.quaternary, "#16191f");
+    const root = document.documentElement;
+    root.style.setProperty("--primary", primary);
+    root.style.setProperty("--secondary", secondary);
+    root.style.setProperty("--tertiary", tertiary);
+    root.style.setProperty("--quaternary", quaternary);
+    root.style.setProperty("--bg", primary);
+    root.style.setProperty("--panel", quaternary);
+    root.style.setProperty("--text", secondary);
+    root.style.setProperty("--accent", tertiary);
+    root.style.setProperty("--line", rgbaFromHex(secondary, 0.08, "rgba(255,255,255,0.08)"));
+    root.style.setProperty("--flash", rgbaFromHex(secondary, 0.3, "rgba(255,255,255,0.3)"));
+    root.style.setProperty("--row-bg", rgbaFromHex(primary, 0.15, "rgba(0,0,0,0.15)"));
   }
 
   function buildHeader(showStatus){
@@ -360,15 +431,16 @@
       es.onmessage=async ev=>{
         try{
           const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+          if(ch.some(k=>k==="general.colors")) await applyColors();
           if(ch.some(k=>k==="standings")) await load();
         }catch{}
       };
     }catch{}
   }
 
+  applyColors();
   load();
   startSSE();
 </script>
 </body>
 </html>
-
