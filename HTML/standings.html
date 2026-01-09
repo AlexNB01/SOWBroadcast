@@ -27,13 +27,14 @@
   .tables.single .table{flex:1;}
   .tables.single .rows{flex:1;}
   .tables.single .row.body{flex:1;}
-  .tables.stack{display:grid;grid-auto-rows:1fr;gap:24px;}
-  .tables.stack .table{height:100%;}
+  .tables.multi{display:grid;grid-auto-rows:1fr;gap:24px;}
+  .tables.multi .table{height:100%;}
   .tables.grid{display:grid;grid-auto-rows:1fr;gap:20px;}
   .tables.grid .table{height:100%;}
-  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;}
+  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
   .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;transform-origin:top left;}
   .tables.single .table-inner{transform:scale(var(--content-scale, 1));width:calc(100% / var(--content-scale, 1));height:calc(100% / var(--content-scale, 1));}
+  .tables.multi .table-inner{transform:scale(var(--content-scale, 1));width:calc(100% / var(--content-scale, 1));height:calc(100% / var(--content-scale, 1));}
   .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
   .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
   .row.header{font-size:20px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:6px;border-bottom:1px solid var(--line);}
@@ -159,10 +160,8 @@
     tablesWrap.className = "tables";
     if(activeGroups.length === 1){
       tablesWrap.classList.add("single");
-    }else if(activeGroups.length <= 2){
-      tablesWrap.classList.add("stack");
     }else{
-      tablesWrap.classList.add("grid");
+      tablesWrap.classList.add("multi");
       tablesWrap.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
     }
 
@@ -290,16 +289,21 @@
     });
 
       tablesWrap.appendChild(table);
-      if(activeGroups.length === 1){
-        requestAnimationFrame(()=>{
-          const availableHeight = table.clientHeight;
-          const contentHeight = inner.scrollHeight;
-          if(availableHeight > 0 && contentHeight > 0){
-            const scale = Math.min(availableHeight / contentHeight, 1.8);
-            inner.style.setProperty("--content-scale", scale.toFixed(3));
-          }
-        });
-      }
+      requestAnimationFrame(()=>{
+        const availableHeight = table.clientHeight;
+        const availableWidth = table.clientWidth;
+        const contentHeight = inner.scrollHeight;
+        const contentWidth = inner.scrollWidth;
+        if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
+          const maxScale = activeGroups.length === 1 ? 2.6 : 1;
+          const scale = Math.min(
+            availableHeight / contentHeight,
+            availableWidth / contentWidth,
+            maxScale
+          );
+          inner.style.setProperty("--content-scale", scale.toFixed(3));
+        }
+      });
     });
     previous = data;
   }
