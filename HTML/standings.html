@@ -18,23 +18,23 @@
     --qualified:#33d17a;
     --eliminated:#ff5c5c;
     --flash:rgba(255,255,255,0.3);
-    --scale:min(calc(100vw / 1920), calc(100vh / 1080));
   }
-  .frame{box-sizing:border-box;padding:calc(80px * var(--scale)) calc(90px * var(--scale));display:flex;flex-direction:column;gap:calc(18px * var(--scale));height:100%;}
-  .title{font-size:calc(58px * var(--scale));font-weight:800;letter-spacing:1px;text-transform:uppercase;}
-  .subtitle{font-size:calc(28px * var(--scale));font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:calc(-8px * var(--scale));}
-  .tables{display:flex;flex-direction:column;gap:calc(20px * var(--scale));}
-  .table{background:var(--panel);border-radius:calc(18px * var(--scale));padding:calc(22px * var(--scale)) calc(26px * var(--scale));box-shadow:0 calc(18px * var(--scale)) calc(40px * var(--scale)) rgba(0,0,0,0.45);display:flex;flex-direction:column;gap:calc(12px * var(--scale));}
-  .group-title{font-size:calc(32px * var(--scale));font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:calc(4px * var(--scale));}
-  .row{display:grid;align-items:center;gap:calc(16px * var(--scale));padding:calc(10px * var(--scale)) calc(12px * var(--scale));border-radius:calc(12px * var(--scale));transition:background 0.6s ease;}
-  .row.header{font-size:calc(20px * var(--scale));text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:calc(6px * var(--scale));border-bottom:1px solid var(--line);}
-  .row.body{font-size:calc(28px * var(--scale));font-weight:700;background:rgba(0,0,0,0.15);}
-  .row.body:not(:last-child){margin-bottom:calc(6px * var(--scale));}
+  .canvas{width:1920px;height:1080px;transform:scale(min(calc(100vw / 1920), calc(100vh / 1080)));transform-origin:top left;}
+  .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
+  .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+  .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
+  .tables{display:flex;flex-direction:column;gap:20px;}
+  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;gap:12px;}
+  .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
+  .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
+  .row.header{font-size:20px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  .row.body{font-size:28px;font-weight:700;background:rgba(0,0,0,0.15);}
+  .row.body:not(:last-child){margin-bottom:6px;}
   .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .rank{width:calc(70px * var(--scale));text-align:center;}
-  .team{display:flex;align-items:center;gap:calc(16px * var(--scale));min-width:0;}
-  .logo{width:calc(48px * var(--scale));height:calc(48px * var(--scale));background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:calc(10px * var(--scale));background-color:#0b0d10;}
-  .status{padding:calc(6px * var(--scale)) calc(12px * var(--scale));border-radius:999px;font-size:calc(18px * var(--scale));text-transform:uppercase;letter-spacing:1px;justify-self:center;text-align:center;}
+  .rank{width:70px;text-align:center;}
+  .team{display:flex;align-items:center;gap:16px;min-width:0;}
+  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:#0b0d10;}
+  .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:center;text-align:center;}
   .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
   .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
   .flash{animation:flash 1.2s ease;}
@@ -48,12 +48,14 @@
 </style>
 </head>
 <body>
-  <div class="frame">
-    <div>
-      <div class="title" id="title">Standings</div>
-      <div class="subtitle" id="subtitle"></div>
+  <div class="canvas">
+    <div class="frame">
+      <div>
+        <div class="title" id="title">Standings</div>
+        <div class="subtitle" id="subtitle"></div>
+      </div>
+      <div class="tables" id="tables"></div>
     </div>
-    <div class="tables" id="tables"></div>
   </div>
 <script>
   const SB = "../Scoreboard";
@@ -97,8 +99,8 @@
       header.appendChild(div);
     });
     header.style.gridTemplateColumns = showStatus
-      ? "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale)) calc(160px * var(--scale))"
-      : "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale))";
+      ? "80px 1fr 80px 80px 90px 110px 160px"
+      : "80px 1fr 80px 80px 90px 110px";
     return header;
   }
 
@@ -202,8 +204,8 @@
       const rowEl = document.createElement("div");
       rowEl.className = "row body" + ((changed || moved) ? " flash" : "");
       rowEl.style.gridTemplateColumns = showStatus
-        ? "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale)) calc(160px * var(--scale))"
-        : "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale))";
+        ? "80px 1fr 80px 80px 90px 110px 160px"
+        : "80px 1fr 80px 80px 90px 110px";
 
       const rank = document.createElement("div");
       rank.className = "cell rank";
