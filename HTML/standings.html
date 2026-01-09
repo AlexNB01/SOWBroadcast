@@ -43,6 +43,7 @@
   .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
   .row.header{font-size:30px;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;border-bottom:1px solid var(--line);color:secondary;font-weight:600;}
   .row.body{font-size:28px;background:var(--);}
+  .row.placeholder{visibility:hidden;}
   .rows{display:flex;flex-direction:column;gap:6px;}
   .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rank{width:70px;text-align:center;}
@@ -257,6 +258,11 @@
 
     activeGroups.forEach((group, groupIndex)=>{
       const rows = group.rows || [];
+      const minRows = 4;
+      const displayRows = rows.slice();
+      while(displayRows.length < minRows){
+        displayRows.push({ __placeholder: true });
+      }
       const showStatus = rows.some(row=>String(row.status || "").trim());
 
       const table = document.createElement("div");
@@ -293,9 +299,10 @@
         });
       }
 
-      rows.forEach((row, idx)=>{
+      displayRows.forEach((row, idx)=>{
+      const isPlaceholder = Boolean(row.__placeholder);
       const key = rowKey(row, idx);
-      const prev = prevRows.get(key);
+      const prev = isPlaceholder ? null : prevRows.get(key);
       const changed = prev && (
         (getTeamName(prev) !== getTeamName(row)) ||
         (getLogoPath(prev) !== getLogoPath(row)) ||
@@ -306,17 +313,17 @@
         ((prev.status ?? "") !== (row.status ?? ""))
       );
 
-      const moved = prevOrder.has(key) && prevOrder.get(key) !== idx;
+      const moved = !isPlaceholder && prevOrder.has(key) && prevOrder.get(key) !== idx;
 
       const rowEl = document.createElement("div");
-      rowEl.className = "row body" + ((changed || moved) ? " flash" : "");
+      rowEl.className = `row body${isPlaceholder ? " placeholder" : ""}` + ((changed || moved) ? " flash" : "");
       rowEl.style.gridTemplateColumns = showStatus
         ? "80px 1fr 80px 80px 90px 110px 160px"
         : "80px 1fr 80px 80px 90px 110px";
 
       const rank = document.createElement("div");
       rank.className = "cell rank center";
-      rank.textContent = row.rank || idx + 1;
+      rank.textContent = isPlaceholder ? "" : (row.rank || idx + 1);
       rowEl.appendChild(rank);
 
       const team = document.createElement("div");
@@ -324,46 +331,46 @@
       const logo = document.createElement("div");
       logo.className = "logo";
       const logoPath = logoUrl(getLogoPath(row));
-      if(logoPath){
+      if(logoPath && !isPlaceholder){
         logo.style.backgroundImage = `url('${logoPath}?_=${Date.now()}')`;
       }
 
       const teamName = getTeamName(row);
       const name = document.createElement("div");
-      name.textContent = teamName;
-      name.className = changed ? "flash-cell" : "";
+      name.textContent = isPlaceholder ? "" : teamName;
+      name.className = (!isPlaceholder && changed) ? "flash-cell" : "";
       team.appendChild(logo);
       team.appendChild(name);
       rowEl.appendChild(team);
 
       const w = document.createElement("div");
       w.className = "cell center";
-      w.textContent = row.wins ?? 0;
+      w.textContent = isPlaceholder ? "" : (row.wins ?? 0);
       if(prev && prev.wins !== row.wins) w.classList.add("flash-cell");
       rowEl.appendChild(w);
 
       const l = document.createElement("div");
       l.className = "cell center";
-      l.textContent = row.losses ?? 0;
+      l.textContent = isPlaceholder ? "" : (row.losses ?? 0);
       if(prev && prev.losses !== row.losses) l.classList.add("flash-cell");
       rowEl.appendChild(l);
 
       const md = document.createElement("div");
       md.className = "cell center";
-      md.textContent = row.map_diff ?? 0;
+      md.textContent = isPlaceholder ? "" : (row.map_diff ?? 0);
       if(prev && prev.map_diff !== row.map_diff) md.classList.add("flash-cell");
       rowEl.appendChild(md);
 
       const points = document.createElement("div");
       points.className = "cell center";
-      points.textContent = row.points ?? 0;
+      points.textContent = isPlaceholder ? "" : (row.points ?? 0);
       if(prev && prev.points !== row.points) points.classList.add("flash-cell");
       rowEl.appendChild(points);
 
       if(showStatus){
         const status = document.createElement("div");
         status.className = "cell status center";
-        if(row.status){
+        if(row.status && !isPlaceholder){
           status.textContent = row.status;
           status.classList.add(row.status);
         }
