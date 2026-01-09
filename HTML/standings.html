@@ -26,10 +26,10 @@
   .overlay-scale{transform:scale(var(--ui-scale, 1));transform-origin:top left;height:100%;width:100%;}
   .tables{display:flex;flex-direction:column;gap:20px;flex:1;min-height:0;}
   .tables.single .table{flex:1;}
-  .tables.single .rows{flex:1;}
-  .tables.single .row.body{flex:1;}
-  .tables.multi{display:grid;grid-auto-rows:auto;gap:24px;align-content:start;}
+  .tables.single .rows{flex:1;min-height:0;}
+  .tables.multi{display:grid;grid-auto-rows:minmax(0, 1fr);gap:24px;align-content:stretch;}
   .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  .table-scale{transform-origin:top left;width:100%;height:100%;}
   .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;}
   .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
   .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
@@ -40,7 +40,7 @@
   .rank{width:70px;text-align:center;}
   .team{display:flex;align-items:center;gap:16px;min-width:0;}
   .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:#0b0d10;}
-  .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:center;text-align:center;}
+  .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:left;text-align:center;}
   .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
   .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
   .flash{animation:flash 1.2s ease;}
@@ -183,6 +183,9 @@
       const table = document.createElement("div");
       table.className = "table";
 
+      const scaleWrap = document.createElement("div");
+      scaleWrap.className = "table-scale";
+
       const inner = document.createElement("div");
       inner.className = "table-inner";
 
@@ -198,7 +201,8 @@
       const rowsWrap = document.createElement("div");
       rowsWrap.className = "rows";
       inner.appendChild(rowsWrap);
-      table.appendChild(inner);
+      scaleWrap.appendChild(inner);
+      table.appendChild(scaleWrap);
 
       const prevRows = new Map();
       const prevOrder = new Map();
@@ -294,6 +298,31 @@
     });
 
     requestAnimationFrame(()=>{
+      document.querySelectorAll(".table").forEach(table=>{
+        const scaleWrap = table.querySelector(".table-scale");
+        const inner = scaleWrap ? scaleWrap.firstElementChild : null;
+        if(!scaleWrap || !inner) return;
+
+        scaleWrap.style.transform = "scale(1)";
+        scaleWrap.style.width = "100%";
+        scaleWrap.style.height = "100%";
+
+        const styles = getComputedStyle(table);
+        const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+        const padY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+        const availableWidth = table.clientWidth - padX;
+        const availableHeight = table.clientHeight - padY;
+        const contentWidth = inner.scrollWidth;
+        const contentHeight = inner.scrollHeight;
+
+        if(availableWidth > 0 && availableHeight > 0 && contentWidth > 0 && contentHeight > 0){
+          const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight, 1);
+          scaleWrap.style.transform = `scale(${scale.toFixed(3)})`;
+          scaleWrap.style.width = `${(100 / scale).toFixed(3)}%`;
+          scaleWrap.style.height = `${(100 / scale).toFixed(3)}%`;
+        }
+      });
+
       const frame = document.querySelector(".frame");
       const availableHeight = frame ? frame.clientHeight : 0;
       const availableWidth = frame ? frame.clientWidth : 0;
@@ -342,3 +371,4 @@
 </script>
 </body>
 </html>
+
