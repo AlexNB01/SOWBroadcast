@@ -140,10 +140,24 @@ class StandingsSettings:
     subtitle: str = ""
     columns: Dict[str, str] = None
     rows: List[StandingsRow] = None
+    groups: List["StandingsGroup"] = None
+    display_group: str = ""
 
     def __post_init__(self):
         if self.columns is None:
             self.columns = {"mode": "map_diff"}
+        if self.rows is None:
+            self.rows = []
+        if self.groups is None:
+            self.groups = []
+
+@dataclass
+class StandingsGroup:
+    key: str = ""
+    name: str = ""
+    rows: List[StandingsRow] = None
+
+    def __post_init__(self):
         if self.rows is None:
             self.rows = []
 
@@ -153,6 +167,16 @@ def _standings_row_from_dict(data: dict) -> StandingsRow:
     payload.pop("maps_for", None)
     payload.pop("maps_against", None)
     return StandingsRow(**payload)
+
+def _standings_group_from_dict(data: dict, fallback_key: str = "") -> StandingsGroup:
+    payload = dict(data or {})
+    rows = [_standings_row_from_dict(r) for r in (payload.get("rows") or [])]
+    key = (payload.get("key") or payload.get("id") or "").strip() or fallback_key
+    return StandingsGroup(
+        key=key,
+        name=payload.get("name", "") or payload.get("title", "") or "",
+        rows=rows,
+    )
 
 def _apply_standings_ranks(rows: List[StandingsRow]) -> None:
     if not rows:
@@ -1208,6 +1232,28 @@ class StandingsTab(QWidget):
         super().__init__()
         root = QVBoxLayout(self)
 
+        self._groups: List[StandingsGroup] = []
+        self._group_counter = 1
+        self._loading_groups = False
+
+        group_box = QGroupBox("Standings Groups")
+        group_layout = QGridLayout(group_box)
+        self.group_combo = QComboBox()
+        self.add_group_btn = QPushButton("Add Group")
+        self.remove_group_btn = QPushButton("Remove Group")
+        self.group_name_edit = QLineEdit()
+        self.display_combo = QComboBox()
+        self.display_combo.addItem("All groups", "__all__")
+        group_layout.addWidget(QLabel("Edit group"), 0, 0)
+        group_layout.addWidget(self.group_combo, 0, 1)
+        group_layout.addWidget(self.add_group_btn, 0, 2)
+        group_layout.addWidget(self.remove_group_btn, 0, 3)
+        group_layout.addWidget(QLabel("Group name"), 1, 0)
+        group_layout.addWidget(self.group_name_edit, 1, 1, 1, 3)
+        group_layout.addWidget(QLabel("Show in standings.html"), 2, 0)
+        group_layout.addWidget(self.display_combo, 2, 1, 1, 3)
+        root.addWidget(group_box)
+
         title_box = QGroupBox("Standings Title")
         title_form = QFormLayout(title_box)
         self.title_edit = QLineEdit()
@@ -1249,8 +1295,12 @@ class StandingsTab(QWidget):
         self.remove_btn.clicked.connect(self._remove_selected)
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(self._update_and_sort)
+        self.add_group_btn.clicked.connect(self._add_group)
+        self.remove_group_btn.clicked.connect(self._remove_group)
+        self.group_combo.currentIndexChanged.connect(self._on_group_changed)
+        self.group_name_edit.textChanged.connect(self._on_group_name_changed)
 
-        self._add_row()
+        self._add_group(initial=True)
 
     def _make_spin(self, minv: int, maxv: int) -> QSpinBox:
         s = QSpinBox()
@@ -1284,6 +1334,97 @@ class StandingsTab(QWidget):
         )
         if path:
             edit.setText(path)
+
+    def _new_group(self, name: str = "", rows: Optional[List[StandingsRow]] = None, key: str = "") -> StandingsGroup:
+        if not key:
+            key = f"group_{self._group_counter}"
+            self._group_counter += 1
+        group = StandingsGroup(key=key, name=name or f"Group {self._group_counter - 1}")
+        if rows is not None:
+            group.rows = rows
+        return group
+
+    def _refresh_display_combo(self, selected_key: Optional[str] = None):
+        self.display_combo.blockSignals(True)
+        current_key = selected_key or self.display_combo.currentData()
+        self.display_combo.clear()
+        self.display_combo.addItem("All groups", "__all__")
+        for group in self._groups:
+            label = group.name or group.key or "Group"
+            self.display_combo.addItem(label, group.key or label)
+        if current_key:
+            idx = self.display_combo.findData(current_key)
+            if idx >= 0:
+                self.display_combo.setCurrentIndex(idx)
+        self.display_combo.blockSignals(False)
+
+    def _sync_current_group(self):
+        if self._loading_groups:
+            return
+        idx = self.group_combo.currentIndex()
+        if idx < 0 or idx >= len(self._groups):
+            return
+        group = self._groups[idx]
+        group.name = self.group_name_edit.text().strip()
+        group.rows = self._rows()
+
+    def _load_group(self, group: StandingsGroup):
+        self._loading_groups = True
+        self.group_name_edit.setText(group.name or "")
+        self._load_rows(group.rows or [])
+        if self.table.rowCount() == 0:
+            self._add_row()
+        self._loading_groups = False
+
+    def _on_group_changed(self):
+        if self._loading_groups:
+            return
+        self._sync_current_group()
+        idx = self.group_combo.currentIndex()
+        if idx < 0 or idx >= len(self._groups):
+            return
+        self._load_group(self._groups[idx])
+
+    def _on_group_name_changed(self):
+        if self._loading_groups:
+            return
+        idx = self.group_combo.currentIndex()
+        if idx < 0 or idx >= len(self._groups):
+            return
+        name = self.group_name_edit.text().strip()
+        self._groups[idx].name = name
+        label = name or self._groups[idx].key or "Group"
+        self.group_combo.setItemText(idx, label)
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+
+    def _add_group(self, initial: bool = False):
+        if not initial:
+            self._sync_current_group()
+        group = self._new_group()
+        self._groups.append(group)
+        label = group.name or group.key or "Group"
+        self.group_combo.addItem(label)
+        self.group_combo.setCurrentIndex(len(self._groups) - 1)
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+        if initial:
+            self._load_group(group)
+        else:
+            self.updated.emit()
+
+    def _remove_group(self):
+        if len(self._groups) <= 1:
+            return
+        idx = self.group_combo.currentIndex()
+        if idx < 0 or idx >= len(self._groups):
+            return
+        self._groups.pop(idx)
+        self.group_combo.removeItem(idx)
+        if idx >= len(self._groups):
+            idx = len(self._groups) - 1
+        self.group_combo.setCurrentIndex(max(idx, 0))
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+        self._on_group_changed()
+        self.updated.emit()
 
     def _add_row(self, row_data: Optional[StandingsRow] = None):
         row = self.table.rowCount()
@@ -1392,9 +1533,13 @@ class StandingsTab(QWidget):
         self.title_edit.clear()
         self.subtitle_edit.clear()
         self.table.setRowCount(0)
-        self._add_row()
+        self._groups = []
+        self.group_combo.clear()
+        self._group_counter = 1
+        self._add_group(initial=True)
 
     def to_settings(self) -> StandingsSettings:
+        self._sync_current_group()
         indexed_rows = self._indexed_rows()
         rows = [row for _, row in indexed_rows]
         columns = {"mode": "map_diff"}
@@ -1404,17 +1549,41 @@ class StandingsTab(QWidget):
             if rank_widget and int(rank_widget.value()) <= 0:
                 rank_widget.setValue(int(row.rank or 0))
 
+        display_group = self.display_combo.currentData() or "__all__"
+        for group in self._groups:
+            _apply_standings_ranks(group.rows or [])
+        if display_group != "__all__" and not any(group.key == display_group for group in self._groups):
+            display_group = "__all__"
+
         return StandingsSettings(
             title=self.title_edit.text().strip(),
             subtitle=self.subtitle_edit.text().strip(),
             columns=columns,
             rows=rows,
+            groups=self._groups,
+            display_group=display_group,
         )
 
     def from_settings(self, settings: StandingsSettings):
         self.title_edit.setText(settings.title or "")
         self.subtitle_edit.setText(settings.subtitle or "")
-        self._load_rows(settings.rows or [])
+        self._groups = []
+        self.group_combo.clear()
+        self._group_counter = 1
+        groups = settings.groups or []
+        if not groups:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=settings.rows or [])]
+        for idx, group in enumerate(groups, start=1):
+            if not group.key:
+                group.key = f"group_{idx}"
+            if not group.name:
+                group.name = f"Group {idx}"
+            self._groups.append(group)
+            self.group_combo.addItem(group.name)
+            self._group_counter = max(self._group_counter, idx + 1)
+        self.group_combo.setCurrentIndex(0)
+        self._refresh_display_combo(selected_key=settings.display_group or "__all__")
+        self._load_group(self._groups[0])
 
 
 class BracketTab(QWidget):
@@ -2148,28 +2317,55 @@ class TournamentApp(QMainWindow):
         out_dir = os.path.join(root, "Standings")
         os.makedirs(out_dir, exist_ok=True)
 
-        _apply_standings_ranks(settings.rows or [])
+        groups = settings.groups or []
+        if not groups:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=settings.rows or [])]
 
-        rows = []
-        for r in settings.rows or []:
-            diff = int(r.map_diff or 0)
-            rows.append({
-                "team": r.team_name,
-                "abbr": r.abbr,
-                "logo": self._normalize_logo_path(r.logo_path),
-                "wins": int(r.wins or 0),
-                "losses": int(r.losses or 0),
-                "map_diff": diff,
-                "points": int(r.points or 0),
-                "status": r.status or "",
-                "rank": int(r.rank or 0),
+        for group in groups:
+            _apply_standings_ranks(group.rows or [])
+
+        def build_rows(source_rows: List[StandingsRow]) -> List[dict]:
+            payload_rows = []
+            for r in source_rows or []:
+                diff = int(r.map_diff or 0)
+                payload_rows.append({
+                    "team": r.team_name,
+                    "abbr": r.abbr,
+                    "logo": self._normalize_logo_path(r.logo_path),
+                    "wins": int(r.wins or 0),
+                    "losses": int(r.losses or 0),
+                    "map_diff": diff,
+                    "points": int(r.points or 0),
+                    "status": r.status or "",
+                    "rank": int(r.rank or 0),
+                })
+            return payload_rows
+
+        groups_payload = []
+        for group in groups:
+            groups_payload.append({
+                "key": group.key,
+                "name": group.name or "",
+                "rows": build_rows(group.rows or []),
             })
+
+        display_group = settings.display_group or "__all__"
+        selected_rows = []
+        if display_group != "__all__":
+            for group in groups:
+                if group.key == display_group:
+                    selected_rows = build_rows(group.rows or [])
+                    break
+        elif len(groups) == 1:
+            selected_rows = build_rows(groups[0].rows or [])
 
         payload = {
             "title": settings.title or "",
             "subtitle": settings.subtitle or "",
             "columns": settings.columns or {"mode": "map_diff"},
-            "rows": rows,
+            "rows": selected_rows,
+            "groups": groups_payload,
+            "display_group": display_group,
         }
         json_path = os.path.join(out_dir, "standings.json")
         changed = self._write_json(json_path, payload)
@@ -3194,11 +3390,19 @@ class TournamentApp(QMainWindow):
 
         sdata = state.get("standings", {}) or {}
         rows = [_standings_row_from_dict(r) for r in (sdata.get("rows") or [])]
+        groups_data = sdata.get("groups") or []
+        groups = []
+        for idx, g in enumerate(groups_data, start=1):
+            groups.append(_standings_group_from_dict(g, fallback_key=f"group_{idx}"))
+        if not groups and rows:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=rows)]
         s_settings = StandingsSettings(
             title=sdata.get("title", ""),
             subtitle=sdata.get("subtitle", ""),
             columns=sdata.get("columns") or {"mode": "map_diff"},
             rows=rows,
+            groups=groups,
+            display_group=sdata.get("display_group", ""),
         )
         if hasattr(self, "standings_tab"):
             self.standings_tab.from_settings(s_settings)
@@ -3263,6 +3467,8 @@ class TournamentApp(QMainWindow):
                 subtitle=s.get("subtitle", ""),
                 columns=s.get("columns") or {"mode": "map_diff"},
                 rows=[_standings_row_from_dict(r) for r in (s.get("rows") or [])],
+                groups=[_standings_group_from_dict(g, fallback_key=f"group_{idx}") for idx, g in enumerate(s.get("groups") or [], start=1)],
+                display_group=s.get("display_group", ""),
             )
             self._export_standings(s_settings)
         if "bracket" in state:

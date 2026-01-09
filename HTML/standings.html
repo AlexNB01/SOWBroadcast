@@ -9,7 +9,7 @@
 <style>
   @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
-  html,body{margin:0;padding:0;width:1920px;height:1080px;background:transparent;overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#fff}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#fff}
   :root{
     --bg:#0f1114;
     --panel:#16191f;
@@ -18,20 +18,23 @@
     --qualified:#33d17a;
     --eliminated:#ff5c5c;
     --flash:rgba(255,255,255,0.3);
+    --scale:min(calc(100vw / 1920), calc(100vh / 1080));
   }
-  .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
-  .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
-  .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
-  .table{background:var(--panel);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;gap:12px;}
-  .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
-  .row.header{font-size:20px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:6px;border-bottom:1px solid var(--line);}
-  .row.body{font-size:28px;font-weight:700;background:rgba(0,0,0,0.15);}
-  .row.body:not(:last-child){margin-bottom:6px;}
+  .frame{box-sizing:border-box;padding:calc(80px * var(--scale)) calc(90px * var(--scale));display:flex;flex-direction:column;gap:calc(18px * var(--scale));height:100%;}
+  .title{font-size:calc(58px * var(--scale));font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+  .subtitle{font-size:calc(28px * var(--scale));font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:calc(-8px * var(--scale));}
+  .tables{display:flex;flex-direction:column;gap:calc(20px * var(--scale));}
+  .table{background:var(--panel);border-radius:calc(18px * var(--scale));padding:calc(22px * var(--scale)) calc(26px * var(--scale));box-shadow:0 calc(18px * var(--scale)) calc(40px * var(--scale)) rgba(0,0,0,0.45);display:flex;flex-direction:column;gap:calc(12px * var(--scale));}
+  .group-title{font-size:calc(32px * var(--scale));font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:calc(4px * var(--scale));}
+  .row{display:grid;align-items:center;gap:calc(16px * var(--scale));padding:calc(10px * var(--scale)) calc(12px * var(--scale));border-radius:calc(12px * var(--scale));transition:background 0.6s ease;}
+  .row.header{font-size:calc(20px * var(--scale));text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-bottom:calc(6px * var(--scale));border-bottom:1px solid var(--line);}
+  .row.body{font-size:calc(28px * var(--scale));font-weight:700;background:rgba(0,0,0,0.15);}
+  .row.body:not(:last-child){margin-bottom:calc(6px * var(--scale));}
   .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .rank{width:70px;text-align:center;}
-  .team{display:flex;align-items:center;gap:16px;min-width:0;}
-  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:#0b0d10;}
-  .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:center;text-align:center;}
+  .rank{width:calc(70px * var(--scale));text-align:center;}
+  .team{display:flex;align-items:center;gap:calc(16px * var(--scale));min-width:0;}
+  .logo{width:calc(48px * var(--scale));height:calc(48px * var(--scale));background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:calc(10px * var(--scale));background-color:#0b0d10;}
+  .status{padding:calc(6px * var(--scale)) calc(12px * var(--scale));border-radius:999px;font-size:calc(18px * var(--scale));text-transform:uppercase;letter-spacing:1px;justify-self:center;text-align:center;}
   .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
   .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
   .flash{animation:flash 1.2s ease;}
@@ -50,10 +53,7 @@
       <div class="title" id="title">Standings</div>
       <div class="subtitle" id="subtitle"></div>
     </div>
-    <div class="table">
-      <div class="row header" id="header"></div>
-      <div id="rows"></div>
-    </div>
+    <div class="tables" id="tables"></div>
   </div>
 <script>
   const SB = "../Scoreboard";
@@ -84,8 +84,8 @@
   }
 
   function buildHeader(showStatus){
-    const header = document.getElementById("header");
-    header.innerHTML = "";
+    const header = document.createElement("div");
+    header.className = "row header";
     const labels = ["Rank","Team","W","L","+/-","Points"];
     if(showStatus){
       labels.push("Status");
@@ -97,8 +97,24 @@
       header.appendChild(div);
     });
     header.style.gridTemplateColumns = showStatus
-      ? "80px 1fr 80px 80px 90px 110px 160px"
-      : "80px 1fr 80px 80px 90px 110px";
+      ? "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale)) calc(160px * var(--scale))"
+      : "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale))";
+    return header;
+  }
+
+  function normalizeGroups(data){
+    if(Array.isArray(data.groups) && data.groups.length){
+      return data.groups.map((group, idx)=>({
+        key: String(group.key || group.id || group.name || `group_${idx + 1}`),
+        name: group.name || "",
+        rows: Array.isArray(group.rows) ? group.rows : []
+      }));
+    }
+    return [{
+      key: "group_1",
+      name: "",
+      rows: Array.isArray(data.rows) ? data.rows : []
+    }];
   }
 
   function rowKey(row, index){
@@ -115,22 +131,60 @@
     title.textContent = data.title || "Standings";
     subtitle.textContent = data.subtitle || "";
 
-    const showStatus = (data.rows || []).some(row=>String(row.status || "").trim());
-    buildHeader(showStatus);
+    const groups = normalizeGroups(data);
+    const displayGroup = data.display_group || data.displayGroup || "__all__";
+    let activeGroups = groups;
+    if(displayGroup && displayGroup !== "__all__"){
+      const match = groups.find(group=>group.key === displayGroup || group.name === displayGroup);
+      if(match){
+        activeGroups = [match];
+      }else if(groups.length){
+        activeGroups = [groups[0]];
+      }
+    }
 
-    const rowsWrap = document.getElementById("rows");
-    rowsWrap.innerHTML = "";
+    const tablesWrap = document.getElementById("tables");
+    tablesWrap.innerHTML = "";
 
-    const prevRows = new Map();
-    const prevOrder = new Map();
-    if(previous && previous.rows){
-      previous.rows.forEach((row, idx)=>{
-        prevRows.set(rowKey(row, idx), row);
-        prevOrder.set(rowKey(row, idx), idx);
+    const previousGroups = new Map();
+    if(previous){
+      normalizeGroups(previous).forEach(group=>{
+        previousGroups.set(group.key, group);
       });
     }
 
-    (data.rows || []).forEach((row, idx)=>{
+    const showGroupTitles = activeGroups.length > 1;
+
+    activeGroups.forEach((group, groupIndex)=>{
+      const rows = group.rows || [];
+      const showStatus = rows.some(row=>String(row.status || "").trim());
+
+      const table = document.createElement("div");
+      table.className = "table";
+
+      if(showGroupTitles){
+        const groupTitle = document.createElement("div");
+        groupTitle.className = "group-title";
+        groupTitle.textContent = group.name || `Group ${groupIndex + 1}`;
+        table.appendChild(groupTitle);
+      }
+
+      table.appendChild(buildHeader(showStatus));
+
+      const rowsWrap = document.createElement("div");
+      table.appendChild(rowsWrap);
+
+      const prevRows = new Map();
+      const prevOrder = new Map();
+      const prevGroup = previousGroups.get(group.key);
+      if(prevGroup && prevGroup.rows){
+        prevGroup.rows.forEach((row, idx)=>{
+          prevRows.set(rowKey(row, idx), row);
+          prevOrder.set(rowKey(row, idx), idx);
+        });
+      }
+
+      rows.forEach((row, idx)=>{
       const key = rowKey(row, idx);
       const prev = prevRows.get(key);
       const changed = prev && (
@@ -148,8 +202,8 @@
       const rowEl = document.createElement("div");
       rowEl.className = "row body" + ((changed || moved) ? " flash" : "");
       rowEl.style.gridTemplateColumns = showStatus
-        ? "80px 1fr 80px 80px 90px 110px 160px"
-        : "80px 1fr 80px 80px 90px 110px";
+        ? "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale)) calc(160px * var(--scale))"
+        : "calc(80px * var(--scale)) 1fr calc(80px * var(--scale)) calc(80px * var(--scale)) calc(90px * var(--scale)) calc(110px * var(--scale))";
 
       const rank = document.createElement("div");
       rank.className = "cell rank";
@@ -207,7 +261,10 @@
         rowEl.appendChild(status);
       }
 
-      rowsWrap.appendChild(rowEl);
+        rowsWrap.appendChild(rowEl);
+      });
+
+      tablesWrap.appendChild(table);
     });
     previous = data;
   }
