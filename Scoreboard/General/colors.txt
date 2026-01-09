@@ -1,4 +1,4 @@
-primary=#FFFFFF
+primary=#ffffff
 secondary=#000000
 tertiary=#55aaff
 quaternary=#006ea1

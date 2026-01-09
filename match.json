@@ -1,8 +1,8 @@
 {
   "team1": {
-    "name": "TODDELLA PITKÄ TIIMINIMfdsffsdd",
-    "abbr": "fds",
-    "logo_path": null,
+    "name": "GoaTricks",
+    "abbr": "GT",
+    "logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Temp/Team Logos/ESM/goatricks.png",
     "score": 0,
     "color_hex": "#55aaff",
     "players": [
@@ -106,7 +106,7 @@
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "—",
+      "pick": "T2",
       "t1_ban": "Ashe",
       "t2_ban": "Brigitte",
       "winner": ""
@@ -117,7 +117,7 @@
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "—",
+      "pick": "T1",
       "t1_ban": "",
       "t2_ban": "",
       "winner": ""
@@ -178,7 +178,7 @@
       "winner": ""
     }
   ],
-  "current_map": 1,
+  "current_map": 2,
   "map_pool": [
     "Aatlis",
     "Antarctic Peninsula",
@@ -211,7 +211,7 @@
     "Watchpoint Gibraltar"
   ],
   "general": {
-    "first_to": 3,
+    "first_to": 5,
     "host": "",
     "caster1": "",
     "caster2": "",
@@ -219,7 +219,7 @@
     "overlay_logo_path": null,
     "transition_logo_path": null,
     "colors": {
-      "primary": "#FFFFFF",
+      "primary": "#ffffff",
       "secondary": "#000000",
       "tertiary": "#55aaff",
       "quaternary": "#006ea1",
