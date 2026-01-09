@@ -227,8 +227,20 @@
     }
   }
 
+  function startSSE(){
+    try{
+      const es=new EventSource("/events");
+      es.onmessage=async ev=>{
+        try{
+          const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+          if(ch.some(k=>k==="standings")) await load();
+        }catch{}
+      };
+    }catch{}
+  }
+
   load();
-  setInterval(load, 1000);
+  startSSE();
 </script>
 </body>
 </html>
