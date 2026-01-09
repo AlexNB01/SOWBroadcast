@@ -31,7 +31,6 @@
   .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-start;}
   .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
-  .overlay-icon{width:90px;height:90px;object-fit:contain;display:none;flex:0 0 auto;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.45));}
   .overlay-scale{transform:scale(var(--ui-scale, 1));transform-origin:top left;height:100%;width:100%;}
   .tables{display:flex;flex-direction:column;gap:20px;flex:1;min-height:0;}
   .tables.single .table{flex:1;}
@@ -71,7 +70,6 @@
             <div class="title" id="title">Standings</div>
             <div class="subtitle" id="subtitle"></div>
           </div>
-          <img class="overlay-icon" id="overlayIcon" alt="overlay icon">
         </div>
         <div class="tables" id="tables"></div>
       </div>
@@ -170,29 +168,6 @@
     root.style.setProperty("--row-bg", rgbaFromHex(primary, 0.15, "rgba(0,0,0,0.15)"));
   }
 
-  async function resolveOverlayLogo(){
-    const path = `${GENERAL}/OverlayLogo.png`;
-    try{
-      const res = await fetch(`${path}?_=${Date.now()}`, { method: "HEAD" });
-      if(res.ok) return path;
-    }catch{
-      return null;
-    }
-    return null;
-  }
-
-  async function updateOverlayIcon(){
-    const icon = document.getElementById("overlayIcon");
-    if(!icon) return;
-    const path = await resolveOverlayLogo();
-    if(path){
-      icon.src = `${path}?_=${Date.now()}`;
-      icon.style.display = "block";
-    }else{
-      icon.removeAttribute("src");
-      icon.style.display = "none";
-    }
-  }
 
   function buildHeader(showStatus){
     const header = document.createElement("div");
@@ -450,7 +425,6 @@
       if(!res.ok) return;
       const data = await res.json();
       render(data);
-      updateOverlayIcon();
     }catch(e){
       // ignore
     }
@@ -470,7 +444,6 @@
   }
 
   applyColors();
-  updateOverlayIcon();
   load();
   startSSE();
 </script>
