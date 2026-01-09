@@ -159,7 +159,7 @@ def _apply_standings_ranks(rows: List[StandingsRow]) -> None:
         return
     used_ranks = {r.rank for r in rows if int(r.rank or 0) > 0}
     def sort_key(r: StandingsRow):
-        return (-int(r.points or 0), -int(r.wins or 0), int(r.losses or 0), -int(r.map_diff or 0), r.team_name.lower())
+        return (-int(r.points or 0), -int(r.map_diff or 0), r.team_name.lower())
     remaining = [r for r in rows if int(r.rank or 0) <= 0]
     remaining.sort(key=sort_key)
     next_rank = 1
@@ -1232,26 +1232,23 @@ class StandingsTab(QWidget):
         btns = QHBoxLayout()
         self.add_btn = QPushButton("Add Row")
         self.remove_btn = QPushButton("Remove Selected")
-        self.sort_btn = QPushButton("Sort by W/L then +/-")
         btns.addWidget(self.add_btn)
         btns.addWidget(self.remove_btn)
-        btns.addWidget(self.sort_btn)
         btns.addStretch(1)
         root.addLayout(btns)
 
         action_row = QHBoxLayout()
         action_row.addStretch(1)
         self.reset_btn = QPushButton("Reset this tab")
-        self.update_btn = QPushButton("Update (Standings)")
+        self.update_btn = QPushButton("Update + sort")
         action_row.addWidget(self.reset_btn)
         action_row.addWidget(self.update_btn)
         root.addLayout(action_row)
 
         self.add_btn.clicked.connect(self._add_row)
         self.remove_btn.clicked.connect(self._remove_selected)
-        self.sort_btn.clicked.connect(self._sort_rows)
         self.reset_btn.clicked.connect(self.reset_tab)
-        self.update_btn.clicked.connect(lambda *_: self.updated.emit())
+        self.update_btn.clicked.connect(self._update_and_sort)
 
         self._add_row()
 
@@ -1376,9 +1373,15 @@ class StandingsTab(QWidget):
         rows = self._rows()
         def sort_key(r: StandingsRow):
             diff = r.map_diff
-            return (-r.wins, r.losses, -diff, r.team_name.lower())
+            return (-r.points, -diff, r.team_name.lower())
         rows.sort(key=sort_key)
+        for rank, row in enumerate(rows, start=1):
+            row.rank = rank
         self._load_rows(rows)
+
+    def _update_and_sort(self):
+        self._sort_rows()
+        self.updated.emit()
 
     def _load_rows(self, rows: List[StandingsRow]):
         self.table.setRowCount(0)
