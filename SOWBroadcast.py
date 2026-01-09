@@ -2562,7 +2562,6 @@ class TournamentApp(QMainWindow):
         os.makedirs(replay_dir, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(fname.strip())
-        self._notify_overlays(["replay"])
 
     def _next_replay_number(self, playlist_dir: str) -> int:
         """Etsi suurin n- prefiksistä ja palauta n+1."""
