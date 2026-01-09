@@ -109,23 +109,11 @@
     }
   }
 
-  function startSSE(){
-    try{
-      const es=new EventSource("/events");
-      es.onmessage=async ev=>{
-        try{
-          const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
-          if(ch.some(k=>k==="replay")) await tick();
-        }catch{}
-      };
-    }catch{}
-  }
-
   async function init(){
     await applyColors();
     await setLogo();
     await tick();
-    startSSE();
+    setInterval(tick, 1000);
   }
 
   document.addEventListener("DOMContentLoaded", init);
