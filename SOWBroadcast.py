@@ -140,10 +140,24 @@ class StandingsSettings:
     subtitle: str = ""
     columns: Dict[str, str] = None
     rows: List[StandingsRow] = None
+    groups: List["StandingsGroup"] = None
+    display_group: str = ""
 
     def __post_init__(self):
         if self.columns is None:
             self.columns = {"mode": "map_diff"}
+        if self.rows is None:
+            self.rows = []
+        if self.groups is None:
+            self.groups = []
+
+@dataclass
+class StandingsGroup:
+    key: str = ""
+    name: str = ""
+    rows: List[StandingsRow] = None
+
+    def __post_init__(self):
         if self.rows is None:
             self.rows = []
 
@@ -153,6 +167,16 @@ def _standings_row_from_dict(data: dict) -> StandingsRow:
     payload.pop("maps_for", None)
     payload.pop("maps_against", None)
     return StandingsRow(**payload)
+
+def _standings_group_from_dict(data: dict, fallback_key: str = "") -> StandingsGroup:
+    payload = dict(data or {})
+    rows = [_standings_row_from_dict(r) for r in (payload.get("rows") or [])]
+    key = (payload.get("key") or payload.get("id") or "").strip() or fallback_key
+    return StandingsGroup(
+        key=key,
+        name=payload.get("name", "") or payload.get("title", "") or "",
+        rows=rows,
+    )
 
 def _apply_standings_ranks(rows: List[StandingsRow]) -> None:
     if not rows:
@@ -1208,6 +1232,31 @@ class StandingsTab(QWidget):
         super().__init__()
         root = QVBoxLayout(self)
 
+        self._groups: List[StandingsGroup] = []
+        self._group_widgets: List[dict] = []
+        self._group_counter = 1
+        self._loading_groups = False
+
+        group_box = QGroupBox("Standings Groups")
+        group_layout = QGridLayout(group_box)
+        self.add_group_btn = QPushButton("Add Group")
+        self.display_combo = QComboBox()
+        self.display_combo.addItem("All groups", "__all__")
+        group_layout.addWidget(self.add_group_btn, 0, 0)
+        group_layout.addWidget(QLabel("Show in standings.html"), 0, 1)
+        group_layout.addWidget(self.display_combo, 0, 2)
+        group_layout.setColumnStretch(2, 1)
+        root.addWidget(group_box)
+
+        self.groups_area = QScrollArea()
+        self.groups_area.setWidgetResizable(True)
+        self.groups_container = QWidget()
+        self.groups_layout = QVBoxLayout(self.groups_container)
+        self.groups_layout.setContentsMargins(0, 0, 0, 0)
+        self.groups_layout.setSpacing(12)
+        self.groups_area.setWidget(self.groups_container)
+        root.addWidget(self.groups_area, 2)
+
         title_box = QGroupBox("Standings Title")
         title_form = QFormLayout(title_box)
         self.title_edit = QLineEdit()
@@ -1215,27 +1264,6 @@ class StandingsTab(QWidget):
         title_form.addRow("Title", self.title_edit)
         title_form.addRow("Subtitle / Group", self.subtitle_edit)
         root.addWidget(title_box)
-
-        self.table = QTableWidget(0, len(self.HEADERS))
-        self.table.setHorizontalHeaderLabels(self.HEADERS)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SingleSelection)
-        header = self.table.horizontalHeader()
-        for i in range(len(self.HEADERS)):
-            if self.HEADERS[i] in {"Team", "Logo"}:
-                header.setSectionResizeMode(i, QHeaderView.Stretch)
-            else:
-                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-        root.addWidget(self.table, 1)
-
-        btns = QHBoxLayout()
-        self.add_btn = QPushButton("Add Row")
-        self.remove_btn = QPushButton("Remove Selected")
-        btns.addWidget(self.add_btn)
-        btns.addWidget(self.remove_btn)
-        btns.addStretch(1)
-        root.addLayout(btns)
 
         action_row = QHBoxLayout()
         action_row.addStretch(1)
@@ -1245,12 +1273,11 @@ class StandingsTab(QWidget):
         action_row.addWidget(self.update_btn)
         root.addLayout(action_row)
 
-        self.add_btn.clicked.connect(self._add_row)
-        self.remove_btn.clicked.connect(self._remove_selected)
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(self._update_and_sort)
+        self.add_group_btn.clicked.connect(self._add_group)
 
-        self._add_row()
+        self._add_group(initial=True)
 
     def _make_spin(self, minv: int, maxv: int) -> QSpinBox:
         s = QSpinBox()
@@ -1285,35 +1312,153 @@ class StandingsTab(QWidget):
         if path:
             edit.setText(path)
 
-    def _add_row(self, row_data: Optional[StandingsRow] = None):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
+    def _build_group_widget(self, group: StandingsGroup) -> dict:
+        box = QGroupBox()
+        box_layout = QVBoxLayout(box)
+
+        header_row = QHBoxLayout()
+        name_label = QLabel("Name")
+        name_edit = QLineEdit(group.name or "")
+        remove_btn = QPushButton("Remove")
+        header_row.addWidget(name_label)
+        header_row.addWidget(name_edit, 1)
+        header_row.addWidget(remove_btn)
+        box_layout.addLayout(header_row)
+
+        table = QTableWidget(0, len(self.HEADERS))
+        table.setHorizontalHeaderLabels(self.HEADERS)
+        table.verticalHeader().setVisible(False)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setSelectionMode(QTableWidget.SingleSelection)
+        header = table.horizontalHeader()
+        for i in range(len(self.HEADERS)):
+            if self.HEADERS[i] in {"Team", "Logo"}:
+                header.setSectionResizeMode(i, QHeaderView.Stretch)
+            else:
+                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        box_layout.addWidget(table, 1)
+
+        row_btns = QHBoxLayout()
+        add_btn = QPushButton("Add Row")
+        remove_btn_row = QPushButton("Remove Selected")
+        row_btns.addWidget(add_btn)
+        row_btns.addWidget(remove_btn_row)
+        row_btns.addStretch(1)
+        box_layout.addLayout(row_btns)
+
+        widget = {
+            "box": box,
+            "group": group,
+            "name_edit": name_edit,
+            "table": table,
+            "remove_btn": remove_btn,
+        }
+        add_btn.clicked.connect(lambda: self._add_row(table))
+        remove_btn_row.clicked.connect(lambda: self._remove_selected(table))
+        remove_btn.clicked.connect(lambda w=widget: self._remove_group(w))
+        name_edit.textChanged.connect(self._on_group_name_changed)
+        return widget
+
+    def _update_group_controls(self):
+        allow_remove = len(self._group_widgets) > 1
+        for widget in self._group_widgets:
+            widget["remove_btn"].setEnabled(allow_remove)
+
+    def _new_group(self, name: str = "", rows: Optional[List[StandingsRow]] = None, key: str = "") -> StandingsGroup:
+        if not key:
+            key = f"group_{self._group_counter}"
+            self._group_counter += 1
+        default_name = name or f"Group {self._group_counter - 1}"
+        group = StandingsGroup(key=key, name=default_name)
+        if rows is not None:
+            group.rows = rows
+        return group
+
+    def _refresh_display_combo(self, selected_key: Optional[str] = None):
+        self.display_combo.blockSignals(True)
+        current_key = selected_key or self.display_combo.currentData()
+        self.display_combo.clear()
+        self.display_combo.addItem("All groups", "__all__")
+        for widget in self._group_widgets:
+            label = (widget["name_edit"].text().strip()
+                     or widget["group"].name
+                     or widget["group"].key
+                     or "Group")
+            self.display_combo.addItem(label, widget["group"].key or label)
+        if current_key:
+            idx = self.display_combo.findData(current_key)
+            if idx >= 0:
+                self.display_combo.setCurrentIndex(idx)
+        self.display_combo.blockSignals(False)
+
+    def _load_group(self, table: QTableWidget, group: StandingsGroup, name_edit: QLineEdit):
+        self._loading_groups = True
+        name_edit.setText(group.name or "")
+        self._load_rows(table, group.rows or [])
+        if table.rowCount() == 0:
+            self._add_row(table)
+        self._loading_groups = False
+
+    def _on_group_name_changed(self):
+        if self._loading_groups:
+            return
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+
+    def _add_group(self, initial: bool = False):
+        group = self._new_group()
+        self._groups.append(group)
+        widget = self._build_group_widget(group)
+        self._group_widgets.append(widget)
+        self.groups_layout.addWidget(widget["box"])
+        if initial:
+            self._add_row(widget["table"])
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+        self._update_group_controls()
+        if not initial:
+            self.updated.emit()
+
+    def _remove_group(self, widget: dict):
+        if len(self._group_widgets) <= 1:
+            return
+        if widget in self._group_widgets:
+            self._group_widgets.remove(widget)
+        if widget["group"] in self._groups:
+            self._groups.remove(widget["group"])
+        widget["box"].setParent(None)
+        widget["box"].deleteLater()
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+        self._update_group_controls()
+        self.updated.emit()
+
+    def _add_row(self, table: QTableWidget, row_data: Optional[StandingsRow] = None):
+        row = table.rowCount()
+        table.insertRow(row)
 
         rank_spin = self._make_spin(0, 99)
         rank_spin.setValue(int(getattr(row_data, "rank", 0) or 0))
-        self.table.setCellWidget(row, 0, rank_spin)
+        table.setCellWidget(row, 0, rank_spin)
 
         team_edit = QLineEdit(getattr(row_data, "team_name", "") or "")
-        self.table.setCellWidget(row, 1, team_edit)
+        table.setCellWidget(row, 1, team_edit)
 
         abbr_edit = QLineEdit(getattr(row_data, "abbr", "") or "")
-        self.table.setCellWidget(row, 2, abbr_edit)
+        table.setCellWidget(row, 2, abbr_edit)
 
         wins_spin = self._make_spin(0, 99)
         wins_spin.setValue(int(getattr(row_data, "wins", 0) or 0))
-        self.table.setCellWidget(row, 3, wins_spin)
+        table.setCellWidget(row, 3, wins_spin)
 
         loss_spin = self._make_spin(0, 99)
         loss_spin.setValue(int(getattr(row_data, "losses", 0) or 0))
-        self.table.setCellWidget(row, 4, loss_spin)
+        table.setCellWidget(row, 4, loss_spin)
 
         diff_spin = self._make_spin(-99, 99)
         diff_spin.setValue(int(getattr(row_data, "map_diff", 0) or 0))
-        self.table.setCellWidget(row, 5, diff_spin)
+        table.setCellWidget(row, 5, diff_spin)
 
         points_spin = self._make_spin(0, 999)
         points_spin.setValue(int(getattr(row_data, "points", 0) or 0))
-        self.table.setCellWidget(row, 6, points_spin)
+        table.setCellWidget(row, 6, points_spin)
 
         status_combo = QComboBox()
         status_combo.addItem("")
@@ -1321,28 +1466,28 @@ class StandingsTab(QWidget):
         status = (getattr(row_data, "status", "") or "").strip().lower()
         ix = status_combo.findText(status, Qt.MatchExactly)
         status_combo.setCurrentIndex(ix if ix >= 0 else 0)
-        self.table.setCellWidget(row, 7, status_combo)
+        table.setCellWidget(row, 7, status_combo)
 
         logo_widget = self._make_logo_cell(getattr(row_data, "logo_path", "") or "")
-        self.table.setCellWidget(row, 8, logo_widget)
+        table.setCellWidget(row, 8, logo_widget)
 
-    def _remove_selected(self):
-        selected = self.table.selectionModel().selectedRows()
+    def _remove_selected(self, table: QTableWidget):
+        selected = table.selectionModel().selectedRows()
         if not selected:
             return
         for idx in sorted([s.row() for s in selected], reverse=True):
-            self.table.removeRow(idx)
+            table.removeRow(idx)
 
-    def _row_data(self, row: int) -> StandingsRow:
-        rank = int(self.table.cellWidget(row, 0).value())
-        team_name = self.table.cellWidget(row, 1).text().strip()
-        abbr = self.table.cellWidget(row, 2).text().strip()
-        wins = int(self.table.cellWidget(row, 3).value())
-        losses = int(self.table.cellWidget(row, 4).value())
-        map_diff = int(self.table.cellWidget(row, 5).value())
-        points = int(self.table.cellWidget(row, 6).value())
-        status = self.table.cellWidget(row, 7).currentText().strip()
-        logo_widget = self.table.cellWidget(row, 8)
+    def _row_data(self, table: QTableWidget, row: int) -> StandingsRow:
+        rank = int(table.cellWidget(row, 0).value())
+        team_name = table.cellWidget(row, 1).text().strip()
+        abbr = table.cellWidget(row, 2).text().strip()
+        wins = int(table.cellWidget(row, 3).value())
+        losses = int(table.cellWidget(row, 4).value())
+        map_diff = int(table.cellWidget(row, 5).value())
+        points = int(table.cellWidget(row, 6).value())
+        status = table.cellWidget(row, 7).currentText().strip()
+        logo_widget = table.cellWidget(row, 8)
         logo_path = logo_widget._edit.text().strip() if logo_widget else ""
         return StandingsRow(
             team_name=team_name,
@@ -1356,13 +1501,13 @@ class StandingsTab(QWidget):
             rank=rank,
         )
 
-    def _rows(self) -> List[StandingsRow]:
-        return [row for _, row in self._indexed_rows()]
+    def _rows(self, table: QTableWidget) -> List[StandingsRow]:
+        return [row for _, row in self._indexed_rows(table)]
 
-    def _indexed_rows(self) -> List[tuple[int, StandingsRow]]:
+    def _indexed_rows(self, table: QTableWidget) -> List[tuple[int, StandingsRow]]:
         rows = []
-        for i in range(self.table.rowCount()):
-            row = self._row_data(i)
+        for i in range(table.rowCount()):
+            row = self._row_data(table, i)
             has_identity = bool(row.team_name or row.abbr or row.logo_path)
             has_stats = any([row.wins, row.losses, row.map_diff, row.points])
             if has_identity or has_stats:
@@ -1370,51 +1515,106 @@ class StandingsTab(QWidget):
         return rows
 
     def _sort_rows(self):
-        rows = self._rows()
-        def sort_key(r: StandingsRow):
-            diff = r.map_diff
-            return (-r.points, -diff, r.team_name.lower())
-        rows.sort(key=sort_key)
-        for rank, row in enumerate(rows, start=1):
-            row.rank = rank
-        self._load_rows(rows)
+        for widget in self._group_widgets:
+            table = widget["table"]
+            rows = self._rows(table)
+            def sort_key(r: StandingsRow):
+                diff = r.map_diff
+                return (-r.points, -diff, r.team_name.lower())
+            rows.sort(key=sort_key)
+            for rank, row in enumerate(rows, start=1):
+                row.rank = rank
+            self._load_rows(table, rows)
 
     def _update_and_sort(self):
         self._sort_rows()
         self.updated.emit()
 
-    def _load_rows(self, rows: List[StandingsRow]):
-        self.table.setRowCount(0)
+    def _load_rows(self, table: QTableWidget, rows: List[StandingsRow]):
+        table.setRowCount(0)
         for row in rows:
-            self._add_row(row)
+            self._add_row(table, row)
 
     def reset_tab(self):
         self.title_edit.clear()
         self.subtitle_edit.clear()
-        self.table.setRowCount(0)
-        self._add_row()
+        self._groups = []
+        for widget in self._group_widgets:
+            widget["box"].setParent(None)
+            widget["box"].deleteLater()
+        self._group_widgets = []
+        self._group_counter = 1
+        self._add_group(initial=True)
 
     def to_settings(self) -> StandingsSettings:
-        indexed_rows = self._indexed_rows()
+        indexed_rows = []
+        if self._group_widgets:
+            indexed_rows = self._indexed_rows(self._group_widgets[0]["table"])
         rows = [row for _, row in indexed_rows]
         columns = {"mode": "map_diff"}
         _apply_standings_ranks(rows)
         for idx, row in indexed_rows:
-            rank_widget = self.table.cellWidget(idx, 0)
+            rank_widget = self._group_widgets[0]["table"].cellWidget(idx, 0) if self._group_widgets else None
             if rank_widget and int(rank_widget.value()) <= 0:
                 rank_widget.setValue(int(row.rank or 0))
+
+        display_group = self.display_combo.currentData() or "__all__"
+        groups = []
+        for widget in self._group_widgets:
+            table = widget["table"]
+            group = widget["group"]
+            group.name = widget["name_edit"].text().strip()
+            indexed = self._indexed_rows(table)
+            group.rows = [row for _, row in indexed]
+            _apply_standings_ranks(group.rows or [])
+            for idx, row in indexed:
+                rank_widget = table.cellWidget(idx, 0)
+                if rank_widget and int(rank_widget.value()) <= 0:
+                    rank_widget.setValue(int(row.rank or 0))
+            groups.append(group)
+        if display_group != "__all__" and not any(group.key == display_group for group in groups):
+            display_group = "__all__"
+        if groups:
+            selected = None
+            if display_group != "__all__":
+                selected = next((g for g in groups if g.key == display_group), None)
+            rows = list(selected.rows) if selected else list(groups[0].rows)
 
         return StandingsSettings(
             title=self.title_edit.text().strip(),
             subtitle=self.subtitle_edit.text().strip(),
             columns=columns,
             rows=rows,
+            groups=groups,
+            display_group=display_group,
         )
 
     def from_settings(self, settings: StandingsSettings):
         self.title_edit.setText(settings.title or "")
         self.subtitle_edit.setText(settings.subtitle or "")
-        self._load_rows(settings.rows or [])
+        self._groups = []
+        for widget in self._group_widgets:
+            widget["box"].setParent(None)
+            widget["box"].deleteLater()
+        self._group_widgets = []
+        self._group_counter = 1
+        groups = settings.groups or []
+        if not groups:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=settings.rows or [])]
+        for idx, group in enumerate(groups, start=1):
+            if not group.key:
+                group.key = f"group_{idx}"
+            if not group.name:
+                group.name = f"Group {idx}"
+            self._groups.append(group)
+            self._group_counter = max(self._group_counter, idx + 1)
+            widget = self._build_group_widget(group)
+            self._group_widgets.append(widget)
+            self.groups_layout.addWidget(widget["box"])
+        self._refresh_display_combo(selected_key=settings.display_group or "__all__")
+        for widget in self._group_widgets:
+            self._load_group(widget["table"], widget["group"], widget["name_edit"])
+        self._update_group_controls()
 
 
 class BracketTab(QWidget):
@@ -2148,28 +2348,55 @@ class TournamentApp(QMainWindow):
         out_dir = os.path.join(root, "Standings")
         os.makedirs(out_dir, exist_ok=True)
 
-        _apply_standings_ranks(settings.rows or [])
+        groups = settings.groups or []
+        if not groups:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=settings.rows or [])]
 
-        rows = []
-        for r in settings.rows or []:
-            diff = int(r.map_diff or 0)
-            rows.append({
-                "team": r.team_name,
-                "abbr": r.abbr,
-                "logo": self._normalize_logo_path(r.logo_path),
-                "wins": int(r.wins or 0),
-                "losses": int(r.losses or 0),
-                "map_diff": diff,
-                "points": int(r.points or 0),
-                "status": r.status or "",
-                "rank": int(r.rank or 0),
+        for group in groups:
+            _apply_standings_ranks(group.rows or [])
+
+        def build_rows(source_rows: List[StandingsRow]) -> List[dict]:
+            payload_rows = []
+            for r in source_rows or []:
+                diff = int(r.map_diff or 0)
+                payload_rows.append({
+                    "team": r.team_name,
+                    "abbr": r.abbr,
+                    "logo": self._normalize_logo_path(r.logo_path),
+                    "wins": int(r.wins or 0),
+                    "losses": int(r.losses or 0),
+                    "map_diff": diff,
+                    "points": int(r.points or 0),
+                    "status": r.status or "",
+                    "rank": int(r.rank or 0),
+                })
+            return payload_rows
+
+        groups_payload = []
+        for group in groups:
+            groups_payload.append({
+                "key": group.key,
+                "name": group.name or "",
+                "rows": build_rows(group.rows or []),
             })
+
+        display_group = settings.display_group or "__all__"
+        selected_rows = []
+        if display_group != "__all__":
+            for group in groups:
+                if group.key == display_group:
+                    selected_rows = build_rows(group.rows or [])
+                    break
+        elif len(groups) == 1:
+            selected_rows = build_rows(groups[0].rows or [])
 
         payload = {
             "title": settings.title or "",
             "subtitle": settings.subtitle or "",
             "columns": settings.columns or {"mode": "map_diff"},
-            "rows": rows,
+            "rows": selected_rows,
+            "groups": groups_payload,
+            "display_group": display_group,
         }
         json_path = os.path.join(out_dir, "standings.json")
         changed = self._write_json(json_path, payload)
@@ -3194,11 +3421,19 @@ class TournamentApp(QMainWindow):
 
         sdata = state.get("standings", {}) or {}
         rows = [_standings_row_from_dict(r) for r in (sdata.get("rows") or [])]
+        groups_data = sdata.get("groups") or []
+        groups = []
+        for idx, g in enumerate(groups_data, start=1):
+            groups.append(_standings_group_from_dict(g, fallback_key=f"group_{idx}"))
+        if not groups and rows:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=rows)]
         s_settings = StandingsSettings(
             title=sdata.get("title", ""),
             subtitle=sdata.get("subtitle", ""),
             columns=sdata.get("columns") or {"mode": "map_diff"},
             rows=rows,
+            groups=groups,
+            display_group=sdata.get("display_group", ""),
         )
         if hasattr(self, "standings_tab"):
             self.standings_tab.from_settings(s_settings)
@@ -3263,6 +3498,8 @@ class TournamentApp(QMainWindow):
                 subtitle=s.get("subtitle", ""),
                 columns=s.get("columns") or {"mode": "map_diff"},
                 rows=[_standings_row_from_dict(r) for r in (s.get("rows") or [])],
+                groups=[_standings_group_from_dict(g, fallback_key=f"group_{idx}") for idx, g in enumerate(s.get("groups") or [], start=1)],
+                display_group=s.get("display_group", ""),
             )
             self._export_standings(s_settings)
         if "bracket" in state:
