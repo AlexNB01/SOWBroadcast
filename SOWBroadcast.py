@@ -130,8 +130,7 @@ class StandingsRow:
     wins: int = 0
     losses: int = 0
     map_diff: int = 0
-    maps_for: int = 0
-    maps_against: int = 0
+    points: int = 0
     status: str = ""
     rank: int = 0
 
@@ -147,6 +146,13 @@ class StandingsSettings:
             self.columns = {"mode": "map_diff"}
         if self.rows is None:
             self.rows = []
+
+def _standings_row_from_dict(data: dict) -> StandingsRow:
+    payload = dict(data or {})
+    payload.setdefault("points", 0)
+    payload.pop("maps_for", None)
+    payload.pop("maps_against", None)
+    return StandingsRow(**payload)
 
 @dataclass
 class TeamRef:
@@ -1179,7 +1185,7 @@ class StandingsTab(QWidget):
     updated = pyqtSignal()
 
     HEADERS = [
-        "Rank", "Team", "Abbr", "W", "L", "Map Diff", "Maps For", "Maps Against", "Status", "Logo"
+        "Rank", "Team", "Abbr", "W", "L", "+/-", "Points", "Status", "Logo"
     ]
 
     def __init__(self):
@@ -1210,7 +1216,7 @@ class StandingsTab(QWidget):
         btns = QHBoxLayout()
         self.add_btn = QPushButton("Add Row")
         self.remove_btn = QPushButton("Remove Selected")
-        self.sort_btn = QPushButton("Sort by W/L then Map Diff")
+        self.sort_btn = QPushButton("Sort by W/L then +/-")
         btns.addWidget(self.add_btn)
         btns.addWidget(self.remove_btn)
         btns.addWidget(self.sort_btn)
@@ -1292,13 +1298,9 @@ class StandingsTab(QWidget):
         diff_spin.setValue(int(getattr(row_data, "map_diff", 0) or 0))
         self.table.setCellWidget(row, 5, diff_spin)
 
-        mf_spin = self._make_spin(0, 99)
-        mf_spin.setValue(int(getattr(row_data, "maps_for", 0) or 0))
-        self.table.setCellWidget(row, 6, mf_spin)
-
-        ma_spin = self._make_spin(0, 99)
-        ma_spin.setValue(int(getattr(row_data, "maps_against", 0) or 0))
-        self.table.setCellWidget(row, 7, ma_spin)
+        points_spin = self._make_spin(0, 999)
+        points_spin.setValue(int(getattr(row_data, "points", 0) or 0))
+        self.table.setCellWidget(row, 6, points_spin)
 
         status_combo = QComboBox()
         status_combo.addItem("")
@@ -1306,10 +1308,10 @@ class StandingsTab(QWidget):
         status = (getattr(row_data, "status", "") or "").strip().lower()
         ix = status_combo.findText(status, Qt.MatchExactly)
         status_combo.setCurrentIndex(ix if ix >= 0 else 0)
-        self.table.setCellWidget(row, 8, status_combo)
+        self.table.setCellWidget(row, 7, status_combo)
 
         logo_widget = self._make_logo_cell(getattr(row_data, "logo_path", "") or "")
-        self.table.setCellWidget(row, 9, logo_widget)
+        self.table.setCellWidget(row, 8, logo_widget)
 
     def _remove_selected(self):
         selected = self.table.selectionModel().selectedRows()
@@ -1325,10 +1327,9 @@ class StandingsTab(QWidget):
         wins = int(self.table.cellWidget(row, 3).value())
         losses = int(self.table.cellWidget(row, 4).value())
         map_diff = int(self.table.cellWidget(row, 5).value())
-        maps_for = int(self.table.cellWidget(row, 6).value())
-        maps_against = int(self.table.cellWidget(row, 7).value())
-        status = self.table.cellWidget(row, 8).currentText().strip()
-        logo_widget = self.table.cellWidget(row, 9)
+        points = int(self.table.cellWidget(row, 6).value())
+        status = self.table.cellWidget(row, 7).currentText().strip()
+        logo_widget = self.table.cellWidget(row, 8)
         logo_path = logo_widget._edit.text().strip() if logo_widget else ""
         return StandingsRow(
             team_name=team_name,
@@ -1337,8 +1338,7 @@ class StandingsTab(QWidget):
             wins=wins,
             losses=losses,
             map_diff=map_diff,
-            maps_for=maps_for,
-            maps_against=maps_against,
+            points=points,
             status=status,
             rank=rank,
         )
@@ -1348,7 +1348,7 @@ class StandingsTab(QWidget):
         for i in range(self.table.rowCount()):
             row = self._row_data(i)
             has_identity = bool(row.team_name or row.abbr or row.logo_path)
-            has_stats = any([row.wins, row.losses, row.map_diff, row.maps_for, row.maps_against])
+            has_stats = any([row.wins, row.losses, row.map_diff, row.points])
             if has_identity or has_stats:
                 rows.append(row)
         return rows
@@ -1357,8 +1357,6 @@ class StandingsTab(QWidget):
         rows = self._rows()
         def sort_key(r: StandingsRow):
             diff = r.map_diff
-            if diff == 0 and (r.maps_for or r.maps_against):
-                diff = r.maps_for - r.maps_against
             return (-r.wins, r.losses, -diff, r.team_name.lower())
         rows.sort(key=sort_key)
         self._load_rows(rows)
@@ -1376,15 +1374,12 @@ class StandingsTab(QWidget):
 
     def to_settings(self) -> StandingsSettings:
         rows = self._rows()
-        use_for_against = any((r.maps_for or r.maps_against) for r in rows)
-        columns = {"mode": "maps_for_against" if use_for_against else "map_diff"}
+        columns = {"mode": "map_diff"}
 
         ranks_present = any(r.rank for r in rows)
         if not ranks_present:
             def sort_key(r: StandingsRow):
                 diff = r.map_diff
-                if diff == 0 and (r.maps_for or r.maps_against):
-                    diff = r.maps_for - r.maps_against
                 return (-r.wins, r.losses, -diff, r.team_name.lower())
             sorted_rows = sorted(rows, key=sort_key)
             rank_lookup = {id(r): i + 1 for i, r in enumerate(sorted_rows)}
@@ -2138,8 +2133,6 @@ class TournamentApp(QMainWindow):
         rows = []
         for r in settings.rows or []:
             diff = int(r.map_diff or 0)
-            if diff == 0 and (r.maps_for or r.maps_against):
-                diff = int(r.maps_for or 0) - int(r.maps_against or 0)
             rows.append({
                 "team": r.team_name,
                 "abbr": r.abbr,
@@ -2147,8 +2140,7 @@ class TournamentApp(QMainWindow):
                 "wins": int(r.wins or 0),
                 "losses": int(r.losses or 0),
                 "map_diff": diff,
-                "maps_for": int(r.maps_for or 0),
-                "maps_against": int(r.maps_against or 0),
+                "points": int(r.points or 0),
                 "status": r.status or "",
                 "rank": int(r.rank or 0),
             })
@@ -3189,7 +3181,7 @@ class TournamentApp(QMainWindow):
         self.waiting_tab.from_settings(WaitingSettings(**wdata))
 
         sdata = state.get("standings", {}) or {}
-        rows = [StandingsRow(**r) for r in (sdata.get("rows") or [])]
+        rows = [_standings_row_from_dict(r) for r in (sdata.get("rows") or [])]
         s_settings = StandingsSettings(
             title=sdata.get("title", ""),
             subtitle=sdata.get("subtitle", ""),
@@ -3258,7 +3250,7 @@ class TournamentApp(QMainWindow):
                 title=s.get("title", ""),
                 subtitle=s.get("subtitle", ""),
                 columns=s.get("columns") or {"mode": "map_diff"},
-                rows=[StandingsRow(**r) for r in (s.get("rows") or [])],
+                rows=[_standings_row_from_dict(r) for r in (s.get("rows") or [])],
             )
             self._export_standings(s_settings)
         if "bracket" in state:

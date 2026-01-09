@@ -83,21 +83,22 @@
     return `${SB}/${path.replace(/\\/g,"/")}`;
   }
 
-  function buildHeader(mode){
+  function buildHeader(showStatus){
     const header = document.getElementById("header");
     header.innerHTML = "";
-    const labels = mode === "maps_for_against"
-      ? ["Rank","Team","W","L","MF","MA","Status"]
-      : ["Rank","Team","W","L","MD","Status"];
+    const labels = ["Rank","Team","W","L","+/-","Points"];
+    if(showStatus){
+      labels.push("Status");
+    }
     labels.forEach(label=>{
       const div = document.createElement("div");
       div.className = "cell";
       div.textContent = label;
       header.appendChild(div);
     });
-    header.style.gridTemplateColumns = mode === "maps_for_against"
-      ? "80px 1fr 80px 80px 90px 90px 160px"
-      : "80px 1fr 80px 80px 90px 160px";
+    header.style.gridTemplateColumns = showStatus
+      ? "80px 1fr 80px 80px 90px 110px 160px"
+      : "80px 1fr 80px 80px 90px 110px";
   }
 
   function rowKey(row, index){
@@ -114,8 +115,8 @@
     title.textContent = data.title || "Standings";
     subtitle.textContent = data.subtitle || "";
 
-    const mode = (data.columns || {}).mode || "map_diff";
-    buildHeader(mode);
+    const showStatus = (data.rows || []).some(row=>String(row.status || "").trim());
+    buildHeader(showStatus);
 
     const rowsWrap = document.getElementById("rows");
     rowsWrap.innerHTML = "";
@@ -138,8 +139,7 @@
         ((prev.wins ?? 0) !== (row.wins ?? 0)) ||
         ((prev.losses ?? 0) !== (row.losses ?? 0)) ||
         ((prev.map_diff ?? 0) !== (row.map_diff ?? 0)) ||
-        ((prev.maps_for ?? 0) !== (row.maps_for ?? 0)) ||
-        ((prev.maps_against ?? 0) !== (row.maps_against ?? 0)) ||
+        ((prev.points ?? 0) !== (row.points ?? 0)) ||
         ((prev.status ?? "") !== (row.status ?? ""))
       );
 
@@ -147,9 +147,9 @@
 
       const rowEl = document.createElement("div");
       rowEl.className = "row body" + ((changed || moved) ? " flash" : "");
-      rowEl.style.gridTemplateColumns = mode === "maps_for_against"
-        ? "80px 1fr 80px 80px 90px 90px 160px"
-        : "80px 1fr 80px 80px 90px 160px";
+      rowEl.style.gridTemplateColumns = showStatus
+        ? "80px 1fr 80px 80px 90px 110px 160px"
+        : "80px 1fr 80px 80px 90px 110px";
 
       const rank = document.createElement("div");
       rank.className = "cell rank";
@@ -185,33 +185,27 @@
       if(prev && prev.losses !== row.losses) l.classList.add("flash-cell");
       rowEl.appendChild(l);
 
-      if(mode === "maps_for_against"){
-        const mf = document.createElement("div");
-        mf.className = "cell";
-        mf.textContent = row.maps_for ?? 0;
-        if(prev && prev.maps_for !== row.maps_for) mf.classList.add("flash-cell");
-        rowEl.appendChild(mf);
+      const md = document.createElement("div");
+      md.className = "cell";
+      md.textContent = row.map_diff ?? 0;
+      if(prev && prev.map_diff !== row.map_diff) md.classList.add("flash-cell");
+      rowEl.appendChild(md);
 
-        const ma = document.createElement("div");
-        ma.className = "cell";
-        ma.textContent = row.maps_against ?? 0;
-        if(prev && prev.maps_against !== row.maps_against) ma.classList.add("flash-cell");
-        rowEl.appendChild(ma);
-      } else {
-        const md = document.createElement("div");
-        md.className = "cell";
-        md.textContent = row.map_diff ?? 0;
-        if(prev && prev.map_diff !== row.map_diff) md.classList.add("flash-cell");
-        rowEl.appendChild(md);
-      }
+      const points = document.createElement("div");
+      points.className = "cell";
+      points.textContent = row.points ?? 0;
+      if(prev && prev.points !== row.points) points.classList.add("flash-cell");
+      rowEl.appendChild(points);
 
-      const status = document.createElement("div");
-      status.className = "cell status";
-      if(row.status){
-        status.textContent = row.status;
-        status.classList.add(row.status);
+      if(showStatus){
+        const status = document.createElement("div");
+        status.className = "cell status";
+        if(row.status){
+          status.textContent = row.status;
+          status.classList.add(row.status);
+        }
+        rowEl.appendChild(status);
       }
-      rowEl.appendChild(status);
 
       rowsWrap.appendChild(rowEl);
     });
