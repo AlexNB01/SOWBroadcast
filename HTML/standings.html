@@ -45,6 +45,7 @@
   .row.body{font-size:28px;background:var(--);}
   .rows{display:flex;flex-direction:column;gap:6px;}
   .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row.header .cell.header-team{padding-left:64px;}
   .rank{width:70px;text-align:center;}
   .team{display:flex;align-items:center;gap:16px;min-width:0;}
   .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:transparent;}
@@ -178,7 +179,7 @@
     }
     labels.forEach(label=>{
       const div = document.createElement("div");
-      div.className = "cell";
+      div.className = label === "Team" ? "cell header-team" : "cell";
       div.textContent = label;
       header.appendChild(div);
     });
