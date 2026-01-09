@@ -27,6 +27,7 @@
   }
   .canvas{width:1920px;height:1080px;transform:scale(min(calc(100vw / 1920), calc(100vh / 1080)));transform-origin:top left;}
   .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
+  .header{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:inline-flex;flex-direction:column;gap:4px;align-self:flex-start;}
   .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
   .overlay-scale{transform:scale(var(--ui-scale, 1));transform-origin:top left;height:100%;width:100%;}
@@ -63,7 +64,7 @@
   <div class="canvas">
     <div class="overlay-scale" id="overlay">
       <div class="frame">
-        <div>
+        <div class="header">
           <div class="title" id="title">Standings</div>
           <div class="subtitle" id="subtitle"></div>
         </div>
