@@ -1360,13 +1360,16 @@ class StandingsTab(QWidget):
         )
 
     def _rows(self) -> List[StandingsRow]:
+        return [row for _, row in self._indexed_rows()]
+
+    def _indexed_rows(self) -> List[tuple[int, StandingsRow]]:
         rows = []
         for i in range(self.table.rowCount()):
             row = self._row_data(i)
             has_identity = bool(row.team_name or row.abbr or row.logo_path)
             has_stats = any([row.wins, row.losses, row.map_diff, row.points])
             if has_identity or has_stats:
-                rows.append(row)
+                rows.append((i, row))
         return rows
 
     def _sort_rows(self):
@@ -1389,9 +1392,14 @@ class StandingsTab(QWidget):
         self._add_row()
 
     def to_settings(self) -> StandingsSettings:
-        rows = self._rows()
+        indexed_rows = self._indexed_rows()
+        rows = [row for _, row in indexed_rows]
         columns = {"mode": "map_diff"}
         _apply_standings_ranks(rows)
+        for idx, row in indexed_rows:
+            rank_widget = self.table.cellWidget(idx, 0)
+            if rank_widget and int(rank_widget.value()) <= 0:
+                rank_widget.setValue(int(row.rank or 0))
 
         return StandingsSettings(
             title=self.title_edit.text().strip(),
