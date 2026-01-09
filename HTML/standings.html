@@ -27,7 +27,7 @@
   }
   .canvas{width:1920px;height:1080px;transform:scale(min(calc(100vw / 1920), calc(100vh / 1080)));transform-origin:top left;}
   .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
-  .header{display:flex;align-items:center;justify-content:space-between;width:100%;gap:24px;}
+  .page-header{display:flex;align-items:center;justify-content:space-between;width:100%;gap:24px;}
   .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-start;}
   .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
@@ -65,7 +65,7 @@
   <div class="canvas">
     <div class="overlay-scale" id="overlay">
       <div class="frame">
-        <div class="header">
+        <div class="page-header">
           <div class="header-text">
             <div class="title" id="title">Standings</div>
             <div class="subtitle" id="subtitle"></div>
@@ -179,6 +179,9 @@
     labels.forEach(label=>{
       const div = document.createElement("div");
       div.className = "cell";
+      if(["Rank","W","L","+/-","Points","Status"].includes(label)){
+        div.classList.add("center");
+      }
       div.textContent = label;
       header.appendChild(div);
     });
@@ -312,7 +315,7 @@
         : "80px 1fr 80px 80px 90px 110px";
 
       const rank = document.createElement("div");
-      rank.className = "cell rank";
+      rank.className = "cell rank center";
       rank.textContent = row.rank || idx + 1;
       rowEl.appendChild(rank);
 
@@ -334,32 +337,32 @@
       rowEl.appendChild(team);
 
       const w = document.createElement("div");
-      w.className = "cell";
+      w.className = "cell center";
       w.textContent = row.wins ?? 0;
       if(prev && prev.wins !== row.wins) w.classList.add("flash-cell");
       rowEl.appendChild(w);
 
       const l = document.createElement("div");
-      l.className = "cell";
+      l.className = "cell center";
       l.textContent = row.losses ?? 0;
       if(prev && prev.losses !== row.losses) l.classList.add("flash-cell");
       rowEl.appendChild(l);
 
       const md = document.createElement("div");
-      md.className = "cell";
+      md.className = "cell center";
       md.textContent = row.map_diff ?? 0;
       if(prev && prev.map_diff !== row.map_diff) md.classList.add("flash-cell");
       rowEl.appendChild(md);
 
       const points = document.createElement("div");
-      points.className = "cell";
+      points.className = "cell center";
       points.textContent = row.points ?? 0;
       if(prev && prev.points !== row.points) points.classList.add("flash-cell");
       rowEl.appendChild(points);
 
       if(showStatus){
         const status = document.createElement("div");
-        status.className = "cell status";
+        status.className = "cell status center";
         if(row.status){
           status.textContent = row.status;
           status.classList.add(row.status);
