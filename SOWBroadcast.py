@@ -1401,9 +1401,6 @@ class StandingsTab(QWidget):
             if rank_widget and int(rank_widget.value()) <= 0:
                 rank_widget.setValue(int(row.rank or 0))
 
-        rows = sorted(rows, key=lambda r: (int(r.rank or 0), r.team_name.lower()))
-        self._load_rows(rows)
-
         return StandingsSettings(
             title=self.title_edit.text().strip(),
             subtitle=self.subtitle_edit.text().strip(),
