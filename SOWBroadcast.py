@@ -154,6 +154,22 @@ def _standings_row_from_dict(data: dict) -> StandingsRow:
     payload.pop("maps_against", None)
     return StandingsRow(**payload)
 
+def _apply_standings_ranks(rows: List[StandingsRow]) -> None:
+    if not rows:
+        return
+    used_ranks = {r.rank for r in rows if int(r.rank or 0) > 0}
+    def sort_key(r: StandingsRow):
+        return (-int(r.points or 0), -int(r.wins or 0), int(r.losses or 0), -int(r.map_diff or 0), r.team_name.lower())
+    remaining = [r for r in rows if int(r.rank or 0) <= 0]
+    remaining.sort(key=sort_key)
+    next_rank = 1
+    for r in remaining:
+        while next_rank in used_ranks:
+            next_rank += 1
+        r.rank = next_rank
+        used_ranks.add(next_rank)
+        next_rank += 1
+
 @dataclass
 class TeamRef:
     name: str = ""
@@ -1344,13 +1360,16 @@ class StandingsTab(QWidget):
         )
 
     def _rows(self) -> List[StandingsRow]:
+        return [row for _, row in self._indexed_rows()]
+
+    def _indexed_rows(self) -> List[tuple[int, StandingsRow]]:
         rows = []
         for i in range(self.table.rowCount()):
             row = self._row_data(i)
             has_identity = bool(row.team_name or row.abbr or row.logo_path)
             has_stats = any([row.wins, row.losses, row.map_diff, row.points])
             if has_identity or has_stats:
-                rows.append(row)
+                rows.append((i, row))
         return rows
 
     def _sort_rows(self):
@@ -1373,18 +1392,17 @@ class StandingsTab(QWidget):
         self._add_row()
 
     def to_settings(self) -> StandingsSettings:
-        rows = self._rows()
+        indexed_rows = self._indexed_rows()
+        rows = [row for _, row in indexed_rows]
         columns = {"mode": "map_diff"}
+        _apply_standings_ranks(rows)
+        for idx, row in indexed_rows:
+            rank_widget = self.table.cellWidget(idx, 0)
+            if rank_widget and int(rank_widget.value()) <= 0:
+                rank_widget.setValue(int(row.rank or 0))
 
-        ranks_present = any(r.rank for r in rows)
-        if not ranks_present:
-            def sort_key(r: StandingsRow):
-                diff = r.map_diff
-                return (-r.wins, r.losses, -diff, r.team_name.lower())
-            sorted_rows = sorted(rows, key=sort_key)
-            rank_lookup = {id(r): i + 1 for i, r in enumerate(sorted_rows)}
-            for r in rows:
-                r.rank = rank_lookup.get(id(r), r.rank)
+        rows = sorted(rows, key=lambda r: (int(r.rank or 0), r.team_name.lower()))
+        self._load_rows(rows)
 
         return StandingsSettings(
             title=self.title_edit.text().strip(),
@@ -2130,6 +2148,8 @@ class TournamentApp(QMainWindow):
         out_dir = os.path.join(root, "Standings")
         os.makedirs(out_dir, exist_ok=True)
 
+        _apply_standings_ranks(settings.rows or [])
+
         rows = []
         for r in settings.rows or []:
             diff = int(r.map_diff or 0)
@@ -2144,14 +2164,6 @@ class TournamentApp(QMainWindow):
                 "status": r.status or "",
                 "rank": int(r.rank or 0),
             })
-
-        if rows and all((r.get("rank") or 0) == 0 for r in rows):
-            def sort_key(r: dict):
-                diff = r.get("map_diff", 0)
-                return (-r.get("wins", 0), r.get("losses", 0), -diff, (r.get("team") or "").lower())
-            rows_sorted = sorted(rows, key=sort_key)
-            for i, r in enumerate(rows_sorted, start=1):
-                r["rank"] = i
 
         payload = {
             "title": settings.title or "",
