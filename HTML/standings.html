@@ -239,11 +239,24 @@
     if(overlay){
       overlay.style.setProperty("--ui-scale", "1");
     }
+    const isTwoGroups = activeGroups.length === 2;
+    const areBothSmallGroups = isTwoGroups && activeGroups.every(group => {
+      const count = Array.isArray(group.rows) ? group.rows.length : 0;
+      return count >= 1 && count <= 4;
+    });
+    const areBothLargeGroups = isTwoGroups && activeGroups.every(group => {
+      const count = Array.isArray(group.rows) ? group.rows.length : 0;
+      return count > 4;
+    });
+    const allowScaling = !areBothLargeGroups;
+
     if(activeGroups.length === 1){
       tablesWrap.classList.add("single");
     }else{
       tablesWrap.classList.add("multi");
-      tablesWrap.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+      tablesWrap.style.gridTemplateColumns = areBothSmallGroups
+        ? "minmax(0, 1fr)"
+        : "repeat(2, minmax(0, 1fr))";
     }
 
     const previousGroups = new Map();
@@ -398,6 +411,10 @@
         scaleWrap.style.width = "100%";
         scaleWrap.style.height = "100%";
 
+        if(!allowScaling){
+          return;
+        }
+
         const styles = getComputedStyle(table);
         const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
         const padY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
@@ -413,6 +430,13 @@
           scaleWrap.style.height = `${(100 / scale).toFixed(3)}%`;
         }
       });
+
+      if(!allowScaling){
+        if(overlay){
+          overlay.style.setProperty("--ui-scale", "1");
+        }
+        return;
+      }
 
       const frame = document.querySelector(".frame");
       const availableHeight = frame ? frame.clientHeight : 0;
