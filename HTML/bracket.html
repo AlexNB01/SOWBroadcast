@@ -226,14 +226,14 @@
     roundsContainer?.classList.toggle("has-lower", hasLower);
     const rowHeightValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--row-height"), 10) || 64;
 
-    function addSection(sectionRounds, rowIndex){
+    function addSection(sectionRounds, rowIndex, columnOffset = 0){
       const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
       const totalRows = maxMatches * 2;
       sectionRounds.forEach((round, roundIndex)=>{
         const roundEl = document.createElement("div");
         roundEl.className = "round";
         roundEl.dataset.round = String(roundIndex);
-        roundEl.style.gridColumn = String(roundIndex + 1);
+        roundEl.style.gridColumn = String(roundIndex + 1 + columnOffset);
         roundEl.style.gridRow = rowIndex;
         if(roundIndex === sectionRounds.length - 1){
           roundEl.dataset.last = "true";
@@ -338,6 +338,12 @@
       });
     }
 
+    const lowerIsBronzeOnly = !focusOnly
+      && sections.lower.length === 1
+      && sections.grand.length === 0
+      && (sections.lower[0].name || "").trim().toLowerCase() === "bronze match";
+    const lowerColumnOffset = lowerIsBronzeOnly ? Math.max(0, sections.upper.length - 1) : 0;
+
     if(focusOnly){
       if(sections[focusSide].length){
         addSection(sections[focusSide], "1");
@@ -347,7 +353,7 @@
         addSection(sections.upper, "1");
       }
       if(sections.lower.length){
-        addSection(sections.lower, "2");
+        addSection(sections.lower, "2", lowerColumnOffset);
       }
     }
     if(sections.grand.length){
