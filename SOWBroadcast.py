@@ -1,7 +1,7 @@
 import sys, os, json, re, shutil, time, threading, unicodedata, shutil
 import server as _sb__force_include
 from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal
 from PyQt5.QtGui import QPixmap, QColor
@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
     QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
-    QTableWidget, QHeaderView
+    QTableWidget, QHeaderView, QDialogButtonBox
 )
 
 # -----------------------------
@@ -235,6 +235,185 @@ class BracketSettings:
     def __post_init__(self):
         if self.rounds is None:
             self.rounds = []
+
+
+class BracketMatchWidget(QWidget):
+    selected = pyqtSignal(object)
+    updated = pyqtSignal()
+
+    def __init__(self, match: BracketMatch, team_options: Optional[List[TeamRef]] = None):
+        super().__init__()
+        self.match = match
+        self._team_options = team_options or []
+        self._team_map = {t.name: t for t in self._team_options if t.name}
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(2, 2, 2, 2)
+        root.setSpacing(4)
+
+        self.team1_combo = self._build_team_combo(match.team1.name)
+        self.team1_score = QSpinBox()
+        self.team1_score.setRange(0, 99)
+        self.team1_score.setValue(int(match.score1 or 0))
+
+        self.team2_combo = self._build_team_combo(match.team2.name)
+        self.team2_score = QSpinBox()
+        self.team2_score.setRange(0, 99)
+        self.team2_score.setValue(int(match.score2 or 0))
+
+        row1 = QHBoxLayout()
+        row1.addWidget(self.team1_combo, 1)
+        row1.addWidget(self.team1_score)
+        row2 = QHBoxLayout()
+        row2.addWidget(self.team2_combo, 1)
+        row2.addWidget(self.team2_score)
+
+        root.addLayout(row1)
+        root.addLayout(row2)
+
+        self.team1_combo.editTextChanged.connect(lambda *_: self._on_team_changed(self.team1_combo, 1))
+        self.team2_combo.editTextChanged.connect(lambda *_: self._on_team_changed(self.team2_combo, 2))
+        self.team1_score.valueChanged.connect(self._on_score_changed)
+        self.team2_score.valueChanged.connect(self._on_score_changed)
+
+    def _build_team_combo(self, initial: str) -> QComboBox:
+        combo = QComboBox()
+        combo.setEditable(False)
+        combo.setMinimumWidth(140)
+        self._populate_combo(combo, initial)
+        return combo
+
+    def _populate_combo(self, combo: QComboBox, initial: str):
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("")
+        for t in self._team_options:
+            if t.name:
+                combo.addItem(t.name)
+        if initial and combo.findText(initial) >= 0:
+            combo.setCurrentText(initial)
+        else:
+            combo.setCurrentIndex(0)
+        combo.blockSignals(False)
+
+    def set_team_options(self, team_options: List[TeamRef]):
+        self._team_options = team_options or []
+        self._team_map = {t.name: t for t in self._team_options if t.name}
+        self._populate_combo(self.team1_combo, self.team1_combo.currentText())
+        self._populate_combo(self.team2_combo, self.team2_combo.currentText())
+
+    def set_team(self, slot: int, team: Optional[TeamRef]):
+        target = self.team1_combo if slot == 1 else self.team2_combo
+        if team and team.name:
+            target.setCurrentText(team.name)
+        else:
+            target.setCurrentIndex(0)
+        self._apply_team_ref(slot, team)
+
+    def _on_team_changed(self, combo: QComboBox, slot: int):
+        name = combo.currentText().strip()
+        team = self._team_map.get(name, TeamRef(name=name))
+        self._apply_team_ref(slot, team)
+        self.updated.emit()
+
+    def _apply_team_ref(self, slot: int, team: Optional[TeamRef]):
+        team = team or TeamRef()
+        if slot == 1:
+            self.match.team1 = TeamRef(name=team.name, abbr=team.abbr, logo_path=team.logo_path)
+        else:
+            self.match.team2 = TeamRef(name=team.name, abbr=team.abbr, logo_path=team.logo_path)
+
+    def _on_score_changed(self, *_):
+        self.match.score1 = int(self.team1_score.value())
+        self.match.score2 = int(self.team2_score.value())
+        self.updated.emit()
+
+    def mousePressEvent(self, event):
+        self.selected.emit(self)
+        super().mousePressEvent(event)
+
+
+class BracketTeamRow(QWidget):
+    changed = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._logo_path = ""
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(4)
+
+        self.name_edit = QLineEdit()
+        self.browse_btn = QPushButton("...")
+        self.browse_btn.setFixedWidth(28)
+
+        layout.addWidget(self.name_edit, 1)
+        layout.addWidget(self.browse_btn)
+
+        self.name_edit.textChanged.connect(self.changed)
+        self.browse_btn.clicked.connect(self._pick_logo)
+
+    def _pick_logo(self):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        start_dir = os.path.join(base, "Scoreboard", "Teams")
+        os.makedirs(start_dir, exist_ok=True)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select team logo",
+            start_dir,
+            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
+        )
+        if path:
+            self._logo_path = path
+            self.changed.emit()
+
+    def set_team(self, team: Optional[TeamRef]):
+        self.name_edit.setText(team.name if team else "")
+        self._logo_path = team.logo_path if team else ""
+
+    def team_ref(self) -> TeamRef:
+        return TeamRef(
+            name=self.name_edit.text().strip(),
+            abbr="",
+            logo_path=self._logo_path or None,
+        )
+
+    def clear(self):
+        self.name_edit.clear()
+        self._logo_path = ""
+
+
+class BracketTeamsImportDialog(QDialog):
+    def __init__(self, parent, teams: List[TeamRef]):
+        super().__init__(parent)
+        self.setWindowTitle("Import Teams from Standings")
+        self.resize(360, 420)
+
+        root = QVBoxLayout(self)
+        root.addWidget(QLabel("Select teams to import."))
+
+        self.listw = QListWidget()
+        for team in teams:
+            label = team.name or "Unnamed team"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, team)
+            item.setCheckState(Qt.Checked)
+            self.listw.addItem(item)
+        root.addWidget(self.listw, 1)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        root.addWidget(btns)
+
+    def selected_teams(self) -> List[TeamRef]:
+        teams = []
+        for i in range(self.listw.count()):
+            item = self.listw.item(i)
+            if item.checkState() == Qt.Checked:
+                teams.append(item.data(Qt.UserRole))
+        return teams
 
 # -----------------------------
 # Asset Manager Dialog
@@ -1638,8 +1817,11 @@ class BracketTab(QWidget):
 
     def __init__(self):
         super().__init__()
-        self._loading = False
         self._match_id_counter = 1
+        self._rounds: List[BracketRound] = []
+        self._match_widgets: List[BracketMatchWidget] = []
+        self._team_options: List[TeamRef] = []
+        self._qualified_provider: Optional[Callable[[], List[TeamRef]]] = None
 
         root = QVBoxLayout(self)
 
@@ -1651,71 +1833,67 @@ class BracketTab(QWidget):
         header_form.addRow("Stage", self.stage_edit)
         root.addWidget(header)
 
+        controls = QGroupBox("Bracket Controls")
+        controls_layout = QHBoxLayout(controls)
+        self.template_combo = QComboBox()
+        self.template_combo.addItems([
+            "4 team single elimination",
+            "6 team single elimination (top 2 start round 2)",
+            "8 team single elimination",
+            "4 team double elimination",
+            "6 team double elimination",
+            "8 team double elimination",
+        ])
+        self.load_template_btn = QPushButton("Load Template")
+        controls_layout.addWidget(QLabel("Template"))
+        controls_layout.addWidget(self.template_combo, 1)
+        controls_layout.addWidget(self.load_template_btn)
+        root.addWidget(controls)
+
         main_split = QSplitter()
         root.addWidget(main_split, 1)
 
-        self.tree = QTreeWidget()
-        self.tree.setHeaderHidden(True)
-        self.tree.setSelectionMode(QTreeWidget.SingleSelection)
-        main_split.addWidget(self.tree)
+        team_panel = QGroupBox("Teams")
+        team_panel_layout = QVBoxLayout(team_panel)
+        team_panel_layout.setContentsMargins(6, 6, 6, 6)
+        team_panel_layout.setSpacing(6)
 
-        editor = QWidget()
-        editor_layout = QVBoxLayout(editor)
+        self.team_list_scroll = QScrollArea()
+        self.team_list_scroll.setWidgetResizable(True)
+        self.team_list_container = QWidget()
+        self.team_list_layout = QVBoxLayout(self.team_list_container)
+        self.team_list_layout.setContentsMargins(2, 2, 2, 2)
+        self.team_list_layout.setSpacing(4)
+        self.team_list_scroll.setWidget(self.team_list_container)
+        team_panel_layout.addWidget(self.team_list_scroll, 1)
 
-        round_box = QGroupBox("Round")
-        round_form = QFormLayout(round_box)
-        self.round_name_edit = QLineEdit()
-        self.round_side_combo = QComboBox()
-        self.round_side_combo.addItem("")
-        self.round_side_combo.addItems(["upper", "lower", "grand"])
-        round_form.addRow("Name", self.round_name_edit)
-        round_form.addRow("Side", self.round_side_combo)
-        editor_layout.addWidget(round_box)
+        self.team_rows: List[BracketTeamRow] = []
+        for _ in range(16):
+            row = BracketTeamRow()
+            row.changed.connect(self._refresh_team_options)
+            self.team_rows.append(row)
+            self.team_list_layout.addWidget(row)
+        self.team_list_layout.addStretch(1)
 
-        match_box = QGroupBox("Match")
-        match_form = QFormLayout(match_box)
-        self.match_id_label = QLineEdit()
-        self.match_id_label.setReadOnly(True)
-        self.match_bo_edit = QLineEdit()
-        self.match_status_combo = QComboBox()
-        self.match_status_combo.addItem("")
-        self.match_status_combo.addItems(["scheduled", "live", "final"])
+        team_btns = QHBoxLayout()
+        team_btns.addStretch(1)
+        self.import_qualified_btn = QPushButton("Import from Standings")
+        self.clear_teams_btn = QPushButton("Clear")
+        team_btns.addWidget(self.import_qualified_btn)
+        team_btns.addWidget(self.clear_teams_btn)
+        team_panel_layout.addLayout(team_btns)
 
-        self.team1_name = QLineEdit()
-        self.team1_abbr = QLineEdit()
-        self.team1_logo = QLineEdit()
-        self.team1_score = QSpinBox(); self.team1_score.setRange(0, 99)
-        self.team2_name = QLineEdit()
-        self.team2_abbr = QLineEdit()
-        self.team2_logo = QLineEdit()
-        self.team2_score = QSpinBox(); self.team2_score.setRange(0, 99)
+        main_split.addWidget(team_panel)
 
-        match_form.addRow("Match ID", self.match_id_label)
-        match_form.addRow("BO label", self.match_bo_edit)
-        match_form.addRow("Status", self.match_status_combo)
-        match_form.addRow("Team 1 Name", self.team1_name)
-        match_form.addRow("Team 1 Abbr", self.team1_abbr)
-        match_form.addRow("Team 1 Logo", self._logo_field(self.team1_logo))
-        match_form.addRow("Team 1 Score", self.team1_score)
-        match_form.addRow("Team 2 Name", self.team2_name)
-        match_form.addRow("Team 2 Abbr", self.team2_abbr)
-        match_form.addRow("Team 2 Logo", self._logo_field(self.team2_logo))
-        match_form.addRow("Team 2 Score", self.team2_score)
-        editor_layout.addWidget(match_box)
-        editor_layout.addStretch(1)
-
-        main_split.addWidget(editor)
-        main_split.setSizes([500, 800])
-
-        btns = QHBoxLayout()
-        self.add_round_btn = QPushButton("Add Round")
-        self.add_match_btn = QPushButton("Add Match")
-        self.del_btn = QPushButton("Delete")
-        btns.addWidget(self.add_round_btn)
-        btns.addWidget(self.add_match_btn)
-        btns.addWidget(self.del_btn)
-        btns.addStretch(1)
-        root.addLayout(btns)
+        self.bracket_scroll = QScrollArea()
+        self.bracket_scroll.setWidgetResizable(True)
+        self.bracket_container = QWidget()
+        self.bracket_layout = QVBoxLayout(self.bracket_container)
+        self.bracket_layout.setContentsMargins(4, 4, 4, 4)
+        self.bracket_layout.setSpacing(10)
+        self.bracket_scroll.setWidget(self.bracket_container)
+        main_split.addWidget(self.bracket_scroll)
+        main_split.setSizes([300, 900])
 
         action_row = QHBoxLayout()
         action_row.addStretch(1)
@@ -1725,270 +1903,217 @@ class BracketTab(QWidget):
         action_row.addWidget(self.update_btn)
         root.addLayout(action_row)
 
-        self.tree.itemSelectionChanged.connect(self._on_selection_changed)
-        self.add_round_btn.clicked.connect(self._add_round)
-        self.add_match_btn.clicked.connect(self._add_match)
-        self.del_btn.clicked.connect(self._delete_selected)
+        self.load_template_btn.clicked.connect(self._load_template_from_combo)
+        self.import_qualified_btn.clicked.connect(self._import_teams_from_standings)
+        self.clear_teams_btn.clicked.connect(self._clear_team_list)
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
 
-        for w in (
-            self.round_name_edit, self.round_side_combo,
-            self.match_bo_edit, self.match_status_combo,
-            self.team1_name, self.team1_abbr, self.team1_logo, self.team1_score,
-            self.team2_name, self.team2_abbr, self.team2_logo, self.team2_score,
-        ):
-            if isinstance(w, QSpinBox):
-                w.valueChanged.connect(self._apply_match_edits)
-            else:
-                w.textChanged.connect(self._apply_round_or_match_edits) if isinstance(w, QLineEdit) else w.currentIndexChanged.connect(self._apply_round_or_match_edits)
-
-    def _logo_field(self, edit: QLineEdit) -> QWidget:
-        wrap = QWidget()
-        lay = QHBoxLayout(wrap)
-        lay.setContentsMargins(0, 0, 0, 0)
-        browse = QPushButton("Browse…")
-        browse.setFixedWidth(80)
-        browse.clicked.connect(lambda *_: self._pick_logo_for(edit))
-        lay.addWidget(edit, 1)
-        lay.addWidget(browse)
-        return wrap
-
-    def _pick_logo_for(self, edit: QLineEdit):
-        base = os.environ.get("SOWB_ROOT") or _app_base()
-        start_dir = os.path.join(base, "Scoreboard", "Teams")
-        os.makedirs(start_dir, exist_ok=True)
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select team logo",
-            start_dir,
-            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
-        )
-        if path:
-            edit.setText(path)
+    def set_qualified_provider(self, provider: Callable[[], List[TeamRef]]):
+        self._qualified_provider = provider
 
     def _new_match_id(self) -> str:
         stamp = int(time.time())
         self._match_id_counter += 1
         return f"m{stamp}-{self._match_id_counter}"
 
-    def _add_round(self):
-        count = self.tree.topLevelItemCount() + 1
-        name = f"Round {count}"
-        item = QTreeWidgetItem([name])
-        item.setData(0, Qt.UserRole, {"type": "round", "name": name, "side": ""})
-        self.tree.addTopLevelItem(item)
-        self.tree.setCurrentItem(item)
+    def _make_match(self) -> BracketMatch:
+        return BracketMatch(
+            id=self._new_match_id(),
+            bo_label="",
+            status="",
+            team1=TeamRef(),
+            team2=TeamRef(),
+            score1=0,
+            score2=0,
+        )
 
-    def _add_match(self):
-        current = self.tree.currentItem()
-        if current is None:
-            return
-        if current.data(0, Qt.UserRole).get("type") == "match":
-            current = current.parent()
-        if current is None:
-            return
-        match_id = self._new_match_id()
-        data = {
-            "type": "match",
-            "id": match_id,
-            "bo_label": "",
-            "status": "",
-            "team1": {"name": "", "abbr": "", "logo_path": ""},
-            "team2": {"name": "", "abbr": "", "logo_path": ""},
-            "score1": 0,
-            "score2": 0,
-        }
-        item = QTreeWidgetItem([self._match_label(data)])
-        item.setData(0, Qt.UserRole, data)
-        current.addChild(item)
-        current.setExpanded(True)
-        self.tree.setCurrentItem(item)
-
-    def _delete_selected(self):
-        current = self.tree.currentItem()
-        if not current:
-            return
-        parent = current.parent()
-        if parent:
-            parent.removeChild(current)
+    def _load_template_from_combo(self):
+        name = self.template_combo.currentText()
+        if name == "4 team single elimination":
+            rounds = self._template_single_elim(4)
+        elif name == "6 team single elimination (top 2 start round 2)":
+            rounds = self._template_single_elim(6)
+        elif name == "8 team single elimination":
+            rounds = self._template_single_elim(8)
+        elif name == "4 team double elimination":
+            rounds = self._template_double_elim(4)
+        elif name == "6 team double elimination":
+            rounds = self._template_double_elim(6)
         else:
-            idx = self.tree.indexOfTopLevelItem(current)
-            if idx >= 0:
-                self.tree.takeTopLevelItem(idx)
+            rounds = self._template_double_elim(8)
+        self._rounds = rounds
+        self._build_bracket_view()
+        self.updated.emit()
 
-    def _on_selection_changed(self):
-        current = self.tree.currentItem()
-        self._loading = True
-        if not current:
-            self._set_round_fields(None)
-            self._set_match_fields(None)
-            self._loading = False
-            return
-        data = current.data(0, Qt.UserRole) or {}
-        if data.get("type") == "round":
-            self._set_round_fields(data)
-            self._set_match_fields(None)
+    def _template_single_elim(self, team_count: int) -> List[BracketRound]:
+        if team_count == 4:
+            round_defs = [("Semifinals", 2), ("Final", 1)]
+        elif team_count == 6:
+            round_defs = [("Round 1", 2), ("Semifinals", 2), ("Final", 1)]
         else:
-            self._set_round_fields(current.parent().data(0, Qt.UserRole) if current.parent() else None)
-            self._set_match_fields(data)
-        self._loading = False
+            round_defs = [("Quarterfinals", 4), ("Semifinals", 2), ("Final", 1)]
+        rounds = []
+        for name, match_count in round_defs:
+            rounds.append(BracketRound(
+                name=name,
+                side="upper",
+                matches=[self._make_match() for _ in range(match_count)],
+            ))
+        return rounds
 
-    def _set_round_fields(self, data: Optional[dict]):
-        if not data:
-            self.round_name_edit.clear()
-            self.round_side_combo.setCurrentIndex(0)
-            return
-        self.round_name_edit.setText(data.get("name", ""))
-        side = data.get("side", "")
-        ix = self.round_side_combo.findText(side, Qt.MatchExactly)
-        self.round_side_combo.setCurrentIndex(ix if ix >= 0 else 0)
+    def _template_double_elim(self, team_count: int) -> List[BracketRound]:
+        if team_count == 4:
+            upper = [("Upper Semifinals", 2), ("Upper Final", 1)]
+            lower = [("Lower Semifinal", 1), ("Lower Final", 1)]
+        elif team_count == 6:
+            upper = [("Upper Round 1", 2), ("Upper Semifinals", 2), ("Upper Final", 1)]
+            lower = [("Lower Round 1", 2), ("Lower Semifinal", 1), ("Lower Final", 1)]
+        else:
+            upper = [("Upper Round 1", 4), ("Upper Semifinals", 2), ("Upper Final", 1)]
+            lower = [("Lower Round 1", 2), ("Lower Round 2", 2), ("Lower Final", 1)]
+        rounds = []
+        for name, match_count in upper:
+            rounds.append(BracketRound(
+                name=name,
+                side="upper",
+                matches=[self._make_match() for _ in range(match_count)],
+            ))
+        for name, match_count in lower:
+            rounds.append(BracketRound(
+                name=name,
+                side="lower",
+                matches=[self._make_match() for _ in range(match_count)],
+            ))
+        rounds.append(BracketRound(
+            name="Grand Final",
+            side="grand",
+            matches=[self._make_match()],
+        ))
+        return rounds
 
-    def _set_match_fields(self, data: Optional[dict]):
-        if not data:
-            self.match_id_label.clear()
-            self.match_bo_edit.clear()
-            self.match_status_combo.setCurrentIndex(0)
-            self.team1_name.clear()
-            self.team1_abbr.clear()
-            self.team1_logo.clear()
-            self.team1_score.setValue(0)
-            self.team2_name.clear()
-            self.team2_abbr.clear()
-            self.team2_logo.clear()
-            self.team2_score.setValue(0)
-            return
-        self.match_id_label.setText(data.get("id", ""))
-        self.match_bo_edit.setText(data.get("bo_label", ""))
-        status = data.get("status", "")
-        ix = self.match_status_combo.findText(status, Qt.MatchExactly)
-        self.match_status_combo.setCurrentIndex(ix if ix >= 0 else 0)
-        t1 = data.get("team1", {}) or {}
-        t2 = data.get("team2", {}) or {}
-        self.team1_name.setText(t1.get("name", ""))
-        self.team1_abbr.setText(t1.get("abbr", ""))
-        self.team1_logo.setText(t1.get("logo_path", ""))
-        self.team1_score.setValue(int(data.get("score1", 0) or 0))
-        self.team2_name.setText(t2.get("name", ""))
-        self.team2_abbr.setText(t2.get("abbr", ""))
-        self.team2_logo.setText(t2.get("logo_path", ""))
-        self.team2_score.setValue(int(data.get("score2", 0) or 0))
+    def _clear_bracket(self):
+        while self.bracket_layout.count():
+            item = self.bracket_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.setParent(None)
+                widget.deleteLater()
+        self._match_widgets = []
 
-    def _apply_round_or_match_edits(self, *_):
-        if self._loading:
+    def _build_bracket_view(self):
+        self._clear_bracket()
+        if not self._rounds:
+            self.bracket_layout.addWidget(QLabel("No bracket loaded. Select a template to begin."))
             return
-        current = self.tree.currentItem()
-        if not current:
-            return
-        data = current.data(0, Qt.UserRole) or {}
-        if data.get("type") == "round":
-            data["name"] = self.round_name_edit.text().strip()
-            data["side"] = self.round_side_combo.currentText().strip()
-            current.setText(0, data["name"] or "Round")
-            current.setData(0, Qt.UserRole, data)
-        elif data.get("type") == "match":
-            self._apply_match_edits()
-            parent = current.parent()
-            if parent:
-                parent_data = parent.data(0, Qt.UserRole) or {}
-                parent_data["name"] = self.round_name_edit.text().strip()
-                parent_data["side"] = self.round_side_combo.currentText().strip()
-                parent.setText(0, parent_data.get("name") or "Round")
-                parent.setData(0, Qt.UserRole, parent_data)
 
-    def _apply_match_edits(self, *_):
-        if self._loading:
-            return
-        current = self.tree.currentItem()
-        if not current:
-            return
-        data = current.data(0, Qt.UserRole) or {}
-        if data.get("type") != "match":
-            return
-        data["bo_label"] = self.match_bo_edit.text().strip()
-        data["status"] = self.match_status_combo.currentText().strip()
-        data["team1"] = {
-            "name": self.team1_name.text().strip(),
-            "abbr": self.team1_abbr.text().strip(),
-            "logo_path": self.team1_logo.text().strip(),
+        sections = {
+            "upper": ("Upper Bracket", []),
+            "lower": ("Lower Bracket", []),
+            "grand": ("Grand Final", []),
         }
-        data["team2"] = {
-            "name": self.team2_name.text().strip(),
-            "abbr": self.team2_abbr.text().strip(),
-            "logo_path": self.team2_logo.text().strip(),
-        }
-        data["score1"] = int(self.team1_score.value())
-        data["score2"] = int(self.team2_score.value())
-        current.setText(0, self._match_label(data))
-        current.setData(0, Qt.UserRole, data)
+        for rnd in self._rounds:
+            key = rnd.side or "upper"
+            if key not in sections:
+                key = "upper"
+            sections[key][1].append(rnd)
 
-    def _match_label(self, data: dict) -> str:
-        t1 = (data.get("team1") or {}).get("name", "") or "TBD"
-        t2 = (data.get("team2") or {}).get("name", "") or "TBD"
-        s1 = data.get("score1", 0)
-        s2 = data.get("score2", 0)
-        return f"{t1} {s1} - {s2} {t2}"
+        for key in ("upper", "lower", "grand"):
+            title, rounds = sections[key]
+            if not rounds:
+                continue
+            box = QGroupBox(title)
+            box_layout = QHBoxLayout(box)
+            box_layout.setSpacing(20)
+            for col_idx, rnd in enumerate(rounds):
+                col = QWidget()
+                col_layout = QVBoxLayout(col)
+                col_layout.setSpacing(10)
+                col_layout.addWidget(QLabel(rnd.name or "Round"))
+                spacing = max(6, 10 * (col_idx + 1))
+                for match in rnd.matches:
+                    widget = BracketMatchWidget(match, team_options=self._team_options)
+                    widget.updated.connect(self._on_match_updated)
+                    col_layout.addWidget(widget)
+                    col_layout.addSpacing(spacing)
+                    self._match_widgets.append(widget)
+                col_layout.addStretch(1)
+                box_layout.addWidget(col)
+            self.bracket_layout.addWidget(box)
+        self.bracket_layout.addStretch(1)
+
+    def _on_match_updated(self):
+        self.updated.emit()
+
+    def _refresh_team_options(self):
+        teams = []
+        for row in self.team_rows:
+            team = row.team_ref()
+            if team.name:
+                teams.append(team)
+        self._team_options = teams
+        for widget in self._match_widgets:
+            widget.set_team_options(self._team_options)
+        self.updated.emit()
+
+    def _clear_team_list(self):
+        for row in self.team_rows:
+            row.clear()
+        self._refresh_team_options()
+
+    def _import_teams_from_standings(self):
+        if not self._qualified_provider:
+            QMessageBox.warning(self, "Import Teams", "No standings data available.")
+            return
+        teams = self._qualified_provider() or []
+        if not teams:
+            QMessageBox.information(self, "Import Teams", "No teams found in standings.")
+            return
+        dlg = BracketTeamsImportDialog(self, teams)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        selected = dlg.selected_teams()
+        for idx, row in enumerate(self.team_rows):
+            row.set_team(selected[idx] if idx < len(selected) else None)
+        self._refresh_team_options()
 
     def reset_tab(self):
         self.title_edit.clear()
         self.stage_edit.clear()
-        self.tree.clear()
-        self._set_round_fields(None)
-        self._set_match_fields(None)
+        self._rounds = []
+        self._team_options = []
+        self._clear_team_list()
+        self._build_bracket_view()
 
     def to_settings(self) -> BracketSettings:
-        rounds = []
-        for i in range(self.tree.topLevelItemCount()):
-            round_item = self.tree.topLevelItem(i)
-            rdata = round_item.data(0, Qt.UserRole) or {}
-            matches = []
-            for j in range(round_item.childCount()):
-                mitem = round_item.child(j)
-                mdata = mitem.data(0, Qt.UserRole) or {}
-                m = BracketMatch(
-                    id=mdata.get("id", ""),
-                    bo_label=mdata.get("bo_label", ""),
-                    team1=TeamRef(**(mdata.get("team1", {}) or {})),
-                    team2=TeamRef(**(mdata.get("team2", {}) or {})),
-                    score1=int(mdata.get("score1", 0) or 0),
-                    score2=int(mdata.get("score2", 0) or 0),
-                    status=mdata.get("status", ""),
-                )
-                matches.append(m)
-            rounds.append(BracketRound(
-                name=rdata.get("name", round_item.text(0)),
-                side=rdata.get("side", ""),
-                matches=matches,
-            ))
         return BracketSettings(
             title=self.title_edit.text().strip(),
             stage=self.stage_edit.text().strip(),
-            rounds=rounds,
+            rounds=self._rounds or [],
         )
 
     def from_settings(self, settings: BracketSettings):
         self.title_edit.setText(settings.title or "")
         self.stage_edit.setText(settings.stage or "")
-        self.tree.clear()
+        self._rounds = []
         for rnd in settings.rounds or []:
-            r_item = QTreeWidgetItem([rnd.name or "Round"])
-            r_item.setData(0, Qt.UserRole, {"type": "round", "name": rnd.name or "", "side": rnd.side or ""})
-            self.tree.addTopLevelItem(r_item)
-            for m in rnd.matches or []:
-                mdata = {
-                    "type": "match",
-                    "id": m.id,
-                    "bo_label": m.bo_label,
-                    "status": m.status,
-                    "team1": {"name": m.team1.name, "abbr": m.team1.abbr, "logo_path": m.team1.logo_path or ""},
-                    "team2": {"name": m.team2.name, "abbr": m.team2.abbr, "logo_path": m.team2.logo_path or ""},
-                    "score1": m.score1,
-                    "score2": m.score2,
-                }
-                m_item = QTreeWidgetItem([self._match_label(mdata)])
-                m_item.setData(0, Qt.UserRole, mdata)
-                r_item.addChild(m_item)
-            r_item.setExpanded(True)
+            matches = []
+            for match in rnd.matches or []:
+                matches.append(BracketMatch(
+                    id=match.id or self._new_match_id(),
+                    bo_label=match.bo_label,
+                    status=match.status,
+                    team1=TeamRef(name=match.team1.name, abbr=match.team1.abbr, logo_path=match.team1.logo_path),
+                    team2=TeamRef(name=match.team2.name, abbr=match.team2.abbr, logo_path=match.team2.logo_path),
+                    score1=match.score1,
+                    score2=match.score2,
+                ))
+            self._rounds.append(BracketRound(
+                name=rnd.name,
+                side=rnd.side,
+                matches=matches,
+            ))
+        self._build_bracket_view()
 
 
 class BulkImportRow(QWidget):
@@ -2176,6 +2301,7 @@ class TournamentApp(QMainWindow):
         # --- BRACKET TAB ---
         self.bracket_tab = BracketTab()
         self.bracket_tab.updated.connect(self._update)
+        self.bracket_tab.set_qualified_provider(self._teams_from_standings)
         tabs.addTab(self.bracket_tab, "Bracket")
         
         self._ensure_default_assets_installed()
@@ -2462,6 +2588,28 @@ class TournamentApp(QMainWindow):
         if changed:
             stamp = time.strftime("%Y-%m-%d %H:%M:%S")
             self._write_txt(os.path.join(out_dir, "updated_at.txt"), stamp)
+
+    def _teams_from_standings(self) -> List[TeamRef]:
+        if not hasattr(self, "standings_tab"):
+            return []
+        settings = self.standings_tab.to_settings()
+        rows: List[StandingsRow] = []
+        if settings.groups:
+            for group in settings.groups:
+                rows.extend(group.rows or [])
+        else:
+            rows = list(settings.rows or [])
+        def sort_key(row: StandingsRow):
+            rank = int(row.rank or 0)
+            return (rank if rank > 0 else 9999, row.team_name.lower())
+        rows.sort(key=sort_key)
+        teams = []
+        for row in rows:
+            name = (row.team_name or "").strip()
+            if not name:
+                continue
+            teams.append(TeamRef(name=name, abbr=row.abbr, logo_path=row.logo_path))
+        return teams
 
     def _name_from_filename(self, path: str) -> str:
         """Ei kovakoodattuja korjauksia: vain väliviivat/alikulkevat -> välilyönti, ja title case."""
