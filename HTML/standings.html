@@ -244,15 +244,7 @@
       const count = Array.isArray(group.rows) ? group.rows.length : 0;
       return count >= 1 && count <= 4;
     });
-    const areBothLargeGroups = isTwoGroups && activeGroups.every(group => {
-      const count = Array.isArray(group.rows) ? group.rows.length : 0;
-      return count > 4;
-    });
-    const hasAnyLargeGroup = isTwoGroups && activeGroups.some(group => {
-      const count = Array.isArray(group.rows) ? group.rows.length : 0;
-      return count > 4;
-    });
-    const allowScaling = !(areBothLargeGroups || hasAnyLargeGroup);
+    const allowUpscale = activeGroups.length === 1 || areBothSmallGroups;
 
     if(activeGroups.length === 1){
       tablesWrap.classList.add("single");
@@ -415,10 +407,6 @@
         scaleWrap.style.width = "100%";
         scaleWrap.style.height = "100%";
 
-        if(!allowScaling){
-          return;
-        }
-
         const styles = getComputedStyle(table);
         const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
         const padY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
@@ -435,20 +423,13 @@
         }
       });
 
-      if(!allowScaling){
-        if(overlay){
-          overlay.style.setProperty("--ui-scale", "1");
-        }
-        return;
-      }
-
       const frame = document.querySelector(".frame");
       const availableHeight = frame ? frame.clientHeight : 0;
       const availableWidth = frame ? frame.clientWidth : 0;
       const contentHeight = frame ? frame.scrollHeight : 0;
       const contentWidth = frame ? frame.scrollWidth : 0;
       if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
-        const maxScale = activeGroups.length === 1 ? 3 : 1;
+        const maxScale = allowUpscale ? 3 : 1;
         const scale = Math.min(
           availableHeight / contentHeight,
           availableWidth / contentWidth,
