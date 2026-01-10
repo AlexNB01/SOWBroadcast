@@ -29,7 +29,7 @@
   .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
   .rounds-container{flex:1;position:relative;overflow:hidden;padding-top:48px;}
-  .rounds-container.has-lower{padding-top:32px;}
+  .rounds-container.has-lower{padding-top:64px;}
   .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;align-items:start;position:relative;width:max-content;height:max-content;transform-origin:top left;}
   .rounds.has-lower{grid-template-rows:auto auto;}
   .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
@@ -175,7 +175,7 @@
     if(!contentWidth || !contentHeight || !availableWidth || !availableHeight) return;
     const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
     const hasLower = roundsWrap.classList.contains("has-lower");
-    const minScale = hasLower ? 0.75 : 0.65;
+    const minScale = hasLower ? 0.7 : 0.65;
     const clamped = Math.max(minScale, Math.min(scale, 1.4));
     const scaledWidth = contentWidth * clamped;
     const scaledHeight = contentHeight * clamped;
@@ -202,14 +202,20 @@
     }
 
     const rounds = data.rounds || [];
+    const focusSide = (data.double_elim_view || "").toLowerCase();
+    const focusOnly = (focusSide === "upper" || focusSide === "lower");
     const sections = { upper: [], lower: [], grand: [] };
     rounds.forEach(round=>{
       const side = (round.side || "upper").toLowerCase();
+      if(focusOnly && side !== focusSide) return;
+      if(focusOnly && side === "grand") return;
       if(side in sections) sections[side].push(round);
       else sections.upper.push(round);
     });
-    const hasLower = sections.lower.length > 0;
-    const columnCount = Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
+    const hasLower = !focusOnly && sections.lower.length > 0;
+    const columnCount = focusOnly
+      ? Math.max(1, sections[focusSide].length)
+      : Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
     roundsWrap.style.gridTemplateColumns = `repeat(${Math.max(1, columnCount)}, max-content)`;
     roundsWrap.classList.toggle("has-lower", hasLower);
     roundsContainer?.classList.toggle("has-lower", hasLower);
@@ -327,13 +333,19 @@
       });
     }
 
-    if(sections.upper.length){
-      addSection(sections.upper, "1");
+    if(focusOnly){
+      if(sections[focusSide].length){
+        addSection(sections[focusSide], "1");
+      }
+    }else{
+      if(sections.upper.length){
+        addSection(sections.upper, "1");
+      }
+      if(sections.lower.length){
+        addSection(sections.lower, "2");
+      }
     }
-    if(sections.lower.length){
-      addSection(sections.lower, "2");
-    }
-    if(sections.grand.length){
+    if(!focusOnly && sections.grand.length){
       const grandRound = sections.grand[0];
       const rowIndex = hasLower ? "1 / span 2" : "1";
       const colIndex = Math.max(1, columnCount);

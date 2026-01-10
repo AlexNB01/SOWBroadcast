@@ -231,6 +231,7 @@ class BracketSettings:
     title: str = ""
     stage: str = ""
     rounds: List[BracketRound] = None
+    double_elim_view: str = ""
 
     def __post_init__(self):
         if self.rounds is None:
@@ -1848,6 +1849,16 @@ class BracketTab(QWidget):
         controls_layout.addWidget(QLabel("Template"))
         controls_layout.addWidget(self.template_combo, 1)
         controls_layout.addWidget(self.load_template_btn)
+        self.double_elim_view_label = QLabel("8-team view")
+        self.double_elim_view_combo = QComboBox()
+        self.double_elim_view_combo.addItems([
+            "Upper Bracket",
+            "Lower Bracket",
+        ])
+        self.double_elim_view_label.setVisible(False)
+        self.double_elim_view_combo.setVisible(False)
+        controls_layout.addWidget(self.double_elim_view_label)
+        controls_layout.addWidget(self.double_elim_view_combo)
         root.addWidget(controls)
 
         main_split = QSplitter()
@@ -1908,6 +1919,7 @@ class BracketTab(QWidget):
         self.clear_teams_btn.clicked.connect(self._clear_team_list)
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
+        self.double_elim_view_combo.currentTextChanged.connect(lambda *_: self.updated.emit())
 
     def set_qualified_provider(self, provider: Callable[[], List[TeamRef]]):
         self._qualified_provider = provider
@@ -1928,6 +1940,30 @@ class BracketTab(QWidget):
             score2=0,
         )
 
+    def _set_double_elim_view_controls(self, visible: bool, value: Optional[str] = None):
+        self.double_elim_view_label.setVisible(visible)
+        self.double_elim_view_combo.setVisible(visible)
+        if value:
+            normalized = value.lower()
+            if normalized == "lower":
+                self.double_elim_view_combo.setCurrentText("Lower Bracket")
+            else:
+                self.double_elim_view_combo.setCurrentText("Upper Bracket")
+
+    def _double_elim_view_value(self) -> str:
+        if not self.double_elim_view_combo.isVisible():
+            return ""
+        return "lower" if self.double_elim_view_combo.currentText() == "Lower Bracket" else "upper"
+
+    def _is_eight_team_double_elim(self, rounds: List[BracketRound]) -> bool:
+        upper = [r for r in rounds if (r.side or "").lower() == "upper"]
+        lower = [r for r in rounds if (r.side or "").lower() == "lower"]
+        if len(upper) != 3 or len(lower) != 3:
+            return False
+        upper_counts = [len(r.matches or []) for r in upper]
+        lower_counts = [len(r.matches or []) for r in lower]
+        return upper_counts == [4, 2, 1] and lower_counts == [2, 2, 1]
+
     def _load_template_from_combo(self):
         name = self.template_combo.currentText()
         if name == "4 team single elimination":
@@ -1942,6 +1978,7 @@ class BracketTab(QWidget):
             rounds = self._template_double_elim(6)
         else:
             rounds = self._template_double_elim(8)
+        self._set_double_elim_view_controls(name == "8 team double elimination", "upper")
         self._rounds = rounds
         self._build_bracket_view()
         self.updated.emit()
@@ -2083,6 +2120,7 @@ class BracketTab(QWidget):
         self._rounds = []
         self._team_options = []
         self._clear_team_list()
+        self._set_double_elim_view_controls(False)
         self._build_bracket_view()
 
     def to_settings(self) -> BracketSettings:
@@ -2090,6 +2128,7 @@ class BracketTab(QWidget):
             title=self.title_edit.text().strip(),
             stage=self.stage_edit.text().strip(),
             rounds=self._rounds or [],
+            double_elim_view=self._double_elim_view_value(),
         )
 
     def from_settings(self, settings: BracketSettings):
@@ -2113,6 +2152,10 @@ class BracketTab(QWidget):
                 side=rnd.side,
                 matches=matches,
             ))
+        if self._is_eight_team_double_elim(self._rounds):
+            self._set_double_elim_view_controls(True, settings.double_elim_view or "upper")
+        else:
+            self._set_double_elim_view_controls(False)
         self._build_bracket_view()
 
 
@@ -2582,6 +2625,7 @@ class TournamentApp(QMainWindow):
             "title": settings.title or "",
             "stage": settings.stage or "",
             "rounds": rounds,
+            "double_elim_view": settings.double_elim_view or "",
         }
         json_path = os.path.join(out_dir, "bracket.json")
         changed = self._write_json(json_path, payload)
@@ -3627,6 +3671,7 @@ class TournamentApp(QMainWindow):
             title=bdata.get("title", ""),
             stage=bdata.get("stage", ""),
             rounds=rounds,
+            double_elim_view=bdata.get("double_elim_view", ""),
         )
         if hasattr(self, "bracket_tab"):
             self.bracket_tab.from_settings(b_settings)
@@ -3690,6 +3735,7 @@ class TournamentApp(QMainWindow):
                 title=b.get("title", ""),
                 stage=b.get("stage", ""),
                 rounds=rounds,
+                double_elim_view=b.get("double_elim_view", ""),
             )
             self._export_bracket(b_settings)
 
