@@ -25,6 +25,7 @@
     --row-height:64px;
   }
   .frame{box-sizing:border-box;padding:70px 80px;height:100%;display:flex;flex-direction:column;gap:18px;}
+  .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-start;}
   .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
   .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;flex:1;align-items:start;position:relative;}
@@ -56,7 +57,7 @@
 </head>
 <body>
   <div class="frame">
-    <div>
+    <div class="header-text">
       <div class="title" id="title">Playoffs</div>
       <div class="stage" id="stage"></div>
     </div>
