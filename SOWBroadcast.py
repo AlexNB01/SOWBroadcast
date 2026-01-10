@@ -1,7 +1,7 @@
 import sys, os, json, re, shutil, time, threading, unicodedata, shutil
 import server as _sb__force_include
 from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal
 from PyQt5.QtGui import QPixmap, QColor
@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QComboBox, QSpinBox, QCheckBox,
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
-    QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea
+    QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
+    QTableWidget, QHeaderView, QDialogButtonBox
 )
 
 # -----------------------------
@@ -120,6 +121,303 @@ class WaitingSettings:
     socials: Dict[str, str] = None
     ticker_override: str = ""
     ticker_override_enabled: bool = False
+
+@dataclass
+class StandingsRow:
+    team_name: str = ""
+    abbr: str = ""
+    logo_path: Optional[str] = None
+    wins: int = 0
+    losses: int = 0
+    map_diff: int = 0
+    points: int = 0
+    status: str = ""
+    rank: int = 0
+
+@dataclass
+class StandingsSettings:
+    title: str = ""
+    subtitle: str = ""
+    columns: Dict[str, str] = None
+    rows: List[StandingsRow] = None
+    groups: List["StandingsGroup"] = None
+    display_group: str = ""
+
+    def __post_init__(self):
+        if self.columns is None:
+            self.columns = {"mode": "map_diff"}
+        if self.rows is None:
+            self.rows = []
+        if self.groups is None:
+            self.groups = []
+
+@dataclass
+class StandingsGroup:
+    key: str = ""
+    name: str = ""
+    rows: List[StandingsRow] = None
+
+    def __post_init__(self):
+        if self.rows is None:
+            self.rows = []
+
+def _standings_row_from_dict(data: dict) -> StandingsRow:
+    payload = dict(data or {})
+    payload.setdefault("points", 0)
+    payload.pop("maps_for", None)
+    payload.pop("maps_against", None)
+    return StandingsRow(**payload)
+
+def _standings_group_from_dict(data: dict, fallback_key: str = "") -> StandingsGroup:
+    payload = dict(data or {})
+    rows = [_standings_row_from_dict(r) for r in (payload.get("rows") or [])]
+    key = (payload.get("key") or payload.get("id") or "").strip() or fallback_key
+    return StandingsGroup(
+        key=key,
+        name=payload.get("name", "") or payload.get("title", "") or "",
+        rows=rows,
+    )
+
+def _apply_standings_ranks(rows: List[StandingsRow]) -> None:
+    if not rows:
+        return
+    used_ranks = {r.rank for r in rows if int(r.rank or 0) > 0}
+    def sort_key(r: StandingsRow):
+        return (-int(r.points or 0), -int(r.map_diff or 0), r.team_name.lower())
+    remaining = [r for r in rows if int(r.rank or 0) <= 0]
+    remaining.sort(key=sort_key)
+    next_rank = 1
+    for r in remaining:
+        while next_rank in used_ranks:
+            next_rank += 1
+        r.rank = next_rank
+        used_ranks.add(next_rank)
+        next_rank += 1
+
+@dataclass
+class TeamRef:
+    name: str = ""
+    abbr: str = ""
+    logo_path: Optional[str] = None
+
+@dataclass
+class BracketMatch:
+    id: str = ""
+    bo_label: str = ""
+    team1: TeamRef = None
+    team2: TeamRef = None
+    score1: int = 0
+    score2: int = 0
+    status: str = ""
+
+    def __post_init__(self):
+        if self.team1 is None:
+            self.team1 = TeamRef()
+        if self.team2 is None:
+            self.team2 = TeamRef()
+
+@dataclass
+class BracketRound:
+    name: str = ""
+    side: str = ""
+    matches: List[BracketMatch] = None
+
+    def __post_init__(self):
+        if self.matches is None:
+            self.matches = []
+
+@dataclass
+class BracketSettings:
+    title: str = ""
+    stage: str = ""
+    rounds: List[BracketRound] = None
+    double_elim_view: str = ""
+    teams: List[TeamRef] = None
+
+    def __post_init__(self):
+        if self.rounds is None:
+            self.rounds = []
+        if self.teams is None:
+            self.teams = []
+
+
+class BracketMatchWidget(QWidget):
+    selected = pyqtSignal(object)
+    updated = pyqtSignal()
+
+    def __init__(self, match: BracketMatch, team_options: Optional[List[TeamRef]] = None):
+        super().__init__()
+        self.match = match
+        self._team_options = team_options or []
+        self._team_map = {t.name: t for t in self._team_options if t.name}
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(2, 2, 2, 2)
+        root.setSpacing(4)
+
+        self.team1_combo = self._build_team_combo(match.team1.name)
+        self.team1_score = QSpinBox()
+        self.team1_score.setRange(0, 99)
+        self.team1_score.setValue(int(match.score1 or 0))
+
+        self.team2_combo = self._build_team_combo(match.team2.name)
+        self.team2_score = QSpinBox()
+        self.team2_score.setRange(0, 99)
+        self.team2_score.setValue(int(match.score2 or 0))
+
+        row1 = QHBoxLayout()
+        row1.addWidget(self.team1_combo, 1)
+        row1.addWidget(self.team1_score)
+        row2 = QHBoxLayout()
+        row2.addWidget(self.team2_combo, 1)
+        row2.addWidget(self.team2_score)
+
+        root.addLayout(row1)
+        root.addLayout(row2)
+
+        self.team1_combo.currentTextChanged.connect(lambda *_: self._on_team_changed(self.team1_combo, 1))
+        self.team2_combo.currentTextChanged.connect(lambda *_: self._on_team_changed(self.team2_combo, 2))
+        self.team1_score.valueChanged.connect(self._on_score_changed)
+        self.team2_score.valueChanged.connect(self._on_score_changed)
+
+    def _build_team_combo(self, initial: str) -> QComboBox:
+        combo = QComboBox()
+        combo.setEditable(False)
+        combo.setMinimumWidth(140)
+        self._populate_combo(combo, initial)
+        return combo
+
+    def _populate_combo(self, combo: QComboBox, initial: str):
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("")
+        for t in self._team_options:
+            if t.name:
+                combo.addItem(t.name)
+        if initial and combo.findText(initial) >= 0:
+            combo.setCurrentText(initial)
+        else:
+            combo.setCurrentIndex(0)
+        combo.blockSignals(False)
+
+    def set_team_options(self, team_options: List[TeamRef]):
+        self._team_options = team_options or []
+        self._team_map = {t.name: t for t in self._team_options if t.name}
+        self._populate_combo(self.team1_combo, self.team1_combo.currentText())
+        self._populate_combo(self.team2_combo, self.team2_combo.currentText())
+
+    def set_team(self, slot: int, team: Optional[TeamRef]):
+        target = self.team1_combo if slot == 1 else self.team2_combo
+        if team and team.name:
+            target.setCurrentText(team.name)
+        else:
+            target.setCurrentIndex(0)
+        self._apply_team_ref(slot, team)
+
+    def _on_team_changed(self, combo: QComboBox, slot: int):
+        name = combo.currentText().strip()
+        team = self._team_map.get(name, TeamRef(name=name))
+        self._apply_team_ref(slot, team)
+        self.updated.emit()
+
+    def _apply_team_ref(self, slot: int, team: Optional[TeamRef]):
+        team = team or TeamRef()
+        if slot == 1:
+            self.match.team1 = TeamRef(name=team.name, abbr=team.abbr, logo_path=team.logo_path)
+        else:
+            self.match.team2 = TeamRef(name=team.name, abbr=team.abbr, logo_path=team.logo_path)
+
+    def _on_score_changed(self, *_):
+        self.match.score1 = int(self.team1_score.value())
+        self.match.score2 = int(self.team2_score.value())
+        self.updated.emit()
+
+    def mousePressEvent(self, event):
+        self.selected.emit(self)
+        super().mousePressEvent(event)
+
+
+class BracketTeamRow(QWidget):
+    changed = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._logo_path = ""
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(4)
+
+        self.name_edit = QLineEdit()
+        self.browse_btn = QPushButton("...")
+        self.browse_btn.setFixedWidth(28)
+
+        layout.addWidget(self.name_edit, 1)
+        layout.addWidget(self.browse_btn)
+
+        self.name_edit.textChanged.connect(self.changed)
+        self.browse_btn.clicked.connect(self._pick_logo)
+
+    def _pick_logo(self):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        start_dir = os.path.join(base, "Scoreboard", "Teams")
+        os.makedirs(start_dir, exist_ok=True)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select team logo",
+            start_dir,
+            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
+        )
+        if path:
+            self._logo_path = path
+            self.changed.emit()
+
+    def set_team(self, team: Optional[TeamRef]):
+        self.name_edit.setText(team.name if team else "")
+        self._logo_path = team.logo_path if team else ""
+
+    def team_ref(self) -> TeamRef:
+        return TeamRef(
+            name=self.name_edit.text().strip(),
+            abbr="",
+            logo_path=self._logo_path or None,
+        )
+
+    def clear(self):
+        self.name_edit.clear()
+        self._logo_path = ""
+
+
+class BracketTeamsImportDialog(QDialog):
+    def __init__(self, parent, teams: List[TeamRef]):
+        super().__init__(parent)
+        self.setWindowTitle("Import Teams from Standings")
+        self.resize(360, 420)
+
+        root = QVBoxLayout(self)
+        root.addWidget(QLabel("Select teams to import."))
+
+        self.listw = QListWidget()
+        for team in teams:
+            label = team.name or "Unnamed team"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, team)
+            item.setCheckState(Qt.Checked)
+            self.listw.addItem(item)
+        root.addWidget(self.listw, 1)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        root.addWidget(btns)
+
+    def selected_teams(self) -> List[TeamRef]:
+        teams = []
+        for i in range(self.listw.count()):
+            item = self.listw.item(i)
+            if item.checkState() == Qt.Checked:
+                teams.append(item.data(Qt.UserRole))
+        return teams
 
 # -----------------------------
 # Asset Manager Dialog
@@ -742,7 +1040,8 @@ def _app_base():
 def _ensure_scoreboard_tree(root):
     subdirs = [
         "General", "Match", "Heroes", "Maps", "Gametypes",
-        "Replay", "Replay\\Playlist", "Roles", "Teams", "Temp", "Waiting"
+        "Replay", "Replay\\Playlist", "Roles", "Teams", "Temp", "Waiting",
+        "Standings", "Bracket"
     ]
     os.makedirs(root, exist_ok=True)
     for d in subdirs:
@@ -1105,6 +1404,846 @@ class DraftTab(QWidget):
         self.updated.emit()
 
 
+class StandingsTab(QWidget):
+    updated = pyqtSignal()
+
+    HEADERS = [
+        "Rank", "Team", "Abbr", "W", "L", "+/-", "Points", "Status", "Logo"
+    ]
+
+    def __init__(self):
+        super().__init__()
+        root = QVBoxLayout(self)
+
+        self._groups: List[StandingsGroup] = []
+        self._group_widgets: List[dict] = []
+        self._group_counter = 1
+        self._loading_groups = False
+
+        group_box = QGroupBox("Standings Groups")
+        group_layout = QGridLayout(group_box)
+        self.add_group_btn = QPushButton("Add Group")
+        self.display_combo = QComboBox()
+        self.display_combo.addItem("All groups", "__all__")
+        group_layout.addWidget(self.add_group_btn, 0, 0)
+        group_layout.addWidget(QLabel("Show in standings.html"), 0, 1)
+        group_layout.addWidget(self.display_combo, 0, 2)
+        group_layout.setColumnStretch(2, 1)
+        root.addWidget(group_box)
+
+        self.groups_area = QScrollArea()
+        self.groups_area.setWidgetResizable(True)
+        self.groups_container = QWidget()
+        self.groups_layout = QVBoxLayout(self.groups_container)
+        self.groups_layout.setContentsMargins(0, 0, 0, 0)
+        self.groups_layout.setSpacing(12)
+        self.groups_area.setWidget(self.groups_container)
+        root.addWidget(self.groups_area, 2)
+
+        title_box = QGroupBox("Standings Title")
+        title_form = QFormLayout(title_box)
+        self.title_edit = QLineEdit()
+        self.subtitle_edit = QLineEdit()
+        title_form.addRow("Title", self.title_edit)
+        title_form.addRow("Subtitle / Group", self.subtitle_edit)
+        root.addWidget(title_box)
+
+        action_row = QHBoxLayout()
+        action_row.addStretch(1)
+        self.reset_btn = QPushButton("Reset this tab")
+        self.update_btn = QPushButton("Update + sort")
+        action_row.addWidget(self.reset_btn)
+        action_row.addWidget(self.update_btn)
+        root.addLayout(action_row)
+
+        self.reset_btn.clicked.connect(self.reset_tab)
+        self.update_btn.clicked.connect(self._update_and_sort)
+        self.add_group_btn.clicked.connect(self._add_group)
+
+        self._add_group(initial=True)
+
+    def _make_spin(self, minv: int, maxv: int) -> QSpinBox:
+        s = QSpinBox()
+        s.setRange(minv, maxv)
+        return s
+
+    def _make_logo_cell(self, value: str = "") -> QWidget:
+        wrap = QWidget()
+        lay = QHBoxLayout(wrap)
+        lay.setContentsMargins(0, 0, 0, 0)
+        edit = QLineEdit()
+        edit.setText(value or "")
+        browse = QPushButton("Browse…")
+        browse.setFixedWidth(80)
+        browse.clicked.connect(lambda *_: self._pick_logo_for(edit))
+        lay.addWidget(edit, 1)
+        lay.addWidget(browse)
+        wrap.setLayout(lay)
+        wrap._edit = edit
+        return wrap
+
+    def _pick_logo_for(self, edit: QLineEdit):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        start_dir = os.path.join(base, "Scoreboard", "Teams")
+        os.makedirs(start_dir, exist_ok=True)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select team logo",
+            start_dir,
+            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
+        )
+        if path:
+            edit.setText(path)
+
+    def _build_group_widget(self, group: StandingsGroup) -> dict:
+        box = QGroupBox()
+        box_layout = QVBoxLayout(box)
+
+        header_row = QHBoxLayout()
+        name_label = QLabel("Name")
+        name_edit = QLineEdit(group.name or "")
+        remove_btn = QPushButton("Remove")
+        header_row.addWidget(name_label)
+        header_row.addWidget(name_edit, 1)
+        header_row.addWidget(remove_btn)
+        box_layout.addLayout(header_row)
+
+        table = QTableWidget(0, len(self.HEADERS))
+        table.setHorizontalHeaderLabels(self.HEADERS)
+        table.verticalHeader().setVisible(False)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setSelectionMode(QTableWidget.SingleSelection)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        header = table.horizontalHeader()
+        for i in range(len(self.HEADERS)):
+            if self.HEADERS[i] in {"Team", "Logo"}:
+                header.setSectionResizeMode(i, QHeaderView.Stretch)
+            else:
+                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        box_layout.addWidget(table, 1)
+
+        row_btns = QHBoxLayout()
+        add_btn = QPushButton("Add Row")
+        remove_btn_row = QPushButton("Remove Selected")
+        row_btns.addWidget(add_btn)
+        row_btns.addWidget(remove_btn_row)
+        row_btns.addStretch(1)
+        box_layout.addLayout(row_btns)
+
+        widget = {
+            "box": box,
+            "group": group,
+            "name_edit": name_edit,
+            "table": table,
+            "remove_btn": remove_btn,
+        }
+        add_btn.clicked.connect(lambda: self._add_row(table))
+        remove_btn_row.clicked.connect(lambda: self._remove_selected(table))
+        remove_btn.clicked.connect(lambda _=False, w=widget: self._remove_group(w))
+        name_edit.textChanged.connect(self._on_group_name_changed)
+        return widget
+
+    def _update_group_controls(self):
+        allow_remove = len(self._group_widgets) > 1
+        for widget in self._group_widgets:
+            widget["remove_btn"].setEnabled(allow_remove)
+
+    def _new_group(self, name: str = "", rows: Optional[List[StandingsRow]] = None, key: str = "") -> StandingsGroup:
+        group_count = len(self._groups) + 1
+        if not key:
+            key = f"group_{self._group_counter}"
+            self._group_counter += 1
+        default_name = name or f"Group {group_count}"
+        group = StandingsGroup(key=key, name=default_name)
+        if rows is not None:
+            group.rows = rows
+        return group
+
+    def _refresh_display_combo(self, selected_key: Optional[str] = None):
+        self.display_combo.blockSignals(True)
+        current_key = selected_key or self.display_combo.currentData()
+        self.display_combo.clear()
+        self.display_combo.addItem("All groups", "__all__")
+        for widget in self._group_widgets:
+            label = (widget["name_edit"].text().strip()
+                     or widget["group"].name
+                     or widget["group"].key
+                     or "Group")
+            self.display_combo.addItem(label, widget["group"].key or label)
+        if current_key:
+            idx = self.display_combo.findData(current_key)
+            if idx >= 0:
+                self.display_combo.setCurrentIndex(idx)
+        self.display_combo.blockSignals(False)
+
+    def _load_group(self, table: QTableWidget, group: StandingsGroup, name_edit: QLineEdit):
+        self._loading_groups = True
+        name_edit.setText(group.name or "")
+        self._load_rows(table, group.rows or [])
+        if table.rowCount() == 0:
+            self._add_row(table)
+        self._loading_groups = False
+
+    def _on_group_name_changed(self):
+        if self._loading_groups:
+            return
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+
+    def _add_group(self, initial: bool = False):
+        group = self._new_group()
+        self._groups.append(group)
+        widget = self._build_group_widget(group)
+        self._group_widgets.append(widget)
+        self.groups_layout.addWidget(widget["box"])
+        if initial:
+            self._add_row(widget["table"])
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+        self._update_group_controls()
+        if not initial:
+            self.updated.emit()
+
+    def _remove_group(self, widget: dict):
+        if len(self._group_widgets) <= 1:
+            return
+        if widget in self._group_widgets:
+            self._group_widgets.remove(widget)
+        if widget["group"] in self._groups:
+            self._groups.remove(widget["group"])
+        widget["box"].setParent(None)
+        widget["box"].deleteLater()
+        self._refresh_display_combo(selected_key=self.display_combo.currentData())
+        self._update_group_controls()
+        self.updated.emit()
+
+    def _update_table_height(self, table: QTableWidget):
+        header_height = table.horizontalHeader().height()
+        rows_height = sum(table.rowHeight(i) for i in range(table.rowCount()))
+        frame = table.frameWidth() * 2
+        height = header_height + rows_height + frame
+        table.setMinimumHeight(height)
+        table.setMaximumHeight(height)
+
+    def _add_row(self, table: QTableWidget, row_data: Optional[StandingsRow] = None):
+        row = table.rowCount()
+        table.insertRow(row)
+
+        rank_spin = self._make_spin(0, 99)
+        rank_spin.setValue(int(getattr(row_data, "rank", 0) or 0))
+        table.setCellWidget(row, 0, rank_spin)
+
+        team_edit = QLineEdit(getattr(row_data, "team_name", "") or "")
+        table.setCellWidget(row, 1, team_edit)
+
+        abbr_edit = QLineEdit(getattr(row_data, "abbr", "") or "")
+        table.setCellWidget(row, 2, abbr_edit)
+
+        wins_spin = self._make_spin(0, 99)
+        wins_spin.setValue(int(getattr(row_data, "wins", 0) or 0))
+        table.setCellWidget(row, 3, wins_spin)
+
+        loss_spin = self._make_spin(0, 99)
+        loss_spin.setValue(int(getattr(row_data, "losses", 0) or 0))
+        table.setCellWidget(row, 4, loss_spin)
+
+        diff_spin = self._make_spin(-99, 99)
+        diff_spin.setValue(int(getattr(row_data, "map_diff", 0) or 0))
+        table.setCellWidget(row, 5, diff_spin)
+
+        points_spin = self._make_spin(0, 999)
+        points_spin.setValue(int(getattr(row_data, "points", 0) or 0))
+        table.setCellWidget(row, 6, points_spin)
+
+        status_combo = QComboBox()
+        status_combo.addItem("")
+        status_combo.addItems(["qualified", "eliminated"])
+        status = (getattr(row_data, "status", "") or "").strip().lower()
+        ix = status_combo.findText(status, Qt.MatchExactly)
+        status_combo.setCurrentIndex(ix if ix >= 0 else 0)
+        table.setCellWidget(row, 7, status_combo)
+
+        logo_widget = self._make_logo_cell(getattr(row_data, "logo_path", "") or "")
+        table.setCellWidget(row, 8, logo_widget)
+        self._update_table_height(table)
+
+    def _remove_selected(self, table: QTableWidget):
+        selected = table.selectionModel().selectedRows()
+        if not selected:
+            return
+        for idx in sorted([s.row() for s in selected], reverse=True):
+            table.removeRow(idx)
+        self._update_table_height(table)
+
+    def _row_data(self, table: QTableWidget, row: int) -> StandingsRow:
+        rank = int(table.cellWidget(row, 0).value())
+        team_name = table.cellWidget(row, 1).text().strip()
+        abbr = table.cellWidget(row, 2).text().strip()
+        wins = int(table.cellWidget(row, 3).value())
+        losses = int(table.cellWidget(row, 4).value())
+        map_diff = int(table.cellWidget(row, 5).value())
+        points = int(table.cellWidget(row, 6).value())
+        status = table.cellWidget(row, 7).currentText().strip()
+        logo_widget = table.cellWidget(row, 8)
+        logo_path = logo_widget._edit.text().strip() if logo_widget else ""
+        return StandingsRow(
+            team_name=team_name,
+            abbr=abbr,
+            logo_path=logo_path or None,
+            wins=wins,
+            losses=losses,
+            map_diff=map_diff,
+            points=points,
+            status=status,
+            rank=rank,
+        )
+
+    def _rows(self, table: QTableWidget) -> List[StandingsRow]:
+        return [row for _, row in self._indexed_rows(table)]
+
+    def _indexed_rows(self, table: QTableWidget) -> List[tuple[int, StandingsRow]]:
+        rows = []
+        for i in range(table.rowCount()):
+            row = self._row_data(table, i)
+            has_identity = bool(row.team_name or row.abbr or row.logo_path)
+            has_stats = any([row.wins, row.losses, row.map_diff, row.points])
+            if has_identity or has_stats:
+                rows.append((i, row))
+        return rows
+
+    def _sort_rows(self):
+        for widget in self._group_widgets:
+            table = widget["table"]
+            rows = self._rows(table)
+            def sort_key(r: StandingsRow):
+                diff = r.map_diff
+                return (-r.points, -diff, r.team_name.lower())
+            rows.sort(key=sort_key)
+            for rank, row in enumerate(rows, start=1):
+                row.rank = rank
+            self._load_rows(table, rows)
+
+    def _update_and_sort(self):
+        self._sort_rows()
+        self.updated.emit()
+
+    def _load_rows(self, table: QTableWidget, rows: List[StandingsRow]):
+        table.setRowCount(0)
+        for row in rows:
+            self._add_row(table, row)
+        if not rows:
+            self._update_table_height(table)
+
+    def reset_tab(self):
+        self.title_edit.clear()
+        self.subtitle_edit.clear()
+        self._groups = []
+        for widget in self._group_widgets:
+            widget["box"].setParent(None)
+            widget["box"].deleteLater()
+        self._group_widgets = []
+        self._group_counter = 1
+        self._add_group(initial=True)
+
+    def to_settings(self) -> StandingsSettings:
+        indexed_rows = []
+        if self._group_widgets:
+            indexed_rows = self._indexed_rows(self._group_widgets[0]["table"])
+        rows = [row for _, row in indexed_rows]
+        columns = {"mode": "map_diff"}
+        _apply_standings_ranks(rows)
+        for idx, row in indexed_rows:
+            rank_widget = self._group_widgets[0]["table"].cellWidget(idx, 0) if self._group_widgets else None
+            if rank_widget and int(rank_widget.value()) <= 0:
+                rank_widget.setValue(int(row.rank or 0))
+
+        display_group = self.display_combo.currentData() or "__all__"
+        groups = []
+        for widget in self._group_widgets:
+            table = widget["table"]
+            group = widget["group"]
+            group.name = widget["name_edit"].text().strip()
+            indexed = self._indexed_rows(table)
+            group.rows = [row for _, row in indexed]
+            _apply_standings_ranks(group.rows or [])
+            for idx, row in indexed:
+                rank_widget = table.cellWidget(idx, 0)
+                if rank_widget and int(rank_widget.value()) <= 0:
+                    rank_widget.setValue(int(row.rank or 0))
+            groups.append(group)
+        if display_group != "__all__" and not any(group.key == display_group for group in groups):
+            display_group = "__all__"
+        if groups:
+            selected = None
+            if display_group != "__all__":
+                selected = next((g for g in groups if g.key == display_group), None)
+            rows = list(selected.rows) if selected else list(groups[0].rows)
+
+        return StandingsSettings(
+            title=self.title_edit.text().strip(),
+            subtitle=self.subtitle_edit.text().strip(),
+            columns=columns,
+            rows=rows,
+            groups=groups,
+            display_group=display_group,
+        )
+
+    def from_settings(self, settings: StandingsSettings):
+        self.title_edit.setText(settings.title or "")
+        self.subtitle_edit.setText(settings.subtitle or "")
+        self._groups = []
+        for widget in self._group_widgets:
+            widget["box"].setParent(None)
+            widget["box"].deleteLater()
+        self._group_widgets = []
+        self._group_counter = 1
+        groups = settings.groups or []
+        if not groups:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=settings.rows or [])]
+        for idx, group in enumerate(groups, start=1):
+            if not group.key:
+                group.key = f"group_{idx}"
+            if not group.name:
+                group.name = f"Group {idx}"
+            self._groups.append(group)
+            self._group_counter = max(self._group_counter, idx + 1)
+            widget = self._build_group_widget(group)
+            self._group_widgets.append(widget)
+            self.groups_layout.addWidget(widget["box"])
+        self._refresh_display_combo(selected_key=settings.display_group or "__all__")
+        for widget in self._group_widgets:
+            self._load_group(widget["table"], widget["group"], widget["name_edit"])
+        self._update_group_controls()
+
+
+class BracketTab(QWidget):
+    updated = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._match_id_counter = 1
+        self._rounds: List[BracketRound] = []
+        self._match_widgets: List[BracketMatchWidget] = []
+        self._team_options: List[TeamRef] = []
+        self._qualified_provider: Optional[Callable[[], List[TeamRef]]] = None
+
+        root = QVBoxLayout(self)
+
+        header = QGroupBox("Bracket Title")
+        header_form = QFormLayout(header)
+        self.title_edit = QLineEdit()
+        self.stage_edit = QLineEdit()
+        header_form.addRow("Title", self.title_edit)
+        header_form.addRow("Stage", self.stage_edit)
+        root.addWidget(header)
+
+        controls = QGroupBox("Bracket Controls")
+        controls_layout = QHBoxLayout(controls)
+        self.template_combo = QComboBox()
+        self.template_combo.addItems([
+            "4 team single elimination",
+            "6 team single elimination (top 2 start round 2)",
+            "8 team single elimination",
+            "4 team double elimination",
+            "6 team double elimination",
+            "8 team double elimination",
+        ])
+        self._single_elim_mode = False
+        self.load_template_btn = QPushButton("Load Template")
+        controls_layout.addWidget(QLabel("Template"))
+        controls_layout.addWidget(self.template_combo, 1)
+        controls_layout.addWidget(self.load_template_btn)
+        self.double_elim_view_label = QLabel("Double elim view")
+        self.double_elim_view_combo = QComboBox()
+        self.double_elim_view_combo.addItems([
+            "Upper Bracket",
+            "Lower Bracket",
+        ])
+        self.double_elim_view_label.setVisible(False)
+        self.double_elim_view_combo.setVisible(False)
+        controls_layout.addWidget(self.double_elim_view_label)
+        controls_layout.addWidget(self.double_elim_view_combo)
+        self.bronze_match_check = QCheckBox("Bronze match")
+        self.bronze_match_check.setVisible(False)
+        controls_layout.addWidget(self.bronze_match_check)
+        root.addWidget(controls)
+
+        main_split = QSplitter()
+        root.addWidget(main_split, 1)
+
+        team_panel = QGroupBox("Teams")
+        team_panel_layout = QVBoxLayout(team_panel)
+        team_panel_layout.setContentsMargins(6, 6, 6, 6)
+        team_panel_layout.setSpacing(6)
+
+        self.team_list_scroll = QScrollArea()
+        self.team_list_scroll.setWidgetResizable(True)
+        self.team_list_container = QWidget()
+        self.team_list_layout = QVBoxLayout(self.team_list_container)
+        self.team_list_layout.setContentsMargins(2, 2, 2, 2)
+        self.team_list_layout.setSpacing(4)
+        self.team_list_scroll.setWidget(self.team_list_container)
+        team_panel_layout.addWidget(self.team_list_scroll, 1)
+
+        self.team_rows: List[BracketTeamRow] = []
+        for _ in range(16):
+            row = BracketTeamRow()
+            row.changed.connect(self._refresh_team_options)
+            self.team_rows.append(row)
+            self.team_list_layout.addWidget(row)
+        self.team_list_layout.addStretch(1)
+
+        team_btns = QHBoxLayout()
+        team_btns.addStretch(1)
+        self.import_qualified_btn = QPushButton("Import from Standings")
+        self.clear_teams_btn = QPushButton("Clear")
+        team_btns.addWidget(self.import_qualified_btn)
+        team_btns.addWidget(self.clear_teams_btn)
+        team_panel_layout.addLayout(team_btns)
+
+        main_split.addWidget(team_panel)
+
+        self.bracket_scroll = QScrollArea()
+        self.bracket_scroll.setWidgetResizable(True)
+        self.bracket_container = QWidget()
+        self.bracket_layout = QVBoxLayout(self.bracket_container)
+        self.bracket_layout.setContentsMargins(4, 4, 4, 4)
+        self.bracket_layout.setSpacing(10)
+        self.bracket_scroll.setWidget(self.bracket_container)
+        main_split.addWidget(self.bracket_scroll)
+        main_split.setSizes([300, 900])
+
+        action_row = QHBoxLayout()
+        action_row.addStretch(1)
+        self.reset_btn = QPushButton("Reset this tab")
+        self.update_btn = QPushButton("Update (Bracket)")
+        action_row.addWidget(self.reset_btn)
+        action_row.addWidget(self.update_btn)
+        root.addLayout(action_row)
+
+        self.load_template_btn.clicked.connect(self._load_template_from_combo)
+        self.import_qualified_btn.clicked.connect(self._import_teams_from_standings)
+        self.clear_teams_btn.clicked.connect(self._clear_team_list)
+        self.reset_btn.clicked.connect(self.reset_tab)
+        self.update_btn.clicked.connect(lambda *_: self.updated.emit())
+        self.double_elim_view_combo.currentTextChanged.connect(lambda *_: self.updated.emit())
+        self.bronze_match_check.stateChanged.connect(self._on_bronze_match_changed)
+        self.title_edit.textChanged.connect(lambda *_: self.updated.emit())
+        self.stage_edit.textChanged.connect(lambda *_: self.updated.emit())
+
+    def set_qualified_provider(self, provider: Callable[[], List[TeamRef]]):
+        self._qualified_provider = provider
+
+    def _new_match_id(self) -> str:
+        stamp = int(time.time())
+        self._match_id_counter += 1
+        return f"m{stamp}-{self._match_id_counter}"
+
+    def _make_match(self) -> BracketMatch:
+        return BracketMatch(
+            id=self._new_match_id(),
+            bo_label="",
+            status="",
+            team1=TeamRef(),
+            team2=TeamRef(),
+            score1=0,
+            score2=0,
+        )
+
+    def _set_double_elim_view_controls(self, visible: bool, value: Optional[str] = None):
+        self.double_elim_view_label.setVisible(visible)
+        self.double_elim_view_combo.setVisible(visible)
+        if value:
+            normalized = value.lower()
+            if normalized == "lower":
+                self.double_elim_view_combo.setCurrentText("Lower Bracket")
+            else:
+                self.double_elim_view_combo.setCurrentText("Upper Bracket")
+
+    def _set_bronze_match_controls(self, visible: bool, enabled: bool = False):
+        self.bronze_match_check.blockSignals(True)
+        self.bronze_match_check.setVisible(visible)
+        self.bronze_match_check.setChecked(enabled)
+        self.bronze_match_check.blockSignals(False)
+
+    def _double_elim_view_value(self) -> str:
+        if not self.double_elim_view_combo.isVisible():
+            return ""
+        return "lower" if self.double_elim_view_combo.currentText() == "Lower Bracket" else "upper"
+
+    def _find_bronze_round_index(self) -> Optional[int]:
+        for idx, rnd in enumerate(self._rounds):
+            if (rnd.side or "").lower() != "lower":
+                continue
+            if (rnd.name or "").strip().lower() != "bronze match":
+                continue
+            if len(rnd.matches or []) != 1:
+                continue
+            return idx
+        return None
+
+    def _apply_bronze_match(self, enabled: bool):
+        idx = self._find_bronze_round_index()
+        if enabled:
+            if idx is None:
+                self._rounds.append(BracketRound(
+                    name="Bronze Match",
+                    side="lower",
+                    matches=[self._make_match()],
+                ))
+        elif idx is not None:
+            self._rounds.pop(idx)
+
+    def _supports_double_elim_view(self, rounds: List[BracketRound]) -> bool:
+        upper = [r for r in rounds if (r.side or "").lower() == "upper"]
+        lower = [r for r in rounds if (r.side or "").lower() == "lower"]
+        upper_counts = [len(r.matches or []) for r in upper]
+        lower_counts = [len(r.matches or []) for r in lower]
+        if upper_counts == [4, 2, 1] and lower_counts == [2, 2, 1]:
+            return True
+        return upper_counts == [2, 2, 1] and lower_counts == [2, 1, 1]
+
+    def _is_single_elim_rounds(self, rounds: List[BracketRound]) -> bool:
+        if any((r.side or "").lower() == "grand" for r in rounds):
+            return False
+        lower_rounds = [r for r in rounds if (r.side or "").lower() == "lower"]
+        if len(lower_rounds) > 1:
+            return False
+        if lower_rounds:
+            rnd = lower_rounds[0]
+            if (rnd.name or "").strip().lower() != "bronze match":
+                return False
+            if len(rnd.matches or []) != 1:
+                return False
+        return bool(rounds)
+
+    def _on_bronze_match_changed(self):
+        if not self._single_elim_mode:
+            return
+        self._apply_bronze_match(self.bronze_match_check.isChecked())
+        self._build_bracket_view()
+        self.updated.emit()
+
+    def _load_template_from_combo(self):
+        name = self.template_combo.currentText()
+        if name == "4 team single elimination":
+            rounds = self._template_single_elim(4)
+        elif name == "6 team single elimination (top 2 start round 2)":
+            rounds = self._template_single_elim(6)
+        elif name == "8 team single elimination":
+            rounds = self._template_single_elim(8)
+        elif name == "4 team double elimination":
+            rounds = self._template_double_elim(4)
+        elif name == "6 team double elimination":
+            rounds = self._template_double_elim(6)
+        else:
+            rounds = self._template_double_elim(8)
+        self._single_elim_mode = name in (
+            "4 team single elimination",
+            "6 team single elimination (top 2 start round 2)",
+            "8 team single elimination",
+        )
+        self._set_double_elim_view_controls(
+            name in ("6 team double elimination", "8 team double elimination"),
+            "upper",
+        )
+        self._set_bronze_match_controls(self._single_elim_mode, False)
+        self._rounds = rounds
+        if self._single_elim_mode:
+            self._apply_bronze_match(self.bronze_match_check.isChecked())
+        self._build_bracket_view()
+        self.updated.emit()
+
+    def _template_single_elim(self, team_count: int) -> List[BracketRound]:
+        if team_count == 4:
+            round_defs = [("Semifinals", 2), ("Final", 1)]
+        elif team_count == 6:
+            round_defs = [("Round 1", 2), ("Semifinals", 2), ("Final", 1)]
+        else:
+            round_defs = [("Quarterfinals", 4), ("Semifinals", 2), ("Final", 1)]
+        rounds = []
+        for name, match_count in round_defs:
+            rounds.append(BracketRound(
+                name=name,
+                side="upper",
+                matches=[self._make_match() for _ in range(match_count)],
+            ))
+        return rounds
+
+    def _template_double_elim(self, team_count: int) -> List[BracketRound]:
+        if team_count == 4:
+            upper = [("Upper Semifinals", 2), ("Upper Final", 1)]
+            lower = [("Lower Semifinal", 1), ("Lower Final", 1)]
+        elif team_count == 6:
+            upper = [("Upper Round 1", 2), ("Upper Semifinals", 2), ("Upper Final", 1)]
+            lower = [("Lower Round 1", 2), ("Lower Semifinal", 1), ("Lower Final", 1)]
+        else:
+            upper = [("Upper Round 1", 4), ("Upper Semifinals", 2), ("Upper Final", 1)]
+            lower = [("Lower Round 1", 2), ("Lower Round 2", 2), ("Lower Final", 1)]
+        rounds = []
+        for name, match_count in upper:
+            rounds.append(BracketRound(
+                name=name,
+                side="upper",
+                matches=[self._make_match() for _ in range(match_count)],
+            ))
+        for name, match_count in lower:
+            rounds.append(BracketRound(
+                name=name,
+                side="lower",
+                matches=[self._make_match() for _ in range(match_count)],
+            ))
+        rounds.append(BracketRound(
+            name="Grand Final",
+            side="grand",
+            matches=[self._make_match()],
+        ))
+        return rounds
+
+    def _clear_bracket(self):
+        while self.bracket_layout.count():
+            item = self.bracket_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.setParent(None)
+                widget.deleteLater()
+        self._match_widgets = []
+
+    def _build_bracket_view(self):
+        self._clear_bracket()
+        if not self._rounds:
+            self.bracket_layout.addWidget(QLabel("No bracket loaded. Select a template to begin."))
+            return
+
+        sections = {
+            "upper": ("Upper Bracket", []),
+            "lower": ("Lower Bracket", []),
+            "grand": ("Grand Final", []),
+        }
+        for rnd in self._rounds:
+            key = rnd.side or "upper"
+            if key not in sections:
+                key = "upper"
+            sections[key][1].append(rnd)
+
+        for key in ("upper", "lower", "grand"):
+            title, rounds = sections[key]
+            if not rounds:
+                continue
+            box = QGroupBox(title)
+            box_layout = QHBoxLayout(box)
+            box_layout.setSpacing(20)
+            for col_idx, rnd in enumerate(rounds):
+                col = QWidget()
+                col_layout = QVBoxLayout(col)
+                col_layout.setSpacing(10)
+                col_layout.addWidget(QLabel(rnd.name or "Round"))
+                spacing = max(6, 10 * (col_idx + 1))
+                for match in rnd.matches:
+                    widget = BracketMatchWidget(match, team_options=self._team_options)
+                    widget.updated.connect(self._on_match_updated)
+                    col_layout.addWidget(widget)
+                    col_layout.addSpacing(spacing)
+                    self._match_widgets.append(widget)
+                col_layout.addStretch(1)
+                box_layout.addWidget(col)
+            self.bracket_layout.addWidget(box)
+        self.bracket_layout.addStretch(1)
+
+    def _on_match_updated(self):
+        self.updated.emit()
+
+    def _refresh_team_options(self):
+        teams = []
+        for row in self.team_rows:
+            team = row.team_ref()
+            if team.name:
+                teams.append(team)
+        self._team_options = teams
+        for widget in self._match_widgets:
+            widget.set_team_options(self._team_options)
+        self.updated.emit()
+
+    def _clear_team_list(self):
+        for row in self.team_rows:
+            row.clear()
+        self._refresh_team_options()
+
+    def _import_teams_from_standings(self):
+        if not self._qualified_provider:
+            QMessageBox.warning(self, "Import Teams", "No standings data available.")
+            return
+        teams = self._qualified_provider() or []
+        if not teams:
+            QMessageBox.information(self, "Import Teams", "No teams found in standings.")
+            return
+        dlg = BracketTeamsImportDialog(self, teams)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        selected = dlg.selected_teams()
+        for idx, row in enumerate(self.team_rows):
+            row.set_team(selected[idx] if idx < len(selected) else None)
+        self._refresh_team_options()
+
+    def reset_tab(self):
+        self.title_edit.clear()
+        self.stage_edit.clear()
+        self._rounds = []
+        self._team_options = []
+        self._clear_team_list()
+        self._set_double_elim_view_controls(False)
+        self._single_elim_mode = False
+        self._set_bronze_match_controls(False)
+        self._build_bracket_view()
+        self.updated.emit()
+
+    def to_settings(self) -> BracketSettings:
+        teams = [row.team_ref() for row in self.team_rows]
+        return BracketSettings(
+            title=self.title_edit.text().strip(),
+            stage=self.stage_edit.text().strip(),
+            rounds=self._rounds or [],
+            double_elim_view=self._double_elim_view_value(),
+            teams=teams,
+        )
+
+    def from_settings(self, settings: BracketSettings):
+        self.title_edit.setText(settings.title or "")
+        self.stage_edit.setText(settings.stage or "")
+        teams = settings.teams or []
+        for idx, row in enumerate(self.team_rows):
+            row.set_team(teams[idx] if idx < len(teams) else None)
+        self._refresh_team_options()
+        self._rounds = []
+        for rnd in settings.rounds or []:
+            matches = []
+            for match in rnd.matches or []:
+                matches.append(BracketMatch(
+                    id=match.id or self._new_match_id(),
+                    bo_label=match.bo_label,
+                    status=match.status,
+                    team1=TeamRef(name=match.team1.name, abbr=match.team1.abbr, logo_path=match.team1.logo_path),
+                    team2=TeamRef(name=match.team2.name, abbr=match.team2.abbr, logo_path=match.team2.logo_path),
+                    score1=match.score1,
+                    score2=match.score2,
+                ))
+            self._rounds.append(BracketRound(
+                name=rnd.name,
+                side=rnd.side,
+                matches=matches,
+            ))
+        if self._supports_double_elim_view(self._rounds):
+            self._set_double_elim_view_controls(True, settings.double_elim_view or "upper")
+        else:
+            self._set_double_elim_view_controls(False)
+        self._single_elim_mode = self._is_single_elim_rounds(self._rounds)
+        if self._single_elim_mode:
+            self._set_bronze_match_controls(True, self._find_bronze_round_index() is not None)
+        else:
+            self._set_bronze_match_controls(False)
+        self._build_bracket_view()
+
+
 class BulkImportRow(QWidget):
     """Yksi rivi import-listassa."""
     def __init__(self, kind: str, file_path: str, name_guess: str, mode_names=None):
@@ -1281,6 +2420,17 @@ class TournamentApp(QMainWindow):
         self.draft_tab = DraftTab(self._maps_by_mode)
         self.draft_tab.updated.connect(self._update)
         tabs.addTab(self.draft_tab, "Draft")
+
+        # --- STANDINGS TAB ---
+        self.standings_tab = StandingsTab()
+        self.standings_tab.updated.connect(self._update)
+        tabs.addTab(self.standings_tab, "Standings")
+
+        # --- BRACKET TAB ---
+        self.bracket_tab = BracketTab()
+        self.bracket_tab.updated.connect(self._update)
+        self.bracket_tab.set_qualified_provider(self._teams_from_standings)
+        tabs.addTab(self.bracket_tab, "Bracket")
         
         self._ensure_default_assets_installed()
         self._auto_discover_assets()  
@@ -1445,6 +2595,150 @@ class TournamentApp(QMainWindow):
         self._write_txt(os.path.join(wdir, "videos_dir.txt"), "")
         self._write_txt(os.path.join(wdir, "timer_running.txt"),
                 "1" if bool(ws.timer_running) else "0")
+
+    def _normalize_logo_path(self, path: Optional[str]) -> Optional[str]:
+        if not path:
+            return None
+        p = path.strip()
+        if not p:
+            return None
+        if not os.path.isabs(p):
+            return p.replace("\\", "/")
+        root = self._scoreboard_root()
+        try:
+            rel = os.path.relpath(p, root)
+            if not rel.startswith(".."):
+                return rel.replace("\\", "/")
+        except Exception:
+            pass
+        return p.replace("\\", "/")
+
+    def _export_standings(self, settings: StandingsSettings):
+        root = self._scoreboard_root()
+        out_dir = os.path.join(root, "Standings")
+        os.makedirs(out_dir, exist_ok=True)
+
+        groups = settings.groups or []
+        if not groups:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=settings.rows or [])]
+
+        for group in groups:
+            _apply_standings_ranks(group.rows or [])
+
+        def build_rows(source_rows: List[StandingsRow]) -> List[dict]:
+            payload_rows = []
+            for r in source_rows or []:
+                diff = int(r.map_diff or 0)
+                payload_rows.append({
+                    "team": r.team_name,
+                    "abbr": r.abbr,
+                    "logo": self._normalize_logo_path(r.logo_path),
+                    "wins": int(r.wins or 0),
+                    "losses": int(r.losses or 0),
+                    "map_diff": diff,
+                    "points": int(r.points or 0),
+                    "status": r.status or "",
+                    "rank": int(r.rank or 0),
+                })
+            return payload_rows
+
+        groups_payload = []
+        for group in groups:
+            groups_payload.append({
+                "key": group.key,
+                "name": group.name or "",
+                "rows": build_rows(group.rows or []),
+            })
+
+        display_group = settings.display_group or "__all__"
+        selected_rows = []
+        if display_group != "__all__":
+            for group in groups:
+                if group.key == display_group:
+                    selected_rows = build_rows(group.rows or [])
+                    break
+        elif len(groups) == 1:
+            selected_rows = build_rows(groups[0].rows or [])
+
+        payload = {
+            "title": settings.title or "",
+            "subtitle": settings.subtitle or "",
+            "columns": settings.columns or {"mode": "map_diff"},
+            "rows": selected_rows,
+            "groups": groups_payload,
+            "display_group": display_group,
+        }
+        json_path = os.path.join(out_dir, "standings.json")
+        changed = self._write_json(json_path, payload)
+        if changed:
+            stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            self._write_txt(os.path.join(out_dir, "updated_at.txt"), stamp)
+
+    def _export_bracket(self, settings: BracketSettings):
+        root = self._scoreboard_root()
+        out_dir = os.path.join(root, "Bracket")
+        os.makedirs(out_dir, exist_ok=True)
+
+        rounds = []
+        for r in settings.rounds or []:
+            matches = []
+            for m in r.matches or []:
+                matches.append({
+                    "id": m.id,
+                    "bo_label": m.bo_label,
+                    "team1": {
+                        "name": m.team1.name,
+                        "abbr": m.team1.abbr,
+                        "logo": self._normalize_logo_path(m.team1.logo_path),
+                    },
+                    "team2": {
+                        "name": m.team2.name,
+                        "abbr": m.team2.abbr,
+                        "logo": self._normalize_logo_path(m.team2.logo_path),
+                    },
+                    "score1": int(m.score1 or 0),
+                    "score2": int(m.score2 or 0),
+                    "status": m.status or "",
+                })
+            rounds.append({
+                "name": r.name,
+                "side": r.side or "",
+                "matches": matches,
+            })
+
+        payload = {
+            "title": settings.title or "",
+            "stage": settings.stage or "",
+            "rounds": rounds,
+            "double_elim_view": settings.double_elim_view or "",
+        }
+        json_path = os.path.join(out_dir, "bracket.json")
+        changed = self._write_json(json_path, payload)
+        if changed:
+            stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            self._write_txt(os.path.join(out_dir, "updated_at.txt"), stamp)
+
+    def _teams_from_standings(self) -> List[TeamRef]:
+        if not hasattr(self, "standings_tab"):
+            return []
+        settings = self.standings_tab.to_settings()
+        rows: List[StandingsRow] = []
+        if settings.groups:
+            for group in settings.groups:
+                rows.extend(group.rows or [])
+        else:
+            rows = list(settings.rows or [])
+        def sort_key(row: StandingsRow):
+            rank = int(row.rank or 0)
+            return (rank if rank > 0 else 9999, row.team_name.lower())
+        rows.sort(key=sort_key)
+        teams = []
+        for row in rows:
+            name = (row.team_name or "").strip()
+            if not name:
+                continue
+            teams.append(TeamRef(name=name, abbr=row.abbr, logo_path=row.logo_path))
+        return teams
 
     def _name_from_filename(self, path: str) -> str:
         """Ei kovakoodattuja korjauksia: vain väliviivat/alikulkevat -> välilyönti, ja title case."""
@@ -1629,6 +2923,10 @@ class TournamentApp(QMainWindow):
             f.write(new)
         return True
 
+    def _write_json(self, path: str, payload: dict) -> bool:
+        body = json.dumps(payload, ensure_ascii=False, indent=2)
+        return self._write_txt(path, body)
+
             
     def build_match_text(self, state: dict) -> str:
         """
@@ -1788,6 +3086,7 @@ class TournamentApp(QMainWindow):
         os.makedirs(replay_dir, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(fname.strip())
+        self._notify_overlays(["replay"])
 
     def _next_replay_number(self, playlist_dir: str) -> int:
         """Etsi suurin n- prefiksistä ja palauta n+1."""
@@ -1863,7 +3162,7 @@ class TournamentApp(QMainWindow):
                 "t2.name","t2.score","t2.color","t2.logo","t2.ban","t2.abbr","t2.players",
                 "general.caster1","general.caster2","general.host",
                 "waiting.texts","waiting.timer","waiting.videos","waiting.socials",
-                "maps"
+                "maps", "standings", "bracket"
             ]
 
         o1, n1 = old.get("team1", {}), new.get("team1", {})
@@ -1954,6 +3253,11 @@ class TournamentApp(QMainWindow):
                    (b.get("map"), b.get("t1"), b.get("t2"), b.get("completed"), b.get("pick"),
                     b.get("t1_ban"), b.get("t2_ban")):
                     keys.append("maps"); break
+
+        if (old.get("standings") or {}) != (new.get("standings") or {}):
+            keys.append("standings")
+        if (old.get("bracket") or {}) != (new.get("bracket") or {}):
+            keys.append("bracket")
 
 
         return keys
@@ -2341,6 +3645,12 @@ class TournamentApp(QMainWindow):
         state["general"] = asdict(general)
         waiting = self.waiting_tab.to_settings()
         state["waiting"] = asdict(waiting)
+        if hasattr(self, "standings_tab"):
+            standings = self.standings_tab.to_settings()
+            state["standings"] = asdict(standings)
+        if hasattr(self, "bracket_tab"):
+            bracket = self.bracket_tab.to_settings()
+            state["bracket"] = asdict(bracket)
         return state
 
 
@@ -2401,6 +3711,56 @@ class TournamentApp(QMainWindow):
         
         wdata = state.get("waiting", {}) or {}
         self.waiting_tab.from_settings(WaitingSettings(**wdata))
+
+        sdata = state.get("standings", {}) or {}
+        rows = [_standings_row_from_dict(r) for r in (sdata.get("rows") or [])]
+        groups_data = sdata.get("groups") or []
+        groups = []
+        for idx, g in enumerate(groups_data, start=1):
+            groups.append(_standings_group_from_dict(g, fallback_key=f"group_{idx}"))
+        if not groups and rows:
+            groups = [StandingsGroup(key="group_1", name="Group 1", rows=rows)]
+        s_settings = StandingsSettings(
+            title=sdata.get("title", ""),
+            subtitle=sdata.get("subtitle", ""),
+            columns=sdata.get("columns") or {"mode": "map_diff"},
+            rows=rows,
+            groups=groups,
+            display_group=sdata.get("display_group", ""),
+        )
+        if hasattr(self, "standings_tab"):
+            self.standings_tab.from_settings(s_settings)
+
+        bdata = state.get("bracket", {}) or {}
+        rounds = []
+        for r in bdata.get("rounds") or []:
+            matches = []
+            for m in r.get("matches") or []:
+                team1 = TeamRef(**(m.get("team1") or {}))
+                team2 = TeamRef(**(m.get("team2") or {}))
+                matches.append(BracketMatch(
+                    id=m.get("id", ""),
+                    bo_label=m.get("bo_label", ""),
+                    team1=team1,
+                    team2=team2,
+                    score1=int(m.get("score1", 0) or 0),
+                    score2=int(m.get("score2", 0) or 0),
+                    status=m.get("status", ""),
+                ))
+            rounds.append(BracketRound(
+                name=r.get("name", ""),
+                side=r.get("side", ""),
+                matches=matches,
+            ))
+        b_settings = BracketSettings(
+            title=bdata.get("title", ""),
+            stage=bdata.get("stage", ""),
+            rounds=rounds,
+            double_elim_view=bdata.get("double_elim_view", ""),
+            teams=[TeamRef(**(t or {})) for t in (bdata.get("teams") or [])],
+        )
+        if hasattr(self, "bracket_tab"):
+            self.bracket_tab.from_settings(b_settings)
             
         pool = state.get("map_pool") or []
         if hasattr(self, "draft_tab"):
@@ -2426,6 +3786,45 @@ class TournamentApp(QMainWindow):
         self._export_match(state)
         
         self._export_waiting(state)
+        if "standings" in state:
+            s = state.get("standings") or {}
+            s_settings = StandingsSettings(
+                title=s.get("title", ""),
+                subtitle=s.get("subtitle", ""),
+                columns=s.get("columns") or {"mode": "map_diff"},
+                rows=[_standings_row_from_dict(r) for r in (s.get("rows") or [])],
+                groups=[_standings_group_from_dict(g, fallback_key=f"group_{idx}") for idx, g in enumerate(s.get("groups") or [], start=1)],
+                display_group=s.get("display_group", ""),
+            )
+            self._export_standings(s_settings)
+        if "bracket" in state:
+            b = state.get("bracket") or {}
+            rounds = []
+            for r in b.get("rounds") or []:
+                matches = []
+                for m in r.get("matches") or []:
+                    matches.append(BracketMatch(
+                        id=m.get("id", ""),
+                        bo_label=m.get("bo_label", ""),
+                        team1=TeamRef(**(m.get("team1") or {})),
+                        team2=TeamRef(**(m.get("team2") or {})),
+                        score1=int(m.get("score1", 0) or 0),
+                        score2=int(m.get("score2", 0) or 0),
+                        status=m.get("status", ""),
+                    ))
+                rounds.append(BracketRound(
+                    name=r.get("name", ""),
+                    side=r.get("side", ""),
+                    matches=matches,
+                ))
+            b_settings = BracketSettings(
+                title=b.get("title", ""),
+                stage=b.get("stage", ""),
+                rounds=rounds,
+                double_elim_view=b.get("double_elim_view", ""),
+                teams=[TeamRef(**(t or {})) for t in (b.get("teams") or [])],
+            )
+            self._export_bracket(b_settings)
 
         self._export_status_text(state)
         self._notify_overlays(changed)
