@@ -32,6 +32,7 @@
   .rounds-container.has-lower{padding-top:64px;}
   .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;align-items:start;position:relative;width:max-content;height:max-content;transform-origin:top left;}
   .rounds.bronze-only{row-gap:24px;}
+  .rounds.bronze-only.bronze-eight{row-gap:12px;}
   .rounds.has-lower{grid-template-rows:auto auto;}
   .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
   .round.grand{align-self:center;}
@@ -344,6 +345,7 @@
       && sections.grand.length === 0
       && (sections.lower[0].name || "").trim().toLowerCase() === "bronze match";
     roundsWrap.classList.toggle("bronze-only", lowerIsBronzeOnly);
+    roundsWrap.classList.toggle("bronze-eight", lowerIsBronzeOnly && sections.upper.length >= 3);
     const lowerColumnOffset = lowerIsBronzeOnly ? Math.max(0, sections.upper.length - 1) : 0;
 
     if(focusOnly){
