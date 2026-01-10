@@ -33,7 +33,7 @@
   .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
   .round.grand{align-self:center;}
   .rounds.has-lower .round.grand{grid-row:1 / span 2;align-self:center;}
-  .round-title{font-size:22px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-left:6px;}
+  .round-title{font-size:22px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding:10px 14px;border-left:6px solid var(--accent);background:var(--primary);border-radius:12px;box-shadow:0 10px 22px rgba(0,0,0,0.25);}
   .matches{position:relative;display:grid;grid-template-rows:repeat(var(--rows,1),var(--row-height));align-items:start;align-content:start;row-gap:0;}
   .match{background:var(--primary);color:var(--secondary);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;transition:background 0.6s ease;border:1px solid var(--line);box-shadow:0 10px 22px rgba(0,0,0,0.2);position:relative;min-height:84px;z-index:1;}
   .connector{position:absolute;top:50%;height:2px;background:var(--line);transform:translateY(-50%);pointer-events:none;}
