@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
     QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
-    QTableWidget, QHeaderView
+    QTableWidget, QHeaderView, QDialogButtonBox
 )
 
 # -----------------------------
@@ -278,8 +278,7 @@ class BracketMatchWidget(QWidget):
 
     def _build_team_combo(self, initial: str) -> QComboBox:
         combo = QComboBox()
-        combo.setEditable(True)
-        combo.setInsertPolicy(QComboBox.NoInsert)
+        combo.setEditable(False)
         combo.setMinimumWidth(140)
         self._populate_combo(combo, initial)
         return combo
@@ -290,7 +289,8 @@ class BracketMatchWidget(QWidget):
         for t in self._team_options:
             if t.name:
                 combo.addItem(t.name)
-        combo.setEditText(initial or "")
+        if initial:
+            combo.setCurrentText(initial)
         combo.blockSignals(False)
 
     def set_team_options(self, team_options: List[TeamRef]):
@@ -376,6 +376,38 @@ class BracketTeamRow(QWidget):
     def clear(self):
         self.name_edit.clear()
         self._logo_path = ""
+
+
+class BracketTeamsImportDialog(QDialog):
+    def __init__(self, parent, teams: List[TeamRef]):
+        super().__init__(parent)
+        self.setWindowTitle("Import Teams from Standings")
+        self.resize(360, 420)
+
+        root = QVBoxLayout(self)
+        root.addWidget(QLabel("Select teams to import."))
+
+        self.listw = QListWidget()
+        for team in teams:
+            label = team.name or "Unnamed team"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, team)
+            item.setCheckState(Qt.Checked)
+            self.listw.addItem(item)
+        root.addWidget(self.listw, 1)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        root.addWidget(btns)
+
+    def selected_teams(self) -> List[TeamRef]:
+        teams = []
+        for i in range(self.listw.count()):
+            item = self.listw.item(i)
+            if item.checkState() == Qt.Checked:
+                teams.append(item.data(Qt.UserRole))
+        return teams
 
 # -----------------------------
 # Asset Manager Dialog
@@ -2031,8 +2063,12 @@ class BracketTab(QWidget):
         if not teams:
             QMessageBox.information(self, "Import Teams", "No teams found in standings.")
             return
+        dlg = BracketTeamsImportDialog(self, teams)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        selected = dlg.selected_teams()
         for idx, row in enumerate(self.team_rows):
-            row.set_team(teams[idx] if idx < len(teams) else None)
+            row.set_team(selected[idx] if idx < len(selected) else None)
         self._refresh_team_options()
 
     def reset_tab(self):
