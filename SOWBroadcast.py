@@ -232,10 +232,13 @@ class BracketSettings:
     stage: str = ""
     rounds: List[BracketRound] = None
     double_elim_view: str = ""
+    teams: List[TeamRef] = None
 
     def __post_init__(self):
         if self.rounds is None:
             self.rounds = []
+        if self.teams is None:
+            self.teams = []
 
 
 class BracketMatchWidget(QWidget):
@@ -2195,16 +2198,22 @@ class BracketTab(QWidget):
         self.updated.emit()
 
     def to_settings(self) -> BracketSettings:
+        teams = [row.team_ref() for row in self.team_rows]
         return BracketSettings(
             title=self.title_edit.text().strip(),
             stage=self.stage_edit.text().strip(),
             rounds=self._rounds or [],
             double_elim_view=self._double_elim_view_value(),
+            teams=teams,
         )
 
     def from_settings(self, settings: BracketSettings):
         self.title_edit.setText(settings.title or "")
         self.stage_edit.setText(settings.stage or "")
+        teams = settings.teams or []
+        for idx, row in enumerate(self.team_rows):
+            row.set_team(teams[idx] if idx < len(teams) else None)
+        self._refresh_team_options()
         self._rounds = []
         for rnd in settings.rounds or []:
             matches = []
@@ -3748,6 +3757,7 @@ class TournamentApp(QMainWindow):
             stage=bdata.get("stage", ""),
             rounds=rounds,
             double_elim_view=bdata.get("double_elim_view", ""),
+            teams=[TeamRef(**(t or {})) for t in (bdata.get("teams") or [])],
         )
         if hasattr(self, "bracket_tab"):
             self.bracket_tab.from_settings(b_settings)
@@ -3812,6 +3822,7 @@ class TournamentApp(QMainWindow):
                 stage=b.get("stage", ""),
                 rounds=rounds,
                 double_elim_view=b.get("double_elim_view", ""),
+                teams=[TeamRef(**(t or {})) for t in (b.get("teams") or [])],
             )
             self._export_bracket(b_settings)
 
