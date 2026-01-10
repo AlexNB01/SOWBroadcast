@@ -228,7 +228,7 @@
     roundsContainer?.classList.toggle("has-lower", hasLower);
     const rowHeightValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--row-height"), 10) || 64;
 
-    function addSection(sectionRounds, rowIndex, columnOffset = 0){
+    function addSection(sectionRounds, rowIndex, columnOffset = 0, rowOffset = 0){
       const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
       const totalRows = maxMatches * 2;
       sectionRounds.forEach((round, roundIndex)=>{
@@ -237,6 +237,9 @@
         roundEl.dataset.round = String(roundIndex);
         roundEl.style.gridColumn = String(roundIndex + 1 + columnOffset);
         roundEl.style.gridRow = rowIndex;
+        if(rowOffset){
+          roundEl.style.marginTop = `${rowOffset}px`;
+        }
         if(roundIndex === sectionRounds.length - 1){
           roundEl.dataset.last = "true";
         }
@@ -340,6 +343,7 @@
       });
     }
 
+    const upperMaxMatches = Math.max(1, ...sections.upper.map(r=>(r.matches || []).length || 0));
     const lowerIsBronzeOnly = !focusOnly
       && sections.lower.length === 1
       && sections.grand.length === 0
@@ -347,6 +351,8 @@
     roundsWrap.classList.toggle("bronze-only", lowerIsBronzeOnly);
     roundsWrap.classList.toggle("bronze-eight", lowerIsBronzeOnly && sections.upper.length >= 3);
     const lowerColumnOffset = lowerIsBronzeOnly ? Math.max(0, sections.upper.length - 1) : 0;
+    const lowerRowIndex = lowerIsBronzeOnly ? "1" : "2";
+    const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1) * rowHeightValue : 0;
 
     if(focusOnly){
       if(sections[focusSide].length){
@@ -357,7 +363,7 @@
         addSection(sections.upper, "1");
       }
       if(sections.lower.length){
-        addSection(sections.lower, "2", lowerColumnOffset);
+        addSection(sections.lower, lowerRowIndex, lowerColumnOffset, bronzeRowOffset);
       }
     }
     if(sections.grand.length){
