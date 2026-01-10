@@ -286,11 +286,14 @@ class BracketMatchWidget(QWidget):
     def _populate_combo(self, combo: QComboBox, initial: str):
         combo.blockSignals(True)
         combo.clear()
+        combo.addItem("")
         for t in self._team_options:
             if t.name:
                 combo.addItem(t.name)
-        if initial:
+        if initial and combo.findText(initial) >= 0:
             combo.setCurrentText(initial)
+        else:
+            combo.setCurrentIndex(0)
         combo.blockSignals(False)
 
     def set_team_options(self, team_options: List[TeamRef]):
@@ -301,7 +304,10 @@ class BracketMatchWidget(QWidget):
 
     def set_team(self, slot: int, team: Optional[TeamRef]):
         target = self.team1_combo if slot == 1 else self.team2_combo
-        target.setEditText(team.name if team else "")
+        if team and team.name:
+            target.setCurrentText(team.name)
+        else:
+            target.setCurrentIndex(0)
         self._apply_team_ref(slot, team)
 
     def _on_team_changed(self, combo: QComboBox, slot: int):
