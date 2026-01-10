@@ -48,7 +48,9 @@
     <div class="rounds" id="rounds"></div>
   </div>
 <script>
-  const SB = "..";
+  const ROOT = "..";
+  const SB = `${ROOT}/Scoreboard`;
+  const BRACKET_JSON = `${SB}/Bracket/bracket.json`;
   let previous = null;
 
   function isAbsolute(path){
@@ -159,7 +161,7 @@
 
   async function load(){
     try{
-      const res = await fetch(`bracket.json?_=${Date.now()}`);
+      const res = await fetch(`${BRACKET_JSON}?_=${Date.now()}`);
       if(!res.ok) return;
       const data = await res.json();
       render(data);
