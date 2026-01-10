@@ -28,7 +28,7 @@
   .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-end;}
   .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
-  .rounds-container{flex:1;position:relative;overflow:hidden;}
+  .rounds-container{flex:1;position:relative;overflow:hidden;padding-top:48px;}
   .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;align-items:start;position:relative;width:max-content;height:max-content;transform-origin:top left;}
   .rounds.has-lower{grid-template-rows:auto auto;}
   .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
@@ -173,7 +173,9 @@
     const availableHeight = container.clientHeight;
     if(!contentWidth || !contentHeight || !availableWidth || !availableHeight) return;
     const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
-    const clamped = Math.max(0.65, Math.min(scale, 1.4));
+    const hasLower = roundsWrap.classList.contains("has-lower");
+    const minScale = hasLower ? 1 : 0.65;
+    const clamped = Math.max(minScale, Math.min(scale, 1.4));
     const scaledWidth = contentWidth * clamped;
     const scaledHeight = contentHeight * clamped;
     const offsetX = Math.max(0, (availableWidth - scaledWidth) / 2);
