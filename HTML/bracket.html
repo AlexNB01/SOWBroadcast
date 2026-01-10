@@ -160,6 +160,18 @@
     }
     return `${SB}/${path.replace(/\\/g,"/")}`;
   }
+  function withCacheBuster(url){
+    if(!url) return "";
+    const joiner = url.includes("?") ? "&" : "?";
+    return `${url}${joiner}_=${Date.now()}`;
+  }
+  function logoUrlWithCache(path, prevPath){
+    const url = logoUrl(path);
+    if(!url) return "";
+    const prevUrl = logoUrl(prevPath);
+    if(prevUrl && prevUrl === url) return url;
+    return withCacheBuster(url);
+  }
 
   function matchKey(match, idx){
     return match.id || `${match.team1?.name || ""}-${match.team2?.name || ""}-${idx}`;
@@ -267,6 +279,8 @@
           const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
           const team1Data = getTeam(match, 1);
           const team2Data = getTeam(match, 2);
+          const prevTeam1 = prev ? getTeam(prev, 1) : null;
+          const prevTeam2 = prev ? getTeam(prev, 2) : null;
 
           const matchEl = document.createElement("div");
           matchEl.className = "match" + (changed ? " flash" : "");
@@ -301,9 +315,9 @@
           team1.className = "team";
           const t1logo = document.createElement("div");
           t1logo.className = "logo";
-          const t1logoPath = logoUrl(team1Data.logo || "");
+          const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
           if(t1logoPath){
-            t1logo.style.backgroundImage = `url('${t1logoPath}?_=${Date.now()}')`;
+            t1logo.style.backgroundImage = `url('${t1logoPath}')`;
           }
           const t1name = document.createElement("div");
           t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
@@ -320,9 +334,9 @@
           team2.className = "team";
           const t2logo = document.createElement("div");
           t2logo.className = "logo";
-          const t2logoPath = logoUrl(team2Data.logo || "");
+          const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
           if(t2logoPath){
-            t2logo.style.backgroundImage = `url('${t2logoPath}?_=${Date.now()}')`;
+            t2logo.style.backgroundImage = `url('${t2logoPath}')`;
           }
           const t2name = document.createElement("div");
           t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
@@ -390,6 +404,8 @@
         const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
         const team1Data = getTeam(match, 1);
         const team2Data = getTeam(match, 2);
+        const prevTeam1 = prev ? getTeam(prev, 1) : null;
+        const prevTeam2 = prev ? getTeam(prev, 2) : null;
 
         const matchEl = document.createElement("div");
         matchEl.className = "match" + (changed ? " flash" : "");
@@ -410,9 +426,9 @@
         team1.className = "team";
         const t1logo = document.createElement("div");
         t1logo.className = "logo";
-        const t1logoPath = logoUrl(team1Data.logo || "");
+        const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
         if(t1logoPath){
-          t1logo.style.backgroundImage = `url('${t1logoPath}?_=${Date.now()}')`;
+          t1logo.style.backgroundImage = `url('${t1logoPath}')`;
         }
         const t1name = document.createElement("div");
         t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
@@ -429,9 +445,9 @@
         team2.className = "team";
         const t2logo = document.createElement("div");
         t2logo.className = "logo";
-        const t2logoPath = logoUrl(team2Data.logo || "");
+        const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
         if(t2logoPath){
-          t2logo.style.backgroundImage = `url('${t2logoPath}?_=${Date.now()}')`;
+          t2logo.style.backgroundImage = `url('${t2logoPath}')`;
         }
         const t2name = document.createElement("div");
         t2name.textContent = team2Data.abbr || team2Data.name || "TBD";

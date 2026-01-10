@@ -1925,6 +1925,8 @@ class BracketTab(QWidget):
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
         self.double_elim_view_combo.currentTextChanged.connect(lambda *_: self.updated.emit())
         self.bronze_match_check.stateChanged.connect(self._on_bronze_match_changed)
+        self.title_edit.textChanged.connect(lambda *_: self.updated.emit())
+        self.stage_edit.textChanged.connect(lambda *_: self.updated.emit())
 
     def set_qualified_provider(self, provider: Callable[[], List[TeamRef]]):
         self._qualified_provider = provider
@@ -2190,6 +2192,7 @@ class BracketTab(QWidget):
         self._single_elim_mode = False
         self._set_bronze_match_controls(False)
         self._build_bracket_view()
+        self.updated.emit()
 
     def to_settings(self) -> BracketSettings:
         return BracketSettings(
