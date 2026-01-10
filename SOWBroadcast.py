@@ -1756,7 +1756,7 @@ class BracketTab(QWidget):
             "8 team double elimination",
         ])
         self.load_template_btn = QPushButton("Load Template")
-        self.import_qualified_btn = QPushButton("Import Qualified Teams")
+        self.import_qualified_btn = QPushButton("Import Teams from Standings")
         controls_layout.addWidget(QLabel("Template"))
         controls_layout.addWidget(self.template_combo, 1)
         controls_layout.addWidget(self.load_template_btn)
@@ -1781,7 +1781,7 @@ class BracketTab(QWidget):
         root.addLayout(action_row)
 
         self.load_template_btn.clicked.connect(self._load_template_from_combo)
-        self.import_qualified_btn.clicked.connect(self._import_qualified_teams)
+        self.import_qualified_btn.clicked.connect(self._import_teams_from_standings)
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
 
@@ -1921,24 +1921,17 @@ class BracketTab(QWidget):
     def _on_match_updated(self):
         self.updated.emit()
 
-    def _import_qualified_teams(self):
+    def _import_teams_from_standings(self):
         if not self._qualified_provider:
-            QMessageBox.warning(self, "Import Qualified Teams", "No standings data available.")
+            QMessageBox.warning(self, "Import Teams", "No standings data available.")
             return
         teams = self._qualified_provider() or []
         if not teams:
-            QMessageBox.information(self, "Import Qualified Teams", "No qualified teams found in standings.")
+            QMessageBox.information(self, "Import Teams", "No teams found in standings.")
             return
         self._team_options = teams
         for widget in self._match_widgets:
             widget.set_team_options(self._team_options)
-        slots = []
-        for widget in self._match_widgets:
-            slots.append((widget, 1))
-            slots.append((widget, 2))
-        for idx, slot in enumerate(slots):
-            team = teams[idx] if idx < len(teams) else None
-            slot[0].set_team(slot[1], team)
         self.updated.emit()
 
     def reset_tab(self):
@@ -2164,7 +2157,7 @@ class TournamentApp(QMainWindow):
         # --- BRACKET TAB ---
         self.bracket_tab = BracketTab()
         self.bracket_tab.updated.connect(self._update)
-        self.bracket_tab.set_qualified_provider(self._qualified_teams_from_standings)
+        self.bracket_tab.set_qualified_provider(self._teams_from_standings)
         tabs.addTab(self.bracket_tab, "Bracket")
         
         self._ensure_default_assets_installed()
@@ -2452,7 +2445,7 @@ class TournamentApp(QMainWindow):
             stamp = time.strftime("%Y-%m-%d %H:%M:%S")
             self._write_txt(os.path.join(out_dir, "updated_at.txt"), stamp)
 
-    def _qualified_teams_from_standings(self) -> List[TeamRef]:
+    def _teams_from_standings(self) -> List[TeamRef]:
         if not hasattr(self, "standings_tab"):
             return []
         settings = self.standings_tab.to_settings()
@@ -2462,16 +2455,12 @@ class TournamentApp(QMainWindow):
                 rows.extend(group.rows or [])
         else:
             rows = list(settings.rows or [])
-        qualified = [
-            row for row in rows
-            if (row.status or "").strip().lower() == "qualified"
-        ]
         def sort_key(row: StandingsRow):
             rank = int(row.rank or 0)
             return (rank if rank > 0 else 9999, row.team_name.lower())
-        qualified.sort(key=sort_key)
+        rows.sort(key=sort_key)
         teams = []
-        for row in qualified:
+        for row in rows:
             name = (row.team_name or "").strip()
             if not name:
                 continue
