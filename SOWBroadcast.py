@@ -271,8 +271,8 @@ class BracketMatchWidget(QWidget):
         root.addLayout(row1)
         root.addLayout(row2)
 
-        self.team1_combo.editTextChanged.connect(lambda *_: self._on_team_changed(self.team1_combo, 1))
-        self.team2_combo.editTextChanged.connect(lambda *_: self._on_team_changed(self.team2_combo, 2))
+        self.team1_combo.currentTextChanged.connect(lambda *_: self._on_team_changed(self.team1_combo, 1))
+        self.team2_combo.currentTextChanged.connect(lambda *_: self._on_team_changed(self.team2_combo, 2))
         self.team1_score.valueChanged.connect(self._on_score_changed)
         self.team2_score.valueChanged.connect(self._on_score_changed)
 
