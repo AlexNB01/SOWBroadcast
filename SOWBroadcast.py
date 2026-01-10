@@ -1330,6 +1330,9 @@ class StandingsTab(QWidget):
         table.verticalHeader().setVisible(False)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setSelectionMode(QTableWidget.SingleSelection)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         header = table.horizontalHeader()
         for i in range(len(self.HEADERS)):
             if self.HEADERS[i] in {"Team", "Logo"}:
@@ -1355,7 +1358,7 @@ class StandingsTab(QWidget):
         }
         add_btn.clicked.connect(lambda: self._add_row(table))
         remove_btn_row.clicked.connect(lambda: self._remove_selected(table))
-        remove_btn.clicked.connect(lambda w=widget: self._remove_group(w))
+        remove_btn.clicked.connect(lambda _=False, w=widget: self._remove_group(w))
         name_edit.textChanged.connect(self._on_group_name_changed)
         return widget
 
@@ -1430,6 +1433,14 @@ class StandingsTab(QWidget):
         self._update_group_controls()
         self.updated.emit()
 
+    def _update_table_height(self, table: QTableWidget):
+        header_height = table.horizontalHeader().height()
+        rows_height = sum(table.rowHeight(i) for i in range(table.rowCount()))
+        frame = table.frameWidth() * 2
+        height = header_height + rows_height + frame
+        table.setMinimumHeight(height)
+        table.setMaximumHeight(height)
+
     def _add_row(self, table: QTableWidget, row_data: Optional[StandingsRow] = None):
         row = table.rowCount()
         table.insertRow(row)
@@ -1470,6 +1481,7 @@ class StandingsTab(QWidget):
 
         logo_widget = self._make_logo_cell(getattr(row_data, "logo_path", "") or "")
         table.setCellWidget(row, 8, logo_widget)
+        self._update_table_height(table)
 
     def _remove_selected(self, table: QTableWidget):
         selected = table.selectionModel().selectedRows()
@@ -1477,6 +1489,7 @@ class StandingsTab(QWidget):
             return
         for idx in sorted([s.row() for s in selected], reverse=True):
             table.removeRow(idx)
+        self._update_table_height(table)
 
     def _row_data(self, table: QTableWidget, row: int) -> StandingsRow:
         rank = int(table.cellWidget(row, 0).value())
@@ -1534,6 +1547,8 @@ class StandingsTab(QWidget):
         table.setRowCount(0)
         for row in rows:
             self._add_row(table, row)
+        if not rows:
+            self._update_table_height(table)
 
     def reset_tab(self):
         self.title_edit.clear()
