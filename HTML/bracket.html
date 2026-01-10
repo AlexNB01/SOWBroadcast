@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Bracket</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+  html,body{margin:0;padding:0;width:1920px;height:1080px;background:transparent;overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text)}
+  :root{
+    --bg:#0f1114;
+    --panel:#16191f;
+    --line:rgba(255,1,1,0.08);
+    --accent:#55aaff;
+    --flash:rgba(255,255,255,0.25);
+    --text:#ffffff;
+    --primary:#ffffff;
+    --secondary:#111111;
+    --tertiary:#55aaff;
+    --quaternary:#16191f;
+    --round-gap:56px;
+    --row-height:64px;
+  }
+  .frame{box-sizing:border-box;padding:70px 80px;height:100%;display:flex;flex-direction:column;gap:18px;}
+  .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-end;}
+  .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+  .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
+  .rounds-container{flex:1;position:relative;overflow:hidden;padding-top:48px;}
+  .rounds-container.has-lower{padding-top:64px;}
+  .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;align-items:start;position:relative;width:max-content;height:max-content;transform-origin:top left;}
+  .rounds.bronze-only{row-gap:24px;}
+  .rounds.bronze-only.bronze-eight{row-gap:12px;}
+  .rounds.has-lower{grid-template-rows:auto auto;}
+  .round{width:280px;display:flex;flex-direction:column;gap:12px;position:relative;}
+  .round.grand{align-self:center;}
+  .rounds.has-lower .round.grand{grid-row:1 / span 2;align-self:center;}
+  .round-title{font-size:22px;text-transform:uppercase;letter-spacing:1px;padding:10px 14px;border-left:6px solid var(--accent);background:var(--primary);border-radius:12px;box-shadow:0 10px 22px rgba(0,0,0,0.25);position:absolute;left:0;top:var(--title-offset, 0);transform:translateY(calc(-100% - 8px));}
+  .matches{position:relative;display:grid;grid-template-rows:repeat(var(--rows,1),var(--row-height));align-items:start;align-content:start;row-gap:0;}
+  .match{background:var(--primary);color:var(--secondary);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;transition:background 0.6s ease;border:1px solid var(--line);box-shadow:0 10px 22px rgba(0,0,0,0.2);position:relative;min-height:84px;z-index:1;}
+  .connector{display:none;}
+  .connector.right{right:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
+  .connector.left{left:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
+  .connector.left::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:var(--connector-height, 0);background:var(--line);}
+  .meta{display:flex;justify-content:space-between;font-size:16px;opacity:0.7;letter-spacing:0.5px;}
+  .team{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:700;}
+  .team .logo{width:32px;height:32px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;background-color:rgba(0,0,0,0.08);}
+  .score{margin-left:auto;font-size:22px;font-weight:800;min-width:24px;text-align:center;}
+  .score.flash{animation:flashScore 1.2s ease;}
+  .status{font-size:16px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;}
+  @keyframes flashScore{
+    0%{color:#fff;}50%{color:var(--accent);}100%{color:#fff;}
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header-text">
+      <div class="title" id="title">Playoffs</div>
+      <div class="stage" id="stage"></div>
+    </div>
+    <div class="rounds-container" id="rounds-container">
+      <div class="rounds" id="rounds"></div>
+    </div>
+  </div>
+<script>
+  const ROOT = "..";
+  const SB = `${ROOT}/Scoreboard`;
+  const GENERAL = `${SB}/General`;
+  const BRACKET_JSON = `${SB}/Bracket/bracket.json`;
+  let previous = null;
+
+  async function read(p){ try{ const r=await fetch(`${p}?_=${Date.now()}`); return r.ok?await r.text():""; }catch{ return ""; } }
+  const hex = (s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
+  function hexToRgb(value){
+    const clean = (value || "").replace("#", "");
+    if(clean.length === 3){
+      return [
+        parseInt(clean[0] + clean[0], 16),
+        parseInt(clean[1] + clean[1], 16),
+        parseInt(clean[2] + clean[2], 16)
+      ];
+    }
+    if(clean.length === 6){
+      return [
+        parseInt(clean.slice(0, 2), 16),
+        parseInt(clean.slice(2, 4), 16),
+        parseInt(clean.slice(4, 6), 16)
+      ];
+    }
+    return null;
+  }
+  function rgbaFromHex(value, alpha, fallback){
+    const rgb = hexToRgb(value);
+    if(!rgb) return fallback;
+    return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
+  }
+  async function applyColors(){
+    const kv = {};
+    (await read(`${GENERAL}/colors.txt`)).split(/\r?\n/).forEach(line=>{
+      const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+      if(m) kv[m[1].trim().toLowerCase()] = m[2].trim();
+    });
+    const primary = hex(kv.primary, "#ffffff");
+    const secondary = hex(kv.secondary, "#111111");
+    const tertiary = hex(kv.tertiary, "#55aaff");
+    const quaternary = hex(kv.quaternary, "#16191f");
+    const root = document.documentElement;
+    root.style.setProperty("--primary", primary);
+    root.style.setProperty("--secondary", secondary);
+    root.style.setProperty("--tertiary", tertiary);
+    root.style.setProperty("--quaternary", quaternary);
+    root.style.setProperty("--bg", primary);
+    root.style.setProperty("--panel", quaternary);
+    root.style.setProperty("--text", secondary);
+    root.style.setProperty("--accent", tertiary);
+    root.style.setProperty("--line", rgbaFromHex(secondary, 0.35, "rgba(255,255,255,0.12)"));
+    root.style.setProperty("--flash", rgbaFromHex(secondary, 0.35, "rgba(255,255,255,0.3)"));
+  }
+
+  function getTeamValue(team, match, keys){
+    for(const key of keys){
+      if(team && team[key]) return team[key];
+      const alt = match ? match[key] : null;
+      if(alt) return alt;
+    }
+    return "";
+  }
+
+  function getTeam(match, slot){
+    const team = slot === 1 ? match.team1 : match.team2;
+    const name = getTeamValue(team, match, ["name", `team${slot}_name`, `team${slot}Name`]);
+    const abbr = getTeamValue(team, match, ["abbr", `team${slot}_abbr`, `team${slot}Abbr`]);
+    const logo = getTeamValue(team, match, ["logo", `team${slot}_logo`, `team${slot}Logo`]);
+    return { name, abbr, logo };
+  }
+
+  function getScore(match, slot){
+    const score = match?.[`score${slot}`];
+    if(score !== undefined && score !== null) return score;
+    const alt = match?.[`team${slot}_score`] ?? match?.[`team${slot}Score`];
+    return alt ?? 0;
+  }
+
+  function isAbsolute(path){
+    return /^(https?:|file:|data:)/i.test(path) || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("/") || path.startsWith("\\\\");
+  }
+  function logoUrl(path){
+    if(!path) return "";
+    if(path.startsWith("Scoreboard/")) return `${ROOT}/${path.replace(/\\/g,"/")}`;
+    if(isAbsolute(path)){
+      if(path.startsWith("file:") || path.startsWith("http")) return path;
+      return `file:///${path.replace(/\\/g,"/")}`;
+    }
+    return `${SB}/${path.replace(/\\/g,"/")}`;
+  }
+  function withCacheBuster(url){
+    if(!url) return "";
+    const joiner = url.includes("?") ? "&" : "?";
+    return `${url}${joiner}_=${Date.now()}`;
+  }
+  function logoUrlWithCache(path, prevPath){
+    const url = logoUrl(path);
+    if(!url) return "";
+    const prevUrl = logoUrl(prevPath);
+    if(prevUrl && prevUrl === url) return url;
+    return withCacheBuster(url);
+  }
+
+  function matchKey(match, idx){
+    return match.id || `${match.team1?.name || ""}-${match.team2?.name || ""}-${idx}`;
+  }
+
+  function fitRounds(){
+    const roundsWrap = document.getElementById("rounds");
+    const container = document.getElementById("rounds-container");
+    if(!roundsWrap || !container) return;
+    roundsWrap.style.transform = "scale(1)";
+    const contentWidth = roundsWrap.scrollWidth;
+    const contentHeight = roundsWrap.scrollHeight;
+    const availableWidth = container.clientWidth;
+    const availableHeight = container.clientHeight;
+    if(!contentWidth || !contentHeight || !availableWidth || !availableHeight) return;
+    const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
+    const hasLower = roundsWrap.classList.contains("has-lower");
+    const minScale = hasLower ? 0.7 : 0.65;
+    const clamped = Math.max(minScale, Math.min(scale, 1.4));
+    const scaledWidth = contentWidth * clamped;
+    const scaledHeight = contentHeight * clamped;
+    const offsetX = Math.max(0, (availableWidth - scaledWidth) / 2);
+    const offsetY = Math.max(0, (availableHeight - scaledHeight) / 2);
+    roundsWrap.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${clamped})`;
+  }
+
+  function render(data){
+    document.getElementById("title").textContent = data.title || "Playoffs";
+    document.getElementById("stage").textContent = data.stage || "";
+
+    const roundsWrap = document.getElementById("rounds");
+    const roundsContainer = document.getElementById("rounds-container");
+    roundsWrap.innerHTML = "";
+
+    const prevMatches = new Map();
+    if(previous && previous.rounds){
+      previous.rounds.forEach(r=>{
+        (r.matches || []).forEach((m, idx)=>{
+          prevMatches.set(matchKey(m, idx), m);
+        });
+      });
+    }
+
+    const rounds = data.rounds || [];
+    const focusSide = (data.double_elim_view || "").toLowerCase();
+    const focusOnly = (focusSide === "upper" || focusSide === "lower");
+    const sections = { upper: [], lower: [], grand: [] };
+    rounds.forEach(round=>{
+      const side = (round.side || "upper").toLowerCase();
+      if(focusOnly){
+        if(focusSide === "upper" && side === "grand"){
+          sections.grand.push(round);
+          return;
+        }
+        if(side !== focusSide) return;
+      }
+      if(side in sections) sections[side].push(round);
+      else sections.upper.push(round);
+    });
+    const hasLower = !focusOnly && sections.lower.length > 0;
+    const columnCount = focusOnly
+      ? Math.max(1, sections[focusSide].length) + (sections.grand.length ? 1 : 0)
+      : Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
+    roundsWrap.style.gridTemplateColumns = `repeat(${Math.max(1, columnCount)}, max-content)`;
+    roundsWrap.classList.toggle("has-lower", hasLower);
+    roundsContainer?.classList.toggle("has-lower", hasLower);
+    const rowHeightValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--row-height"), 10) || 64;
+
+    function addSection(sectionRounds, rowIndex, columnOffset = 0, rowOffset = 0){
+      const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
+      const totalRows = maxMatches * 2;
+      sectionRounds.forEach((round, roundIndex)=>{
+        const roundEl = document.createElement("div");
+        roundEl.className = "round";
+        roundEl.dataset.round = String(roundIndex);
+        roundEl.style.gridColumn = String(roundIndex + 1 + columnOffset);
+        roundEl.style.gridRow = rowIndex;
+        if(rowOffset){
+          roundEl.style.marginTop = `${rowOffset}px`;
+        }
+        if(roundIndex === sectionRounds.length - 1){
+          roundEl.dataset.last = "true";
+        }
+
+        const matchesWrap = document.createElement("div");
+        matchesWrap.className = "matches";
+        matchesWrap.style.setProperty("--rows", totalRows);
+
+        const matchCount = (round.matches || []).length || 1;
+        const block = totalRows / matchCount;
+        const prevMatchCount = roundIndex > 0 ? (sectionRounds[roundIndex - 1].matches || []).length || 1 : matchCount;
+        const prevBlock = totalRows / prevMatchCount;
+        const connectorHeight = prevMatchCount === matchCount ? 0 : prevBlock * rowHeightValue;
+        const titleRow = Math.max(1, Math.round(block / 2));
+        matchesWrap.style.setProperty("--title-offset", `${(titleRow - 1) * rowHeightValue}px`);
+
+        const title = document.createElement("div");
+        title.className = "round-title";
+        title.textContent = round.name || "";
+        matchesWrap.appendChild(title);
+
+        (round.matches || []).forEach((match, idx)=>{
+          const key = matchKey(match, idx);
+          const prev = prevMatches.get(key);
+          const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
+          const team1Data = getTeam(match, 1);
+          const team2Data = getTeam(match, 2);
+          const prevTeam1 = prev ? getTeam(prev, 1) : null;
+          const prevTeam2 = prev ? getTeam(prev, 2) : null;
+
+          const matchEl = document.createElement("div");
+          matchEl.className = "match" + (changed ? " flash" : "");
+          const computedRow = Math.round(block / 2 + idx * block);
+          const maxStart = Math.max(1, totalRows - 1);
+          matchEl.style.gridRow = `${Math.min(maxStart, computedRow)} / span 2`;
+
+          if(roundIndex > 0){
+            const leftConnector = document.createElement("span");
+            leftConnector.className = "connector left";
+            leftConnector.style.setProperty("--connector-height", `${connectorHeight}px`);
+            matchEl.appendChild(leftConnector);
+          }
+          if(roundIndex < sectionRounds.length - 1){
+            const rightConnector = document.createElement("span");
+            rightConnector.className = "connector right";
+            matchEl.appendChild(rightConnector);
+          }
+
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          const bo = document.createElement("div");
+          bo.textContent = match.bo_label || "";
+          const status = document.createElement("div");
+          status.className = "status";
+          status.textContent = match.status || "";
+          meta.appendChild(bo);
+          meta.appendChild(status);
+          matchEl.appendChild(meta);
+
+          const team1 = document.createElement("div");
+          team1.className = "team";
+          const t1logo = document.createElement("div");
+          t1logo.className = "logo";
+          const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
+          if(t1logoPath){
+            t1logo.style.backgroundImage = `url('${t1logoPath}')`;
+          }
+          const t1name = document.createElement("div");
+          t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
+          const t1score = document.createElement("div");
+          t1score.className = "score";
+          t1score.textContent = getScore(match, 1);
+          if(prev && getScore(prev, 1) !== getScore(match, 1)) t1score.classList.add("flash");
+          team1.appendChild(t1logo);
+          team1.appendChild(t1name);
+          team1.appendChild(t1score);
+          matchEl.appendChild(team1);
+
+          const team2 = document.createElement("div");
+          team2.className = "team";
+          const t2logo = document.createElement("div");
+          t2logo.className = "logo";
+          const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
+          if(t2logoPath){
+            t2logo.style.backgroundImage = `url('${t2logoPath}')`;
+          }
+          const t2name = document.createElement("div");
+          t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
+          const t2score = document.createElement("div");
+          t2score.className = "score";
+          t2score.textContent = getScore(match, 2);
+          if(prev && getScore(prev, 2) !== getScore(match, 2)) t2score.classList.add("flash");
+          team2.appendChild(t2logo);
+          team2.appendChild(t2name);
+          team2.appendChild(t2score);
+          matchEl.appendChild(team2);
+
+          matchesWrap.appendChild(matchEl);
+        });
+
+        roundEl.appendChild(matchesWrap);
+        roundsWrap.appendChild(roundEl);
+      });
+    }
+
+    const upperMaxMatches = Math.max(1, ...sections.upper.map(r=>(r.matches || []).length || 0));
+    const lowerIsBronzeOnly = !focusOnly
+      && sections.lower.length === 1
+      && sections.grand.length === 0
+      && (sections.lower[0].name || "").trim().toLowerCase() === "bronze match";
+    roundsWrap.classList.toggle("bronze-only", lowerIsBronzeOnly);
+    roundsWrap.classList.toggle("bronze-eight", lowerIsBronzeOnly && sections.upper.length >= 3);
+    const lowerColumnOffset = lowerIsBronzeOnly ? Math.max(0, sections.upper.length - 1) : 0;
+    const lowerRowIndex = lowerIsBronzeOnly ? "1" : "2";
+    const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1.7) * rowHeightValue : 0;
+
+    if(focusOnly){
+      if(sections[focusSide].length){
+        addSection(sections[focusSide], "1");
+      }
+    }else{
+      if(sections.upper.length){
+        addSection(sections.upper, "1");
+      }
+      if(sections.lower.length){
+        addSection(sections.lower, lowerRowIndex, lowerColumnOffset, bronzeRowOffset);
+      }
+    }
+    if(sections.grand.length){
+      const grandRound = sections.grand[0];
+      const rowIndex = hasLower ? "1 / span 2" : "1";
+      const colIndex = Math.max(1, columnCount);
+      const grandEl = document.createElement("div");
+      grandEl.className = "round grand";
+      grandEl.style.gridColumn = String(colIndex);
+      grandEl.style.gridRow = rowIndex;
+
+      const title = document.createElement("div");
+      title.className = "round-title";
+      title.textContent = grandRound.name || "";
+      grandEl.appendChild(title);
+
+      const matchesWrap = document.createElement("div");
+      matchesWrap.className = "matches";
+      matchesWrap.style.setProperty("--rows", "2");
+
+      (grandRound.matches || []).forEach((match, idx)=>{
+        const key = matchKey(match, idx);
+        const prev = prevMatches.get(key);
+        const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
+        const team1Data = getTeam(match, 1);
+        const team2Data = getTeam(match, 2);
+        const prevTeam1 = prev ? getTeam(prev, 1) : null;
+        const prevTeam2 = prev ? getTeam(prev, 2) : null;
+
+        const matchEl = document.createElement("div");
+        matchEl.className = "match" + (changed ? " flash" : "");
+        matchEl.style.gridRow = "1 / span 2";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const bo = document.createElement("div");
+        bo.textContent = match.bo_label || "";
+        const status = document.createElement("div");
+        status.className = "status";
+        status.textContent = match.status || "";
+        meta.appendChild(bo);
+        meta.appendChild(status);
+        matchEl.appendChild(meta);
+
+        const team1 = document.createElement("div");
+        team1.className = "team";
+        const t1logo = document.createElement("div");
+        t1logo.className = "logo";
+        const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
+        if(t1logoPath){
+          t1logo.style.backgroundImage = `url('${t1logoPath}')`;
+        }
+        const t1name = document.createElement("div");
+        t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
+        const t1score = document.createElement("div");
+        t1score.className = "score";
+        t1score.textContent = getScore(match, 1);
+        if(prev && getScore(prev, 1) !== getScore(match, 1)) t1score.classList.add("flash");
+        team1.appendChild(t1logo);
+        team1.appendChild(t1name);
+        team1.appendChild(t1score);
+        matchEl.appendChild(team1);
+
+        const team2 = document.createElement("div");
+        team2.className = "team";
+        const t2logo = document.createElement("div");
+        t2logo.className = "logo";
+        const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
+        if(t2logoPath){
+          t2logo.style.backgroundImage = `url('${t2logoPath}')`;
+        }
+        const t2name = document.createElement("div");
+        t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
+        const t2score = document.createElement("div");
+        t2score.className = "score";
+        t2score.textContent = getScore(match, 2);
+        if(prev && getScore(prev, 2) !== getScore(match, 2)) t2score.classList.add("flash");
+        team2.appendChild(t2logo);
+        team2.appendChild(t2name);
+        team2.appendChild(t2score);
+        matchEl.appendChild(team2);
+
+        matchesWrap.appendChild(matchEl);
+      });
+
+      grandEl.appendChild(matchesWrap);
+      roundsWrap.appendChild(grandEl);
+    }
+    previous = data;
+    requestAnimationFrame(fitRounds);
+  }
+
+  async function load(){
+    try{
+      await applyColors();
+      const res = await fetch(`${BRACKET_JSON}?_=${Date.now()}`);
+      if(!res.ok) return;
+      const data = await res.json();
+      render(data);
+    }catch(e){
+      // ignore
+    }
+  }
+
+  function startSSE(){
+    try{
+      const es=new EventSource("/events");
+      es.onmessage=async ev=>{
+        try{
+          const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+          if(ch.some(k=>k==="bracket")) await load();
+          if(ch.some(k=>k==="general.colors")) await applyColors();
+        }catch{}
+      };
+    }catch{}
+  }
+
+  load();
+  startSSE();
+  window.addEventListener("resize", fitRounds);
+</script>
+</body>
+</html>

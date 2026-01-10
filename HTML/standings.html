@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Standings</title>
+<style>
+  @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
+  @font-face{font-family:'Rajdhani';src:url("../../HTML/fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text)}
+  :root{
+    --primary:#0f1114;
+    --secondary:#ffffff;
+    --tertiary:#55aaff;
+    --quaternary:#16191f;
+    --bg:var(--primary);
+    --panel:var(--quaternary);
+    --text:var(--secondary);
+    --line:rgba(255,255,255,0.08);
+    --accent:var(--tertiary);
+    --qualified:#33d17a;
+    --eliminated:#ff5c5c;
+    --flash:rgba(255,255,255,0.3);
+    --row-bg:rgba(0,0,0,0.15);
+  }
+  .canvas{width:1920px;height:1080px;transform:scale(min(calc(100vw / 1920), calc(100vh / 1080)));transform-origin:top left;}
+  .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
+  .page-header{display:flex;align-items:center;justify-content:space-between;width:100%;gap:24px;}
+  .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-start;}
+  .title{font-size:58px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+  .subtitle{font-size:28px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
+  .overlay-scale{transform:scale(var(--ui-scale, 1));transform-origin:top left;height:100%;width:100%;}
+  .tables{display:flex;flex-direction:column;gap:20px;flex:1;min-height:0;}
+  .tables.single .table{flex:1;}
+  .tables.single .rows{flex:1;min-height:0;}
+  .tables.multi{display:grid;grid-auto-rows:minmax(0, 1fr);gap:24px;align-content:stretch;}
+  .table{background:var(--primary);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  .table-scale{transform-origin:top left;width:100%;height:100%;}
+  .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;}
+  .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;margin-left:10px;}
+  .row{display:grid;align-items:center;gap:16px;padding:10px 12px;border-radius:12px;transition:background 0.6s ease;}
+  .row.header{font-size:30px;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;border-bottom:1px solid var(--line);color:secondary;font-weight:600;}
+  .row.body{font-size:28px;background:var(--);}
+  .row.placeholder{visibility:hidden;}
+  .rows{display:flex;flex-direction:column;gap:6px;}
+  .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rank{width:70px;text-align:center;}
+  .team{display:flex;align-items:center;gap:16px;min-width:0;}
+  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:transparent;}
+  .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:left;text-align:center;}
+  .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
+  .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
+  .flash{animation:flash 1.2s ease;}
+  .flash-cell{animation:flashCell 1.2s ease;}
+  @keyframes flash{
+    0%{background:var(--flash);}100%{background:var(--row-bg);}
+  }
+  @keyframes flashCell{
+    0%{color:#fff;}50%{color:var(--accent);}100%{color:#fff;}
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="overlay-scale" id="overlay">
+      <div class="frame">
+        <div class="page-header">
+          <div class="header-text">
+            <div class="title" id="title">Standings</div>
+            <div class="subtitle" id="subtitle"></div>
+          </div>
+        </div>
+        <div class="tables" id="tables"></div>
+      </div>
+    </div>
+  </div>
+<script>
+  const SB = "../Scoreboard";
+  const GENERAL = `${SB}/General`;
+  const STANDINGS_JSON = `${SB}/Standings/standings.json`;
+  let previous = null
+  
+  function getTeamName(row){
+  return (row && (row.team ?? row.team_name ?? "")) || "";
+  }
+  function getLogoPath(row){
+    return (row && (row.logo ?? row.logo_path ?? "")) || "";
+  }
+  function getAbbr(row){
+    return (row && (row.abbr ?? row.team_abbr ?? "")) || "";
+  }
+
+
+  function isAbsolute(path){
+    return /^(https?:|file:|data:)/i.test(path) || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("/") || path.startsWith("\\\\");
+  }
+  function logoUrl(path){
+    if(!path) return "";
+    if(isAbsolute(path)){
+      if(path.startsWith("file:") || path.startsWith("http")) return path;
+      return `file:///${path.replace(/\\/g,"/")}`;
+    }
+    return `${SB}/${path.replace(/\\/g,"/")}`;
+  }
+  function withCacheBuster(url){
+    if(!url) return "";
+    const joiner = url.includes("?") ? "&" : "?";
+    return `${url}${joiner}_=${Date.now()}`;
+  }
+  function logoUrlWithCache(path, prevPath){
+    const url = logoUrl(path);
+    if(!url) return "";
+    const prevUrl = logoUrl(prevPath);
+    if(prevUrl && prevUrl === url) return url;
+    return withCacheBuster(url);
+  }
+
+  async function read(p){
+    try{
+      const r = await fetch(`${p}?_=${Date.now()}`);
+      return r.ok ? await r.text() : "";
+    }catch{
+      return "";
+    }
+  }
+
+  function hex(value, fallback){
+    const s = (value || "").trim();
+    if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s;
+    return fallback;
+  }
+
+  function hexToRgb(value){
+    const clean = (value || "").replace("#", "");
+    if(clean.length === 3){
+      return [
+        parseInt(clean[0] + clean[0], 16),
+        parseInt(clean[1] + clean[1], 16),
+        parseInt(clean[2] + clean[2], 16)
+      ];
+    }
+    if(clean.length === 6){
+      return [
+        parseInt(clean.slice(0, 2), 16),
+        parseInt(clean.slice(2, 4), 16),
+        parseInt(clean.slice(4, 6), 16)
+      ];
+    }
+    return null;
+  }
+
+  function rgbaFromHex(value, alpha, fallback){
+    const rgb = hexToRgb(value);
+    if(!rgb) return fallback;
+    return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
+  }
+
+  async function applyColors(){
+    const kv = {};
+    (await read(`${GENERAL}/colors.txt`)).split(/\r?\n/).forEach(line=>{
+      const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+      if(m) kv[m[1].trim().toLowerCase()] = m[2].trim();
+    });
+    const primary = hex(kv.primary, "#0f1114");
+    const secondary = hex(kv.secondary, "#ffffff");
+    const tertiary = hex(kv.tertiary, "#55aaff");
+    const quaternary = hex(kv.quaternary, "#16191f");
+    const root = document.documentElement;
+    root.style.setProperty("--primary", primary);
+    root.style.setProperty("--secondary", secondary);
+    root.style.setProperty("--tertiary", tertiary);
+    root.style.setProperty("--quaternary", quaternary);
+    root.style.setProperty("--bg", primary);
+    root.style.setProperty("--panel", quaternary);
+    root.style.setProperty("--text", secondary);
+    root.style.setProperty("--accent", tertiary);
+    root.style.setProperty("--line", rgbaFromHex(secondary, 0.08, "rgba(255,255,255,0.08)"));
+    root.style.setProperty("--flash", rgbaFromHex(secondary, 0.3, "rgba(255,255,255,0.3)"));
+    root.style.setProperty("--row-bg", rgbaFromHex(primary, 0.15, "rgba(0,0,0,0.15)"));
+  }
+
+
+  function buildHeader(showStatus){
+    const header = document.createElement("div");
+    header.className = "row header";
+    const labels = ["Rank","Team","W","L","+/-","Points"];
+    if(showStatus){
+      labels.push("Status");
+    }
+    labels.forEach(label=>{
+      const div = document.createElement("div");
+      div.className = "cell";
+      if(["Rank","W","L","+/-","Points","Status"].includes(label)){
+        div.classList.add("center");
+      }
+      div.textContent = label;
+      header.appendChild(div);
+    });
+    header.style.gridTemplateColumns = showStatus
+      ? "80px 1fr 80px 80px 90px 110px 160px"
+      : "80px 1fr 80px 80px 90px 110px";
+    return header;
+  }
+
+  function normalizeGroups(data){
+    if(Array.isArray(data.groups) && data.groups.length){
+      return data.groups.map((group, idx)=>({
+        key: String(group.key || group.id || group.name || `group_${idx + 1}`),
+        name: group.name || "",
+        rows: Array.isArray(group.rows) ? group.rows : []
+      }));
+    }
+    return [{
+      key: "group_1",
+      name: "",
+      rows: Array.isArray(data.rows) ? data.rows : []
+    }];
+  }
+
+  function rowKey(row, index){
+    const team = getTeamName(row);
+    const abbr = getAbbr(row);
+    const logo = getLogoPath(row);
+    return team || abbr || logo || String(index);
+  }
+
+
+  function render(data){
+    const title = document.getElementById("title");
+    const subtitle = document.getElementById("subtitle");
+    title.textContent = data.title || "Standings";
+    subtitle.textContent = data.subtitle || "";
+
+    const groups = normalizeGroups(data);
+    const displayGroup = data.display_group || data.displayGroup || "__all__";
+    let activeGroups = groups;
+    if(displayGroup && displayGroup !== "__all__"){
+      const match = groups.find(group=>group.key === displayGroup || group.name === displayGroup);
+      if(match){
+        activeGroups = [match];
+      }else if(groups.length){
+        activeGroups = [groups[0]];
+      }
+    }
+
+    const tablesWrap = document.getElementById("tables");
+    tablesWrap.innerHTML = "";
+    tablesWrap.className = "tables";
+    const overlay = document.getElementById("overlay");
+    if(overlay){
+      overlay.style.setProperty("--ui-scale", "1");
+    }
+    if(activeGroups.length === 1){
+      tablesWrap.classList.add("single");
+    }else{
+      tablesWrap.classList.add("multi");
+      tablesWrap.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+    }
+
+    const previousGroups = new Map();
+    if(previous){
+      normalizeGroups(previous).forEach(group=>{
+        previousGroups.set(group.key, group);
+      });
+    }
+
+    const showGroupTitles = activeGroups.length > 1;
+
+    activeGroups.forEach((group, groupIndex)=>{
+      const rows = group.rows || [];
+      const minRows = 4;
+      const displayRows = rows.slice();
+      while(displayRows.length < minRows){
+        displayRows.push({ __placeholder: true });
+      }
+      const showStatus = rows.some(row=>String(row.status || "").trim());
+
+      const table = document.createElement("div");
+      table.className = "table";
+
+      const scaleWrap = document.createElement("div");
+      scaleWrap.className = "table-scale";
+
+      const inner = document.createElement("div");
+      inner.className = "table-inner";
+
+      if(showGroupTitles){
+        const groupTitle = document.createElement("div");
+        groupTitle.className = "group-title";
+        groupTitle.textContent = group.name || `Group ${groupIndex + 1}`;
+        inner.appendChild(groupTitle);
+      }
+
+      inner.appendChild(buildHeader(showStatus));
+
+      const rowsWrap = document.createElement("div");
+      rowsWrap.className = "rows";
+      inner.appendChild(rowsWrap);
+      scaleWrap.appendChild(inner);
+      table.appendChild(scaleWrap);
+
+      const prevRows = new Map();
+      const prevOrder = new Map();
+      const prevGroup = previousGroups.get(group.key);
+      if(prevGroup && prevGroup.rows){
+        prevGroup.rows.forEach((row, idx)=>{
+          prevRows.set(rowKey(row, idx), row);
+          prevOrder.set(rowKey(row, idx), idx);
+        });
+      }
+
+      displayRows.forEach((row, idx)=>{
+      const isPlaceholder = Boolean(row.__placeholder);
+      const key = rowKey(row, idx);
+      const prev = isPlaceholder ? null : prevRows.get(key);
+      const changed = prev && (
+        (getTeamName(prev) !== getTeamName(row)) ||
+        (getLogoPath(prev) !== getLogoPath(row)) ||
+        ((prev.wins ?? 0) !== (row.wins ?? 0)) ||
+        ((prev.losses ?? 0) !== (row.losses ?? 0)) ||
+        ((prev.map_diff ?? 0) !== (row.map_diff ?? 0)) ||
+        ((prev.points ?? 0) !== (row.points ?? 0)) ||
+        ((prev.status ?? "") !== (row.status ?? ""))
+      );
+
+      const moved = !isPlaceholder && prevOrder.has(key) && prevOrder.get(key) !== idx;
+
+      const rowEl = document.createElement("div");
+      rowEl.className = `row body${isPlaceholder ? " placeholder" : ""}` + ((changed || moved) ? " flash" : "");
+      rowEl.style.gridTemplateColumns = showStatus
+        ? "80px 1fr 80px 80px 90px 110px 160px"
+        : "80px 1fr 80px 80px 90px 110px";
+
+      const rank = document.createElement("div");
+      rank.className = "cell rank center";
+      rank.textContent = isPlaceholder ? "" : (row.rank || idx + 1);
+      rowEl.appendChild(rank);
+
+      const team = document.createElement("div");
+      team.className = "cell team";
+      const logo = document.createElement("div");
+      logo.className = "logo";
+      const logoPath = logoUrlWithCache(getLogoPath(row), prev ? getLogoPath(prev) : "");
+      if(logoPath && !isPlaceholder){
+        logo.style.backgroundImage = `url('${logoPath}')`;
+      }
+
+      const teamName = getTeamName(row);
+      const name = document.createElement("div");
+      name.textContent = isPlaceholder ? "" : teamName;
+      name.className = (!isPlaceholder && changed) ? "flash-cell" : "";
+      team.appendChild(logo);
+      team.appendChild(name);
+      rowEl.appendChild(team);
+
+      const w = document.createElement("div");
+      w.className = "cell center";
+      w.textContent = isPlaceholder ? "" : (row.wins ?? 0);
+      if(prev && prev.wins !== row.wins) w.classList.add("flash-cell");
+      rowEl.appendChild(w);
+
+      const l = document.createElement("div");
+      l.className = "cell center";
+      l.textContent = isPlaceholder ? "" : (row.losses ?? 0);
+      if(prev && prev.losses !== row.losses) l.classList.add("flash-cell");
+      rowEl.appendChild(l);
+
+      const md = document.createElement("div");
+      md.className = "cell center";
+      md.textContent = isPlaceholder ? "" : (row.map_diff ?? 0);
+      if(prev && prev.map_diff !== row.map_diff) md.classList.add("flash-cell");
+      rowEl.appendChild(md);
+
+      const points = document.createElement("div");
+      points.className = "cell center";
+      points.textContent = isPlaceholder ? "" : (row.points ?? 0);
+      if(prev && prev.points !== row.points) points.classList.add("flash-cell");
+      rowEl.appendChild(points);
+
+      if(showStatus){
+        const status = document.createElement("div");
+        status.className = "cell status center";
+        if(row.status && !isPlaceholder){
+          status.textContent = row.status;
+          status.classList.add(row.status);
+        }
+        rowEl.appendChild(status);
+      }
+
+      rowsWrap.appendChild(rowEl);
+    });
+
+      tablesWrap.appendChild(table);
+    });
+
+    requestAnimationFrame(()=>{
+      document.querySelectorAll(".table").forEach(table=>{
+        const scaleWrap = table.querySelector(".table-scale");
+        const inner = scaleWrap ? scaleWrap.firstElementChild : null;
+        if(!scaleWrap || !inner) return;
+
+        scaleWrap.style.transform = "scale(1)";
+        scaleWrap.style.width = "100%";
+        scaleWrap.style.height = "100%";
+
+        const styles = getComputedStyle(table);
+        const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+        const padY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+        const availableWidth = table.clientWidth - padX;
+        const availableHeight = table.clientHeight - padY;
+        const contentWidth = inner.scrollWidth;
+        const contentHeight = inner.scrollHeight;
+
+        if(availableWidth > 0 && availableHeight > 0 && contentWidth > 0 && contentHeight > 0){
+          const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight, 1);
+          scaleWrap.style.transform = `scale(${scale.toFixed(3)})`;
+          scaleWrap.style.width = `${(100 / scale).toFixed(3)}%`;
+          scaleWrap.style.height = `${(100 / scale).toFixed(3)}%`;
+        }
+      });
+
+      const frame = document.querySelector(".frame");
+      const availableHeight = frame ? frame.clientHeight : 0;
+      const availableWidth = frame ? frame.clientWidth : 0;
+      const contentHeight = frame ? frame.scrollHeight : 0;
+      const contentWidth = frame ? frame.scrollWidth : 0;
+      if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
+        const maxScale = activeGroups.length === 1 ? 3 : 1;
+        const scale = Math.min(
+          availableHeight / contentHeight,
+          availableWidth / contentWidth,
+          maxScale
+        );
+        if(overlay){
+          overlay.style.setProperty("--ui-scale", scale.toFixed(3));
+        }
+      }
+    });
+    previous = data;
+  }
+
+  async function load(){
+    try{
+      const res = await fetch(`${STANDINGS_JSON}?_=${Date.now()}`);
+      if(!res.ok) return;
+      const data = await res.json();
+      render(data);
+    }catch(e){
+      // ignore
+    }
+  }
+
+  function startSSE(){
+    try{
+      const es=new EventSource("/events");
+      es.onmessage=async ev=>{
+        try{
+          const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+          if(ch.some(k=>k==="general.colors")) await applyColors();
+          if(ch.some(k=>k==="standings")) await load();
+        }catch{}
+      };
+    }catch{}
+  }
+
+  applyColors();
+  load();
+  startSSE();
+</script>
+</body>
+</html>
