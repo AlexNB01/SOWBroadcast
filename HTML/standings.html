@@ -243,6 +243,7 @@
     }
     const isTwoGroupLayout = activeGroups.length === 2;
     const hasLargeGroup = activeGroups.some(group=>(group.rows || []).length > 4);
+    const bothLargeGroups = isTwoGroupLayout && activeGroups.every(group=>(group.rows || []).length > 4);
     const stackedSmallGroups = isTwoGroupLayout && activeGroups.every(group=>{
       const count = (group.rows || []).length;
       return count >= 1 && count <= 4;
@@ -346,7 +347,7 @@
         logo.style.backgroundImage = `url('${logoPath}?_=${Date.now()}')`;
       }
 
-      const teamName = getTeamName(row);
+      const teamName = bothLargeGroups ? (getAbbr(row) || getTeamName(row)) : getTeamName(row);
       const name = document.createElement("div");
       name.textContent = isPlaceholder ? "" : teamName;
       name.className = (!isPlaceholder && changed) ? "flash-cell" : "";
