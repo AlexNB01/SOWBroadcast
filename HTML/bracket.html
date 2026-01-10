@@ -25,10 +25,11 @@
     --row-height:64px;
   }
   .frame{box-sizing:border-box;padding:70px 80px;height:100%;display:flex;flex-direction:column;gap:18px;}
-  .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-start;}
+  .header-text{background:var(--primary);border-left:10px solid var(--accent);border-radius:16px;padding:18px 26px;box-shadow:0 14px 32px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:4px;align-self:flex-end;}
   .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
-  .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;flex:1;align-items:start;position:relative;}
+  .rounds-container{flex:1;position:relative;overflow:hidden;}
+  .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;align-items:start;position:relative;width:max-content;height:max-content;transform-origin:top left;}
   .rounds.has-lower{grid-template-rows:auto auto;}
   .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
   .round.grand{align-self:center;}
@@ -61,7 +62,9 @@
       <div class="title" id="title">Playoffs</div>
       <div class="stage" id="stage"></div>
     </div>
-    <div class="rounds" id="rounds"></div>
+    <div class="rounds-container" id="rounds-container">
+      <div class="rounds" id="rounds"></div>
+    </div>
   </div>
 <script>
   const ROOT = "..";
@@ -157,6 +160,25 @@
 
   function matchKey(match, idx){
     return match.id || `${match.team1?.name || ""}-${match.team2?.name || ""}-${idx}`;
+  }
+
+  function fitRounds(){
+    const roundsWrap = document.getElementById("rounds");
+    const container = document.getElementById("rounds-container");
+    if(!roundsWrap || !container) return;
+    roundsWrap.style.transform = "scale(1)";
+    const contentWidth = roundsWrap.scrollWidth;
+    const contentHeight = roundsWrap.scrollHeight;
+    const availableWidth = container.clientWidth;
+    const availableHeight = container.clientHeight;
+    if(!contentWidth || !contentHeight || !availableWidth || !availableHeight) return;
+    const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
+    const clamped = Math.max(0.65, Math.min(scale, 1.4));
+    const scaledWidth = contentWidth * clamped;
+    const scaledHeight = contentHeight * clamped;
+    const offsetX = Math.max(0, (availableWidth - scaledWidth) / 2);
+    const offsetY = Math.max(0, (availableHeight - scaledHeight) / 2);
+    roundsWrap.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${clamped})`;
   }
 
   function render(data){
@@ -391,6 +413,7 @@
       roundsWrap.appendChild(grandEl);
     }
     previous = data;
+    requestAnimationFrame(fitRounds);
   }
 
   async function load(){
@@ -420,6 +443,7 @@
 
   load();
   startSSE();
+  window.addEventListener("resize", fitRounds);
 </script>
 </body>
 </html>
