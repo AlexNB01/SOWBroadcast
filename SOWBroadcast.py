@@ -1849,7 +1849,7 @@ class BracketTab(QWidget):
         controls_layout.addWidget(QLabel("Template"))
         controls_layout.addWidget(self.template_combo, 1)
         controls_layout.addWidget(self.load_template_btn)
-        self.double_elim_view_label = QLabel("8-team view")
+        self.double_elim_view_label = QLabel("Double elim view")
         self.double_elim_view_combo = QComboBox()
         self.double_elim_view_combo.addItems([
             "Upper Bracket",
@@ -1955,14 +1955,14 @@ class BracketTab(QWidget):
             return ""
         return "lower" if self.double_elim_view_combo.currentText() == "Lower Bracket" else "upper"
 
-    def _is_eight_team_double_elim(self, rounds: List[BracketRound]) -> bool:
+    def _supports_double_elim_view(self, rounds: List[BracketRound]) -> bool:
         upper = [r for r in rounds if (r.side or "").lower() == "upper"]
         lower = [r for r in rounds if (r.side or "").lower() == "lower"]
-        if len(upper) != 3 or len(lower) != 3:
-            return False
         upper_counts = [len(r.matches or []) for r in upper]
         lower_counts = [len(r.matches or []) for r in lower]
-        return upper_counts == [4, 2, 1] and lower_counts == [2, 2, 1]
+        if upper_counts == [4, 2, 1] and lower_counts == [2, 2, 1]:
+            return True
+        return upper_counts == [2, 2, 1] and lower_counts == [2, 1, 1]
 
     def _load_template_from_combo(self):
         name = self.template_combo.currentText()
@@ -1978,7 +1978,10 @@ class BracketTab(QWidget):
             rounds = self._template_double_elim(6)
         else:
             rounds = self._template_double_elim(8)
-        self._set_double_elim_view_controls(name == "8 team double elimination", "upper")
+        self._set_double_elim_view_controls(
+            name in ("6 team double elimination", "8 team double elimination"),
+            "upper",
+        )
         self._rounds = rounds
         self._build_bracket_view()
         self.updated.emit()
@@ -2152,7 +2155,7 @@ class BracketTab(QWidget):
                 side=rnd.side,
                 matches=matches,
             ))
-        if self._is_eight_team_double_elim(self._rounds):
+        if self._supports_double_elim_view(self._rounds):
             self._set_double_elim_view_controls(True, settings.double_elim_view or "upper")
         else:
             self._set_double_elim_view_controls(False)
