@@ -104,6 +104,18 @@
     }
     return `${SB}/${path.replace(/\\/g,"/")}`;
   }
+  function withCacheBuster(url){
+    if(!url) return "";
+    const joiner = url.includes("?") ? "&" : "?";
+    return `${url}${joiner}_=${Date.now()}`;
+  }
+  function logoUrlWithCache(path, prevPath){
+    const url = logoUrl(path);
+    if(!url) return "";
+    const prevUrl = logoUrl(prevPath);
+    if(prevUrl && prevUrl === url) return url;
+    return withCacheBuster(url);
+  }
 
   async function read(p){
     try{
@@ -330,9 +342,9 @@
       team.className = "cell team";
       const logo = document.createElement("div");
       logo.className = "logo";
-      const logoPath = logoUrl(getLogoPath(row));
+      const logoPath = logoUrlWithCache(getLogoPath(row), prev ? getLogoPath(prev) : "");
       if(logoPath && !isPlaceholder){
-        logo.style.backgroundImage = `url('${logoPath}?_=${Date.now()}')`;
+        logo.style.backgroundImage = `url('${logoPath}')`;
       }
 
       const teamName = getTeamName(row);

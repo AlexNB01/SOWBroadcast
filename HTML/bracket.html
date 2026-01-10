@@ -44,16 +44,12 @@
   .connector.right{right:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
   .connector.left{left:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
   .connector.left::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:var(--connector-height, 0);background:var(--line);}
-  .match.flash{animation:flash 1.2s ease;}
   .meta{display:flex;justify-content:space-between;font-size:16px;opacity:0.7;letter-spacing:0.5px;}
   .team{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:700;}
   .team .logo{width:32px;height:32px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;background-color:rgba(0,0,0,0.08);}
   .score{margin-left:auto;font-size:22px;font-weight:800;min-width:24px;text-align:center;}
   .score.flash{animation:flashScore 1.2s ease;}
   .status{font-size:16px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;}
-  @keyframes flash{
-    0%{background:var(--flash);}100%{background:rgba(0,0,0,0.2);}
-  }
   @keyframes flashScore{
     0%{color:#fff;}50%{color:var(--accent);}100%{color:#fff;}
   }
@@ -159,6 +155,18 @@
       return `file:///${path.replace(/\\/g,"/")}`;
     }
     return `${SB}/${path.replace(/\\/g,"/")}`;
+  }
+  function withCacheBuster(url){
+    if(!url) return "";
+    const joiner = url.includes("?") ? "&" : "?";
+    return `${url}${joiner}_=${Date.now()}`;
+  }
+  function logoUrlWithCache(path, prevPath){
+    const url = logoUrl(path);
+    if(!url) return "";
+    const prevUrl = logoUrl(prevPath);
+    if(prevUrl && prevUrl === url) return url;
+    return withCacheBuster(url);
   }
 
   function matchKey(match, idx){
@@ -267,6 +275,8 @@
           const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
           const team1Data = getTeam(match, 1);
           const team2Data = getTeam(match, 2);
+          const prevTeam1 = prev ? getTeam(prev, 1) : null;
+          const prevTeam2 = prev ? getTeam(prev, 2) : null;
 
           const matchEl = document.createElement("div");
           matchEl.className = "match" + (changed ? " flash" : "");
@@ -301,9 +311,9 @@
           team1.className = "team";
           const t1logo = document.createElement("div");
           t1logo.className = "logo";
-          const t1logoPath = logoUrl(team1Data.logo || "");
+          const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
           if(t1logoPath){
-            t1logo.style.backgroundImage = `url('${t1logoPath}?_=${Date.now()}')`;
+            t1logo.style.backgroundImage = `url('${t1logoPath}')`;
           }
           const t1name = document.createElement("div");
           t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
@@ -320,9 +330,9 @@
           team2.className = "team";
           const t2logo = document.createElement("div");
           t2logo.className = "logo";
-          const t2logoPath = logoUrl(team2Data.logo || "");
+          const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
           if(t2logoPath){
-            t2logo.style.backgroundImage = `url('${t2logoPath}?_=${Date.now()}')`;
+            t2logo.style.backgroundImage = `url('${t2logoPath}')`;
           }
           const t2name = document.createElement("div");
           t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
@@ -390,6 +400,8 @@
         const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
         const team1Data = getTeam(match, 1);
         const team2Data = getTeam(match, 2);
+        const prevTeam1 = prev ? getTeam(prev, 1) : null;
+        const prevTeam2 = prev ? getTeam(prev, 2) : null;
 
         const matchEl = document.createElement("div");
         matchEl.className = "match" + (changed ? " flash" : "");
@@ -410,9 +422,9 @@
         team1.className = "team";
         const t1logo = document.createElement("div");
         t1logo.className = "logo";
-        const t1logoPath = logoUrl(team1Data.logo || "");
+        const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
         if(t1logoPath){
-          t1logo.style.backgroundImage = `url('${t1logoPath}?_=${Date.now()}')`;
+          t1logo.style.backgroundImage = `url('${t1logoPath}')`;
         }
         const t1name = document.createElement("div");
         t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
@@ -429,9 +441,9 @@
         team2.className = "team";
         const t2logo = document.createElement("div");
         t2logo.className = "logo";
-        const t2logoPath = logoUrl(team2Data.logo || "");
+        const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
         if(t2logoPath){
-          t2logo.style.backgroundImage = `url('${t2logoPath}?_=${Date.now()}')`;
+          t2logo.style.backgroundImage = `url('${t2logoPath}')`;
         }
         const t2name = document.createElement("div");
         t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
