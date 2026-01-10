@@ -207,8 +207,13 @@
     const sections = { upper: [], lower: [], grand: [] };
     rounds.forEach(round=>{
       const side = (round.side || "upper").toLowerCase();
-      if(focusOnly && side !== focusSide) return;
-      if(focusOnly && side === "grand") return;
+      if(focusOnly){
+        if(focusSide === "upper" && side === "grand"){
+          sections.grand.push(round);
+          return;
+        }
+        if(side !== focusSide) return;
+      }
       if(side in sections) sections[side].push(round);
       else sections.upper.push(round);
     });
@@ -345,7 +350,7 @@
         addSection(sections.lower, "2");
       }
     }
-    if(!focusOnly && sections.grand.length){
+    if(sections.grand.length){
       const grandRound = sections.grand[0];
       const rowIndex = hasLower ? "1 / span 2" : "1";
       const colIndex = Math.max(1, columnCount);
