@@ -491,6 +491,10 @@ async function upTimer(){
     const base = (await read(WAIT+"/videos_dir.txt")).trim();
     const lines = (await read(WAIT+"/videos.txt")).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
     playlist = lines.map(fn => resolveUrl(base, fn));
+    for (let i = playlist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+    }
     playIndex = 0;
     const has = playlist.length>0;
     document.getElementById("noVideo").style.display = has ? "none" : "flex";
@@ -523,9 +527,10 @@ function startSSE(){
       try{
         const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
         if(ch.some(k=>k==="general.colors")) await applyColors();
-		if(ch.some(k=>k.startsWith("waiting."))){
-		  await Promise.all([upBrbText(), upTimer(), loadPlaylist(), upSocials()]);
-		}
+		if(ch.some(k=>k==="waiting.texts")) await upBrbText();
+		if(ch.some(k=>k==="waiting.timer")) await upTimer();
+		if(ch.some(k=>k==="waiting.videos")) await loadPlaylist();
+		if(ch.some(k=>k==="waiting.socials")) await upSocials();
 		if(ch.some(k=>k.startsWith("general."))){
 		  await upOverlayLogo();
 		}
