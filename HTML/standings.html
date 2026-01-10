@@ -48,8 +48,7 @@
   .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rank{width:70px;text-align:center;}
   .team{display:flex;align-items:center;gap:16px;min-width:0;}
-  .logo{width:48px;height:48px;flex:0 0 48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:transparent;}
-  .team-name{flex:1;min-width:0;}
+  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:transparent;}
   .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:left;text-align:center;}
   .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
   .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
@@ -171,7 +170,7 @@
   }
 
 
-  function buildHeader(showStatus, columns){
+  function buildHeader(showStatus){
     const header = document.createElement("div");
     header.className = "row header";
     const labels = ["Rank","Team","W","L","+/-","Points"];
@@ -187,7 +186,9 @@
       div.textContent = label;
       header.appendChild(div);
     });
-    header.style.gridTemplateColumns = columns;
+    header.style.gridTemplateColumns = showStatus
+      ? "80px 1fr 80px 80px 90px 110px 160px"
+      : "80px 1fr 80px 80px 90px 110px";
     return header;
   }
 
@@ -254,13 +255,6 @@
     }
 
     const showGroupTitles = activeGroups.length > 1;
-    const isMulti = activeGroups.length > 1;
-    const columnsWithStatus = isMulti
-      ? "70px minmax(0, 1.4fr) 70px 70px 80px 90px 130px"
-      : "80px minmax(0, 1.6fr) 80px 80px 90px 110px 160px";
-    const columnsWithoutStatus = isMulti
-      ? "70px minmax(0, 1.4fr) 70px 70px 80px 90px"
-      : "80px minmax(0, 1.6fr) 80px 80px 90px 110px";
 
     activeGroups.forEach((group, groupIndex)=>{
       const rows = group.rows || [];
@@ -287,8 +281,7 @@
         inner.appendChild(groupTitle);
       }
 
-      const columns = showStatus ? columnsWithStatus : columnsWithoutStatus;
-      inner.appendChild(buildHeader(showStatus, columns));
+      inner.appendChild(buildHeader(showStatus));
 
       const rowsWrap = document.createElement("div");
       rowsWrap.className = "rows";
@@ -324,7 +317,9 @@
 
       const rowEl = document.createElement("div");
       rowEl.className = `row body${isPlaceholder ? " placeholder" : ""}` + ((changed || moved) ? " flash" : "");
-      rowEl.style.gridTemplateColumns = columns;
+      rowEl.style.gridTemplateColumns = showStatus
+        ? "80px 1fr 80px 80px 90px 110px 160px"
+        : "80px 1fr 80px 80px 90px 110px";
 
       const rank = document.createElement("div");
       rank.className = "cell rank center";
@@ -343,7 +338,7 @@
       const teamName = getTeamName(row);
       const name = document.createElement("div");
       name.textContent = isPlaceholder ? "" : teamName;
-      name.className = `team-name${(!isPlaceholder && changed) ? " flash-cell" : ""}`;
+      name.className = (!isPlaceholder && changed) ? "flash-cell" : "";
       team.appendChild(logo);
       team.appendChild(name);
       rowEl.appendChild(team);
