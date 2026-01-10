@@ -27,8 +27,11 @@
   .frame{box-sizing:border-box;padding:70px 80px;height:100%;display:flex;flex-direction:column;gap:18px;}
   .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
-  .rounds{display:flex;gap:var(--round-gap);flex:1;align-items:flex-start;position:relative;}
+  .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;flex:1;align-items:start;position:relative;}
+  .rounds.has-lower{grid-template-rows:auto auto;}
   .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
+  .round.grand{align-self:center;}
+  .rounds.has-lower .round.grand{grid-row:1 / span 2;align-self:center;}
   .round-title{font-size:22px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-left:6px;}
   .matches{position:relative;display:grid;grid-template-rows:repeat(var(--rows,1),var(--row-height));align-items:start;align-content:start;row-gap:0;}
   .match{background:var(--primary);color:var(--secondary);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;transition:background 0.6s ease;border:1px solid var(--line);box-shadow:0 10px 22px rgba(0,0,0,0.2);position:relative;min-height:84px;z-index:1;}
@@ -172,28 +175,153 @@
     }
 
     const rounds = data.rounds || [];
-    const maxMatches = Math.max(1, ...rounds.map(r=>(r.matches || []).length || 0));
-    const totalRows = maxMatches * 2;
+    const sections = { upper: [], lower: [], grand: [] };
+    rounds.forEach(round=>{
+      const side = (round.side || "upper").toLowerCase();
+      if(side in sections) sections[side].push(round);
+      else sections.upper.push(round);
+    });
+    const hasLower = sections.lower.length > 0;
+    const columnCount = Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
+    roundsWrap.style.gridTemplateColumns = `repeat(${Math.max(1, columnCount)}, max-content)`;
+    roundsWrap.classList.toggle("has-lower", hasLower);
     const rowHeightValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--row-height"), 10) || 64;
 
-    rounds.forEach((round, roundIndex)=>{
-      const roundEl = document.createElement("div");
-      roundEl.className = "round";
-      roundEl.dataset.round = String(roundIndex);
-      if(roundIndex === rounds.length - 1){
-        roundEl.dataset.last = "true";
-      }
+    function addSection(sectionRounds, rowIndex){
+      const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
+      const totalRows = maxMatches * 2;
+      sectionRounds.forEach((round, roundIndex)=>{
+        const roundEl = document.createElement("div");
+        roundEl.className = "round";
+        roundEl.dataset.round = String(roundIndex);
+        roundEl.style.gridColumn = String(roundIndex + 1);
+        roundEl.style.gridRow = rowIndex;
+        if(roundIndex === sectionRounds.length - 1){
+          roundEl.dataset.last = "true";
+        }
+
+        const title = document.createElement("div");
+        title.className = "round-title";
+        title.textContent = round.name || "";
+        roundEl.appendChild(title);
+
+        const matchesWrap = document.createElement("div");
+        matchesWrap.className = "matches";
+        matchesWrap.style.setProperty("--rows", totalRows);
+
+        const matchCount = (round.matches || []).length || 1;
+        const block = totalRows / matchCount;
+        const prevMatchCount = roundIndex > 0 ? (sectionRounds[roundIndex - 1].matches || []).length || 1 : matchCount;
+        const prevBlock = totalRows / prevMatchCount;
+        const connectorHeight = prevMatchCount === matchCount ? 0 : (prevBlock / 2) * rowHeightValue;
+
+        (round.matches || []).forEach((match, idx)=>{
+          const key = matchKey(match, idx);
+          const prev = prevMatches.get(key);
+          const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
+          const team1Data = getTeam(match, 1);
+          const team2Data = getTeam(match, 2);
+
+          const matchEl = document.createElement("div");
+          matchEl.className = "match" + (changed ? " flash" : "");
+          const computedRow = Math.round(block / 2 + idx * block);
+          const maxStart = Math.max(1, totalRows - 1);
+          matchEl.style.gridRow = `${Math.min(maxStart, computedRow)} / span 2`;
+
+          if(roundIndex > 0){
+            const leftConnector = document.createElement("span");
+            leftConnector.className = "connector left";
+            leftConnector.style.setProperty("--connector-height", `${connectorHeight}px`);
+            matchEl.appendChild(leftConnector);
+          }
+          if(roundIndex < sectionRounds.length - 1){
+            const rightConnector = document.createElement("span");
+            rightConnector.className = "connector right";
+            matchEl.appendChild(rightConnector);
+          }
+
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          const bo = document.createElement("div");
+          bo.textContent = match.bo_label || "";
+          const status = document.createElement("div");
+          status.className = "status";
+          status.textContent = match.status || "";
+          meta.appendChild(bo);
+          meta.appendChild(status);
+          matchEl.appendChild(meta);
+
+          const team1 = document.createElement("div");
+          team1.className = "team";
+          const t1logo = document.createElement("div");
+          t1logo.className = "logo";
+          const t1logoPath = logoUrl(team1Data.logo || "");
+          if(t1logoPath){
+            t1logo.style.backgroundImage = `url('${t1logoPath}?_=${Date.now()}')`;
+          }
+          const t1name = document.createElement("div");
+          t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
+          const t1score = document.createElement("div");
+          t1score.className = "score";
+          t1score.textContent = getScore(match, 1);
+          if(prev && getScore(prev, 1) !== getScore(match, 1)) t1score.classList.add("flash");
+          team1.appendChild(t1logo);
+          team1.appendChild(t1name);
+          team1.appendChild(t1score);
+          matchEl.appendChild(team1);
+
+          const team2 = document.createElement("div");
+          team2.className = "team";
+          const t2logo = document.createElement("div");
+          t2logo.className = "logo";
+          const t2logoPath = logoUrl(team2Data.logo || "");
+          if(t2logoPath){
+            t2logo.style.backgroundImage = `url('${t2logoPath}?_=${Date.now()}')`;
+          }
+          const t2name = document.createElement("div");
+          t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
+          const t2score = document.createElement("div");
+          t2score.className = "score";
+          t2score.textContent = getScore(match, 2);
+          if(prev && getScore(prev, 2) !== getScore(match, 2)) t2score.classList.add("flash");
+          team2.appendChild(t2logo);
+          team2.appendChild(t2name);
+          team2.appendChild(t2score);
+          matchEl.appendChild(team2);
+
+          matchesWrap.appendChild(matchEl);
+        });
+
+        roundEl.appendChild(matchesWrap);
+        roundsWrap.appendChild(roundEl);
+      });
+    }
+
+    if(sections.upper.length){
+      addSection(sections.upper, "1");
+    }
+    if(sections.lower.length){
+      addSection(sections.lower, "2");
+    }
+    if(sections.grand.length){
+      const grandRound = sections.grand[0];
+      const rowIndex = hasLower ? "1 / span 2" : "1";
+      const colIndex = Math.max(1, columnCount);
+      const grandEl = document.createElement("div");
+      grandEl.className = "round grand";
+      grandEl.style.gridColumn = String(colIndex);
+      grandEl.style.gridRow = rowIndex;
 
       const title = document.createElement("div");
       title.className = "round-title";
-      title.textContent = round.name || "";
-      roundEl.appendChild(title);
+      title.textContent = grandRound.name || "";
+      grandEl.appendChild(title);
 
       const matchesWrap = document.createElement("div");
       matchesWrap.className = "matches";
-      matchesWrap.style.setProperty("--rows", totalRows);
+      matchesWrap.style.setProperty("--rows", "2");
 
-      (round.matches || []).forEach((match, idx)=>{
+      (grandRound.matches || []).forEach((match, idx)=>{
         const key = matchKey(match, idx);
         const prev = prevMatches.get(key);
         const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
@@ -202,25 +330,7 @@
 
         const matchEl = document.createElement("div");
         matchEl.className = "match" + (changed ? " flash" : "");
-        const step = Math.pow(2, roundIndex + 1);
-        const computedRow = roundIndex === 0
-          ? 1 + idx * 2
-          : 1 + step / 2 + idx * step;
-        const maxStart = Math.max(1, totalRows - 1);
-        matchEl.style.gridRow = `${Math.min(maxStart, Math.round(computedRow))} / span 2`;
-
-        if(roundIndex > 0){
-          const leftConnector = document.createElement("span");
-          leftConnector.className = "connector left";
-          const connectorHeight = (step / 2) * rowHeightValue;
-          leftConnector.style.setProperty("--connector-height", `${connectorHeight}px`);
-          matchEl.appendChild(leftConnector);
-        }
-        if(roundIndex < rounds.length - 1){
-          const rightConnector = document.createElement("span");
-          rightConnector.className = "connector right";
-          matchEl.appendChild(rightConnector);
-        }
+        matchEl.style.gridRow = "1 / span 2";
 
         const meta = document.createElement("div");
         meta.className = "meta";
@@ -274,9 +384,9 @@
         matchesWrap.appendChild(matchEl);
       });
 
-      roundEl.appendChild(matchesWrap);
-      roundsWrap.appendChild(roundEl);
-    });
+      grandEl.appendChild(matchesWrap);
+      roundsWrap.appendChild(grandEl);
+    }
     previous = data;
   }
 
