@@ -1368,10 +1368,11 @@ class StandingsTab(QWidget):
             widget["remove_btn"].setEnabled(allow_remove)
 
     def _new_group(self, name: str = "", rows: Optional[List[StandingsRow]] = None, key: str = "") -> StandingsGroup:
+        group_count = len(self._groups) + 1
         if not key:
             key = f"group_{self._group_counter}"
             self._group_counter += 1
-        default_name = name or f"Group {self._group_counter - 1}"
+        default_name = name or f"Group {group_count}"
         group = StandingsGroup(key=key, name=default_name)
         if rows is not None:
             group.rows = rows
