@@ -13,7 +13,7 @@
   :root{
     --bg:#0f1114;
     --panel:#16191f;
-    --line:rgba(255,255,255,0.08);
+    --line:rgba(255,1,1,0.08);
     --accent:#55aaff;
     --flash:rgba(255,255,255,0.25);
     --text:#ffffff;
@@ -120,8 +120,8 @@
     root.style.setProperty("--panel", quaternary);
     root.style.setProperty("--text", secondary);
     root.style.setProperty("--accent", tertiary);
-    root.style.setProperty("--line", rgbaFromHex(secondary, 0.12, "rgba(255,255,255,0.12)"));
-    root.style.setProperty("--flash", rgbaFromHex(secondary, 0.3, "rgba(255,255,255,0.3)"));
+    root.style.setProperty("--line", rgbaFromHex(secondary, 0.35, "rgba(255,255,255,0.12)"));
+    root.style.setProperty("--flash", rgbaFromHex(secondary, 0.35, "rgba(255,255,255,0.3)"));
   }
 
   function getTeamValue(team, match, keys){
@@ -352,7 +352,7 @@
     roundsWrap.classList.toggle("bronze-eight", lowerIsBronzeOnly && sections.upper.length >= 3);
     const lowerColumnOffset = lowerIsBronzeOnly ? Math.max(0, sections.upper.length - 1) : 0;
     const lowerRowIndex = lowerIsBronzeOnly ? "1" : "2";
-    const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1.5) * rowHeightValue : 0;
+    const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1.7) * rowHeightValue : 0;
 
     if(focusOnly){
       if(sections[focusSide].length){
