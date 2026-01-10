@@ -242,7 +242,7 @@
       overlay.style.setProperty("--ui-scale", "1");
     }
     const isTwoGroupLayout = activeGroups.length === 2;
-    const hasLargeGroup = activeGroups.some(group=>(group.rows || []).length > 4);
+    const allSmallGroups = activeGroups.every(group=>(group.rows || []).length < 5);
     const bothLargeGroups = isTwoGroupLayout && activeGroups.every(group=>(group.rows || []).length > 4);
     const stackedSmallGroups = isTwoGroupLayout && activeGroups.every(group=>{
       const count = (group.rows || []).length;
@@ -427,7 +427,7 @@
       const contentHeight = frame ? frame.scrollHeight : 0;
       const contentWidth = frame ? frame.scrollWidth : 0;
       if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
-        const allowUpscale = activeGroups.length === 1 || (isTwoGroupLayout && !hasLargeGroup);
+        const allowUpscale = activeGroups.length === 1 || (isTwoGroupLayout && allSmallGroups);
         const maxScale = allowUpscale ? 3 : 1;
         const scale = Math.min(
           availableHeight / contentHeight,
