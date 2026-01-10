@@ -248,7 +248,11 @@
       const count = Array.isArray(group.rows) ? group.rows.length : 0;
       return count > 4;
     });
-    const allowScaling = !areBothLargeGroups;
+    const hasAnyLargeGroup = isTwoGroups && activeGroups.some(group => {
+      const count = Array.isArray(group.rows) ? group.rows.length : 0;
+      return count > 4;
+    });
+    const allowScaling = !(areBothLargeGroups || hasAnyLargeGroup);
 
     if(activeGroups.length === 1){
       tablesWrap.classList.add("single");
