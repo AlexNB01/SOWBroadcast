@@ -27,13 +27,13 @@
   .frame{box-sizing:border-box;padding:70px 80px;height:100%;display:flex;flex-direction:column;gap:18px;}
   .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
-  .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;flex:1;align-items:start;position:relative;}
+  .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;flex:1;align-items:stretch;position:relative;}
   .rounds.has-lower{grid-template-rows:auto auto;}
-  .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
+  .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;height:100%;}
   .round.grand{align-self:center;}
   .rounds.has-lower .round.grand{grid-row:1 / span 2;align-self:center;}
   .round-title{font-size:22px;text-transform:uppercase;letter-spacing:1px;opacity:0.75;padding-left:6px;}
-  .matches{position:relative;display:grid;grid-template-rows:repeat(var(--rows,1),var(--row-height));align-items:start;align-content:start;row-gap:0;}
+  .matches{position:relative;display:grid;grid-template-rows:repeat(var(--rows,1),var(--row-height));align-items:start;align-content:start;row-gap:0;flex:1;}
   .match{background:var(--primary);color:var(--secondary);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;transition:background 0.6s ease;border:1px solid var(--line);box-shadow:0 10px 22px rgba(0,0,0,0.2);position:relative;min-height:84px;z-index:1;}
   .connector{position:absolute;top:50%;height:2px;background:var(--line);transform:translateY(-50%);pointer-events:none;}
   .connector.right{right:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
@@ -183,13 +183,18 @@
     });
     const hasLower = sections.lower.length > 0;
     const columnCount = Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
-    roundsWrap.style.gridTemplateColumns = `repeat(${Math.max(1, columnCount)}, max-content)`;
+    roundsWrap.style.gridTemplateColumns = `repeat(${Math.max(1, columnCount)}, minmax(0, 1fr))`;
     roundsWrap.classList.toggle("has-lower", hasLower);
-    const rowHeightValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--row-height"), 10) || 64;
+    const roundsStyle = getComputedStyle(roundsWrap);
+    const rowGapValue = parseInt(roundsStyle.rowGap, 10) || 48;
+    const totalHeight = roundsWrap.clientHeight || 1;
+    const sectionHeight = hasLower ? (totalHeight - rowGapValue) / 2 : totalHeight;
+    const headerOffset = 40;
 
     function addSection(sectionRounds, rowIndex){
       const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
       const totalRows = maxMatches * 2;
+      const rowHeightValue = Math.max(44, Math.floor((sectionHeight - headerOffset) / totalRows));
       sectionRounds.forEach((round, roundIndex)=>{
         const roundEl = document.createElement("div");
         roundEl.className = "round";
@@ -208,6 +213,7 @@
         const matchesWrap = document.createElement("div");
         matchesWrap.className = "matches";
         matchesWrap.style.setProperty("--rows", totalRows);
+        matchesWrap.style.setProperty("--row-height", `${rowHeightValue}px`);
 
         const matchCount = (round.matches || []).length || 1;
         const block = totalRows / matchCount;
@@ -320,6 +326,9 @@
       const matchesWrap = document.createElement("div");
       matchesWrap.className = "matches";
       matchesWrap.style.setProperty("--rows", "2");
+      const grandHeight = hasLower ? totalHeight : sectionHeight;
+      const grandRowHeight = Math.max(44, Math.floor((grandHeight - headerOffset) / 2));
+      matchesWrap.style.setProperty("--row-height", `${grandRowHeight}px`);
 
       (grandRound.matches || []).forEach((match, idx)=>{
         const key = matchKey(match, idx);
