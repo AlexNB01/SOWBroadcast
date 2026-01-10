@@ -13,7 +13,7 @@
   :root{
     --bg:#0f1114;
     --panel:#16191f;
-    --line:rgba(255,255,255,0.08);
+    --line:rgba(255,1,1,0.08);
     --accent:#55aaff;
     --flash:rgba(255,255,255,0.25);
     --text:#ffffff;
@@ -29,8 +29,10 @@
   .title{font-size:56px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
   .stage{font-size:26px;font-weight:500;opacity:0.7;letter-spacing:0.5px;margin-top:-8px;}
   .rounds-container{flex:1;position:relative;overflow:hidden;padding-top:48px;}
-  .rounds-container.has-lower{padding-top:0;}
+  .rounds-container.has-lower{padding-top:64px;}
   .rounds{display:grid;column-gap:var(--round-gap);row-gap:48px;align-items:start;position:relative;width:max-content;height:max-content;transform-origin:top left;}
+  .rounds.bronze-only{row-gap:24px;}
+  .rounds.bronze-only.bronze-eight{row-gap:12px;}
   .rounds.has-lower{grid-template-rows:auto auto;}
   .round{width:220px;display:flex;flex-direction:column;gap:12px;position:relative;}
   .round.grand{align-self:center;}
@@ -118,8 +120,8 @@
     root.style.setProperty("--panel", quaternary);
     root.style.setProperty("--text", secondary);
     root.style.setProperty("--accent", tertiary);
-    root.style.setProperty("--line", rgbaFromHex(secondary, 0.12, "rgba(255,255,255,0.12)"));
-    root.style.setProperty("--flash", rgbaFromHex(secondary, 0.3, "rgba(255,255,255,0.3)"));
+    root.style.setProperty("--line", rgbaFromHex(secondary, 0.35, "rgba(255,255,255,0.12)"));
+    root.style.setProperty("--flash", rgbaFromHex(secondary, 0.35, "rgba(255,255,255,0.3)"));
   }
 
   function getTeamValue(team, match, keys){
@@ -175,12 +177,12 @@
     if(!contentWidth || !contentHeight || !availableWidth || !availableHeight) return;
     const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
     const hasLower = roundsWrap.classList.contains("has-lower");
-    const minScale = hasLower ? 1 : 0.65;
+    const minScale = hasLower ? 0.7 : 0.65;
     const clamped = Math.max(minScale, Math.min(scale, 1.4));
     const scaledWidth = contentWidth * clamped;
     const scaledHeight = contentHeight * clamped;
     const offsetX = Math.max(0, (availableWidth - scaledWidth) / 2);
-    const offsetY = hasLower ? 0 : Math.max(0, (availableHeight - scaledHeight) / 2);
+    const offsetY = Math.max(0, (availableHeight - scaledHeight) / 2);
     roundsWrap.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${clamped})`;
   }
 
@@ -202,28 +204,42 @@
     }
 
     const rounds = data.rounds || [];
+    const focusSide = (data.double_elim_view || "").toLowerCase();
+    const focusOnly = (focusSide === "upper" || focusSide === "lower");
     const sections = { upper: [], lower: [], grand: [] };
     rounds.forEach(round=>{
       const side = (round.side || "upper").toLowerCase();
+      if(focusOnly){
+        if(focusSide === "upper" && side === "grand"){
+          sections.grand.push(round);
+          return;
+        }
+        if(side !== focusSide) return;
+      }
       if(side in sections) sections[side].push(round);
       else sections.upper.push(round);
     });
-    const hasLower = sections.lower.length > 0;
-    const columnCount = Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
+    const hasLower = !focusOnly && sections.lower.length > 0;
+    const columnCount = focusOnly
+      ? Math.max(1, sections[focusSide].length) + (sections.grand.length ? 1 : 0)
+      : Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
     roundsWrap.style.gridTemplateColumns = `repeat(${Math.max(1, columnCount)}, max-content)`;
     roundsWrap.classList.toggle("has-lower", hasLower);
     roundsContainer?.classList.toggle("has-lower", hasLower);
     const rowHeightValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--row-height"), 10) || 64;
 
-    function addSection(sectionRounds, rowIndex){
+    function addSection(sectionRounds, rowIndex, columnOffset = 0, rowOffset = 0){
       const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
       const totalRows = maxMatches * 2;
       sectionRounds.forEach((round, roundIndex)=>{
         const roundEl = document.createElement("div");
         roundEl.className = "round";
         roundEl.dataset.round = String(roundIndex);
-        roundEl.style.gridColumn = String(roundIndex + 1);
+        roundEl.style.gridColumn = String(roundIndex + 1 + columnOffset);
         roundEl.style.gridRow = rowIndex;
+        if(rowOffset){
+          roundEl.style.marginTop = `${rowOffset}px`;
+        }
         if(roundIndex === sectionRounds.length - 1){
           roundEl.dataset.last = "true";
         }
@@ -327,11 +343,28 @@
       });
     }
 
-    if(sections.upper.length){
-      addSection(sections.upper, "1");
-    }
-    if(sections.lower.length){
-      addSection(sections.lower, "2");
+    const upperMaxMatches = Math.max(1, ...sections.upper.map(r=>(r.matches || []).length || 0));
+    const lowerIsBronzeOnly = !focusOnly
+      && sections.lower.length === 1
+      && sections.grand.length === 0
+      && (sections.lower[0].name || "").trim().toLowerCase() === "bronze match";
+    roundsWrap.classList.toggle("bronze-only", lowerIsBronzeOnly);
+    roundsWrap.classList.toggle("bronze-eight", lowerIsBronzeOnly && sections.upper.length >= 3);
+    const lowerColumnOffset = lowerIsBronzeOnly ? Math.max(0, sections.upper.length - 1) : 0;
+    const lowerRowIndex = lowerIsBronzeOnly ? "1" : "2";
+    const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1.7) * rowHeightValue : 0;
+
+    if(focusOnly){
+      if(sections[focusSide].length){
+        addSection(sections[focusSide], "1");
+      }
+    }else{
+      if(sections.upper.length){
+        addSection(sections.upper, "1");
+      }
+      if(sections.lower.length){
+        addSection(sections.lower, lowerRowIndex, lowerColumnOffset, bronzeRowOffset);
+      }
     }
     if(sections.grand.length){
       const grandRound = sections.grand[0];
