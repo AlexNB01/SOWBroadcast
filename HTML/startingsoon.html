@@ -349,6 +349,12 @@ async function upSocials(){
   try{
     const raw = await read(WAIT + "/socials.json");
     const data = JSON.parse(raw || "null");
+    const key = JSON.stringify(Object.keys(data || {}).sort().reduce((acc, k) => {
+      acc[k] = data[k];
+      return acc;
+    }, {}));
+    if (key === upSocials._lastKey) return;
+    upSocials._lastKey = key;
     if(!data || Object.keys(data).length===0){ el.style.display="none"; el.innerHTML=""; return; }
 
     el.innerHTML = "";
@@ -469,6 +475,7 @@ function fitBigText(){
 }
 
 let timerSeconds = 0;
+let lastTimerText = null;
 
 function formatMMSS(s){
   s = Math.max(0, s|0);
@@ -481,17 +488,29 @@ async function upTimer(){
   const sRaw = (await read(WAIT+"/timer_seconds.txt")).trim();
   const s = parseInt(sRaw, 10);
   const secs = isNaN(s) ? 0 : Math.max(0, s);
-  document.getElementById("timer").textContent = formatMMSS(secs);
+  const nextText = formatMMSS(secs);
+  if (nextText !== lastTimerText) {
+    document.getElementById("timer").textContent = nextText;
+    lastTimerText = nextText;
+  }
 }
 
   let playlist = []; let playIndex = 0;
+  let lastPlaylistKey = null;
 	function resolveUrl(_base, file){
 	  return WAIT + "/Playlist/" + file;
 	}
   async function loadPlaylist(){
     const base = (await read(WAIT+"/videos_dir.txt")).trim();
     const lines = (await read(WAIT+"/videos.txt")).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const nextKey = lines.join("\n");
+    if (nextKey === lastPlaylistKey) return;
+    lastPlaylistKey = nextKey;
     playlist = lines.map(fn => resolveUrl(base, fn));
+    for (let i = playlist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+    }
     playIndex = 0;
     const has = playlist.length>0;
     document.getElementById("noVideo").style.display = has ? "none" : "flex";
@@ -525,9 +544,10 @@ function startSSE(){
       try{
         const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
         if(ch.some(k=>k==="general.colors")) await applyColors();
-		if(ch.some(k=>k.startsWith("waiting."))){
-		  await Promise.all([upStartText(), upTimer(), loadPlaylist(), upSocials()]);
-		}
+		if(ch.some(k=>k==="waiting.texts")) await upStartText();
+		if(ch.some(k=>k==="waiting.timer")) await upTimer();
+		if(ch.some(k=>k==="waiting.videos")) await loadPlaylist();
+		if(ch.some(k=>k==="waiting.socials")) await upSocials();
 		if(ch.some(k=>k.startsWith("general."))){
 		  await upOverlayLogo();
 		}
@@ -545,6 +565,7 @@ function startSSE(){
   await Promise.all([upStartText(), upTimer(), loadPlaylist(), upTicker(), upOverlayLogo(), positionOverlayLogo(), upSocials()]);
   fitBigText();
   startSSE();
+  setInterval(upTimer, 1000);
 })();
 
 </script>
