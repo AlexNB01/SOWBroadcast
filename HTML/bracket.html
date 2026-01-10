@@ -352,7 +352,7 @@
     roundsWrap.classList.toggle("bronze-eight", lowerIsBronzeOnly && sections.upper.length >= 3);
     const lowerColumnOffset = lowerIsBronzeOnly ? Math.max(0, sections.upper.length - 1) : 0;
     const lowerRowIndex = lowerIsBronzeOnly ? "1" : "2";
-    const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1) * rowHeightValue : 0;
+    const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1.5) * rowHeightValue : 0;
 
     if(focusOnly){
       if(sections[focusSide].length){
