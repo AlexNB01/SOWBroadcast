@@ -326,6 +326,57 @@ class BracketMatchWidget(QWidget):
         self.selected.emit(self)
         super().mousePressEvent(event)
 
+
+class BracketTeamRow(QWidget):
+    changed = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._logo_path = ""
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(4)
+
+        self.name_edit = QLineEdit()
+        self.browse_btn = QPushButton("...")
+        self.browse_btn.setFixedWidth(28)
+
+        layout.addWidget(self.name_edit, 1)
+        layout.addWidget(self.browse_btn)
+
+        self.name_edit.textChanged.connect(self.changed)
+        self.browse_btn.clicked.connect(self._pick_logo)
+
+    def _pick_logo(self):
+        base = os.environ.get("SOWB_ROOT") or _app_base()
+        start_dir = os.path.join(base, "Scoreboard", "Teams")
+        os.makedirs(start_dir, exist_ok=True)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select team logo",
+            start_dir,
+            "Images (*.png *.jpg *.jpeg *.webp *.svg)"
+        )
+        if path:
+            self._logo_path = path
+            self.changed.emit()
+
+    def set_team(self, team: Optional[TeamRef]):
+        self.name_edit.setText(team.name if team else "")
+        self._logo_path = team.logo_path if team else ""
+
+    def team_ref(self) -> TeamRef:
+        return TeamRef(
+            name=self.name_edit.text().strip(),
+            abbr="",
+            logo_path=self._logo_path or None,
+        )
+
+    def clear(self):
+        self.name_edit.clear()
+        self._logo_path = ""
+
 # -----------------------------
 # Asset Manager Dialog
 # -----------------------------
@@ -1756,12 +1807,45 @@ class BracketTab(QWidget):
             "8 team double elimination",
         ])
         self.load_template_btn = QPushButton("Load Template")
-        self.import_qualified_btn = QPushButton("Import Teams from Standings")
         controls_layout.addWidget(QLabel("Template"))
         controls_layout.addWidget(self.template_combo, 1)
         controls_layout.addWidget(self.load_template_btn)
-        controls_layout.addWidget(self.import_qualified_btn)
         root.addWidget(controls)
+
+        main_split = QSplitter()
+        root.addWidget(main_split, 1)
+
+        team_panel = QGroupBox("Teams")
+        team_panel_layout = QVBoxLayout(team_panel)
+        team_panel_layout.setContentsMargins(6, 6, 6, 6)
+        team_panel_layout.setSpacing(6)
+
+        self.team_list_scroll = QScrollArea()
+        self.team_list_scroll.setWidgetResizable(True)
+        self.team_list_container = QWidget()
+        self.team_list_layout = QVBoxLayout(self.team_list_container)
+        self.team_list_layout.setContentsMargins(2, 2, 2, 2)
+        self.team_list_layout.setSpacing(4)
+        self.team_list_scroll.setWidget(self.team_list_container)
+        team_panel_layout.addWidget(self.team_list_scroll, 1)
+
+        self.team_rows: List[BracketTeamRow] = []
+        for _ in range(16):
+            row = BracketTeamRow()
+            row.changed.connect(self._refresh_team_options)
+            self.team_rows.append(row)
+            self.team_list_layout.addWidget(row)
+        self.team_list_layout.addStretch(1)
+
+        team_btns = QHBoxLayout()
+        team_btns.addStretch(1)
+        self.import_qualified_btn = QPushButton("Import from Standings")
+        self.clear_teams_btn = QPushButton("Clear")
+        team_btns.addWidget(self.import_qualified_btn)
+        team_btns.addWidget(self.clear_teams_btn)
+        team_panel_layout.addLayout(team_btns)
+
+        main_split.addWidget(team_panel)
 
         self.bracket_scroll = QScrollArea()
         self.bracket_scroll.setWidgetResizable(True)
@@ -1770,7 +1854,8 @@ class BracketTab(QWidget):
         self.bracket_layout.setContentsMargins(4, 4, 4, 4)
         self.bracket_layout.setSpacing(10)
         self.bracket_scroll.setWidget(self.bracket_container)
-        root.addWidget(self.bracket_scroll, 1)
+        main_split.addWidget(self.bracket_scroll)
+        main_split.setSizes([300, 900])
 
         action_row = QHBoxLayout()
         action_row.addStretch(1)
@@ -1782,6 +1867,7 @@ class BracketTab(QWidget):
 
         self.load_template_btn.clicked.connect(self._load_template_from_combo)
         self.import_qualified_btn.clicked.connect(self._import_teams_from_standings)
+        self.clear_teams_btn.clicked.connect(self._clear_team_list)
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
 
@@ -1921,6 +2007,22 @@ class BracketTab(QWidget):
     def _on_match_updated(self):
         self.updated.emit()
 
+    def _refresh_team_options(self):
+        teams = []
+        for row in self.team_rows:
+            team = row.team_ref()
+            if team.name:
+                teams.append(team)
+        self._team_options = teams
+        for widget in self._match_widgets:
+            widget.set_team_options(self._team_options)
+        self.updated.emit()
+
+    def _clear_team_list(self):
+        for row in self.team_rows:
+            row.clear()
+        self._refresh_team_options()
+
     def _import_teams_from_standings(self):
         if not self._qualified_provider:
             QMessageBox.warning(self, "Import Teams", "No standings data available.")
@@ -1929,16 +2031,16 @@ class BracketTab(QWidget):
         if not teams:
             QMessageBox.information(self, "Import Teams", "No teams found in standings.")
             return
-        self._team_options = teams
-        for widget in self._match_widgets:
-            widget.set_team_options(self._team_options)
-        self.updated.emit()
+        for idx, row in enumerate(self.team_rows):
+            row.set_team(teams[idx] if idx < len(teams) else None)
+        self._refresh_team_options()
 
     def reset_tab(self):
         self.title_edit.clear()
         self.stage_edit.clear()
         self._rounds = []
         self._team_options = []
+        self._clear_team_list()
         self._build_bracket_view()
 
     def to_settings(self) -> BracketSettings:
