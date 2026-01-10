@@ -241,13 +241,15 @@
     if(overlay){
       overlay.style.setProperty("--ui-scale", "1");
     }
+    const isTwoGroupLayout = activeGroups.length === 2;
+    const hasLargeGroup = activeGroups.some(group=>(group.rows || []).length > 4);
+    const stackedSmallGroups = isTwoGroupLayout && activeGroups.every(group=>{
+      const count = (group.rows || []).length;
+      return count >= 1 && count <= 4;
+    });
     if(activeGroups.length === 1){
       tablesWrap.classList.add("single");
     }else{
-      const stackedSmallGroups = activeGroups.length === 2 && activeGroups.every(group=>{
-        const count = (group.rows || []).length;
-        return count >= 1 && count <= 4;
-      });
       tablesWrap.classList.add("multi");
       if(stackedSmallGroups){
         tablesWrap.classList.add("stacked");
@@ -424,7 +426,8 @@
       const contentHeight = frame ? frame.scrollHeight : 0;
       const contentWidth = frame ? frame.scrollWidth : 0;
       if(availableHeight > 0 && contentHeight > 0 && availableWidth > 0 && contentWidth > 0){
-        const maxScale = activeGroups.length === 1 ? 3 : 1;
+        const allowUpscale = activeGroups.length === 1 || (isTwoGroupLayout && !hasLargeGroup);
+        const maxScale = allowUpscale ? 3 : 1;
         const scale = Math.min(
           availableHeight / contentHeight,
           availableWidth / contentWidth,
