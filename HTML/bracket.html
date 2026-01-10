@@ -44,16 +44,12 @@
   .connector.right{right:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
   .connector.left{left:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
   .connector.left::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:var(--connector-height, 0);background:var(--line);}
-  .match.flash{animation:flash 1.2s ease;}
   .meta{display:flex;justify-content:space-between;font-size:16px;opacity:0.7;letter-spacing:0.5px;}
   .team{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:700;}
   .team .logo{width:32px;height:32px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;background-color:rgba(0,0,0,0.08);}
   .score{margin-left:auto;font-size:22px;font-weight:800;min-width:24px;text-align:center;}
   .score.flash{animation:flashScore 1.2s ease;}
   .status{font-size:16px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;}
-  @keyframes flash{
-    0%{background:var(--flash);}100%{background:rgba(0,0,0,0.2);}
-  }
   @keyframes flashScore{
     0%{color:#fff;}50%{color:var(--accent);}100%{color:#fff;}
   }
