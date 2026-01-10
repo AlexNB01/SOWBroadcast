@@ -1358,7 +1358,7 @@ class StandingsTab(QWidget):
         }
         add_btn.clicked.connect(lambda: self._add_row(table))
         remove_btn_row.clicked.connect(lambda: self._remove_selected(table))
-        remove_btn.clicked.connect(lambda w=widget: self._remove_group(w))
+        remove_btn.clicked.connect(lambda _=False, w=widget: self._remove_group(w))
         name_edit.textChanged.connect(self._on_group_name_changed)
         return widget
 
