@@ -1845,6 +1845,7 @@ class BracketTab(QWidget):
             "6 team double elimination",
             "8 team double elimination",
         ])
+        self._single_elim_mode = False
         self.load_template_btn = QPushButton("Load Template")
         controls_layout.addWidget(QLabel("Template"))
         controls_layout.addWidget(self.template_combo, 1)
@@ -1859,6 +1860,9 @@ class BracketTab(QWidget):
         self.double_elim_view_combo.setVisible(False)
         controls_layout.addWidget(self.double_elim_view_label)
         controls_layout.addWidget(self.double_elim_view_combo)
+        self.bronze_match_check = QCheckBox("Bronze match")
+        self.bronze_match_check.setVisible(False)
+        controls_layout.addWidget(self.bronze_match_check)
         root.addWidget(controls)
 
         main_split = QSplitter()
@@ -1920,6 +1924,7 @@ class BracketTab(QWidget):
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(lambda *_: self.updated.emit())
         self.double_elim_view_combo.currentTextChanged.connect(lambda *_: self.updated.emit())
+        self.bronze_match_check.stateChanged.connect(self._on_bronze_match_changed)
 
     def set_qualified_provider(self, provider: Callable[[], List[TeamRef]]):
         self._qualified_provider = provider
@@ -1950,10 +1955,39 @@ class BracketTab(QWidget):
             else:
                 self.double_elim_view_combo.setCurrentText("Upper Bracket")
 
+    def _set_bronze_match_controls(self, visible: bool, enabled: bool = False):
+        self.bronze_match_check.blockSignals(True)
+        self.bronze_match_check.setVisible(visible)
+        self.bronze_match_check.setChecked(enabled)
+        self.bronze_match_check.blockSignals(False)
+
     def _double_elim_view_value(self) -> str:
         if not self.double_elim_view_combo.isVisible():
             return ""
         return "lower" if self.double_elim_view_combo.currentText() == "Lower Bracket" else "upper"
+
+    def _find_bronze_round_index(self) -> Optional[int]:
+        for idx, rnd in enumerate(self._rounds):
+            if (rnd.side or "").lower() != "lower":
+                continue
+            if (rnd.name or "").strip().lower() != "bronze match":
+                continue
+            if len(rnd.matches or []) != 1:
+                continue
+            return idx
+        return None
+
+    def _apply_bronze_match(self, enabled: bool):
+        idx = self._find_bronze_round_index()
+        if enabled:
+            if idx is None:
+                self._rounds.append(BracketRound(
+                    name="Bronze Match",
+                    side="lower",
+                    matches=[self._make_match()],
+                ))
+        elif idx is not None:
+            self._rounds.pop(idx)
 
     def _supports_double_elim_view(self, rounds: List[BracketRound]) -> bool:
         upper = [r for r in rounds if (r.side or "").lower() == "upper"]
@@ -1963,6 +1997,27 @@ class BracketTab(QWidget):
         if upper_counts == [4, 2, 1] and lower_counts == [2, 2, 1]:
             return True
         return upper_counts == [2, 2, 1] and lower_counts == [2, 1, 1]
+
+    def _is_single_elim_rounds(self, rounds: List[BracketRound]) -> bool:
+        if any((r.side or "").lower() == "grand" for r in rounds):
+            return False
+        lower_rounds = [r for r in rounds if (r.side or "").lower() == "lower"]
+        if len(lower_rounds) > 1:
+            return False
+        if lower_rounds:
+            rnd = lower_rounds[0]
+            if (rnd.name or "").strip().lower() != "bronze match":
+                return False
+            if len(rnd.matches or []) != 1:
+                return False
+        return bool(rounds)
+
+    def _on_bronze_match_changed(self):
+        if not self._single_elim_mode:
+            return
+        self._apply_bronze_match(self.bronze_match_check.isChecked())
+        self._build_bracket_view()
+        self.updated.emit()
 
     def _load_template_from_combo(self):
         name = self.template_combo.currentText()
@@ -1978,11 +2033,19 @@ class BracketTab(QWidget):
             rounds = self._template_double_elim(6)
         else:
             rounds = self._template_double_elim(8)
+        self._single_elim_mode = name in (
+            "4 team single elimination",
+            "6 team single elimination (top 2 start round 2)",
+            "8 team single elimination",
+        )
         self._set_double_elim_view_controls(
             name in ("6 team double elimination", "8 team double elimination"),
             "upper",
         )
+        self._set_bronze_match_controls(self._single_elim_mode, False)
         self._rounds = rounds
+        if self._single_elim_mode:
+            self._apply_bronze_match(self.bronze_match_check.isChecked())
         self._build_bracket_view()
         self.updated.emit()
 
@@ -2124,6 +2187,8 @@ class BracketTab(QWidget):
         self._team_options = []
         self._clear_team_list()
         self._set_double_elim_view_controls(False)
+        self._single_elim_mode = False
+        self._set_bronze_match_controls(False)
         self._build_bracket_view()
 
     def to_settings(self) -> BracketSettings:
@@ -2159,6 +2224,11 @@ class BracketTab(QWidget):
             self._set_double_elim_view_controls(True, settings.double_elim_view or "upper")
         else:
             self._set_double_elim_view_controls(False)
+        self._single_elim_mode = self._is_single_elim_rounds(self._rounds)
+        if self._single_elim_mode:
+            self._set_bronze_match_controls(True, self._find_bronze_round_index() is not None)
+        else:
+            self._set_bronze_match_controls(False)
         self._build_bracket_view()
 
 
