@@ -219,7 +219,7 @@
     });
     const hasLower = !focusOnly && sections.lower.length > 0;
     const columnCount = focusOnly
-      ? Math.max(1, sections[focusSide].length)
+      ? Math.max(1, sections[focusSide].length) + (sections.grand.length ? 1 : 0)
       : Math.max(sections.upper.length, sections.lower.length) + (sections.grand.length ? 1 : 0);
     roundsWrap.style.gridTemplateColumns = `repeat(${Math.max(1, columnCount)}, max-content)`;
     roundsWrap.classList.toggle("has-lower", hasLower);
