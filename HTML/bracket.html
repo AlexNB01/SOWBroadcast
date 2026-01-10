@@ -48,14 +48,41 @@
     <div class="rounds" id="rounds"></div>
   </div>
 <script>
-  const SB = "..";
+  const ROOT = "..";
+  const SB = `${ROOT}/Scoreboard`;
+  const BRACKET_JSON = `${SB}/Bracket/bracket.json`;
   let previous = null;
+
+  function getTeamValue(team, match, keys){
+    for(const key of keys){
+      if(team && team[key]) return team[key];
+      const alt = match ? match[key] : null;
+      if(alt) return alt;
+    }
+    return "";
+  }
+
+  function getTeam(match, slot){
+    const team = slot === 1 ? match.team1 : match.team2;
+    const name = getTeamValue(team, match, ["name", `team${slot}_name`, `team${slot}Name`]);
+    const abbr = getTeamValue(team, match, ["abbr", `team${slot}_abbr`, `team${slot}Abbr`]);
+    const logo = getTeamValue(team, match, ["logo", `team${slot}_logo`, `team${slot}Logo`]);
+    return { name, abbr, logo };
+  }
+
+  function getScore(match, slot){
+    const score = match?.[`score${slot}`];
+    if(score !== undefined && score !== null) return score;
+    const alt = match?.[`team${slot}_score`] ?? match?.[`team${slot}Score`];
+    return alt ?? 0;
+  }
 
   function isAbsolute(path){
     return /^(https?:|file:|data:)/i.test(path) || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("/") || path.startsWith("\\\\");
   }
   function logoUrl(path){
     if(!path) return "";
+    if(path.startsWith("Scoreboard/")) return `${ROOT}/${path.replace(/\\/g,"/")}`;
     if(isAbsolute(path)){
       if(path.startsWith("file:") || path.startsWith("http")) return path;
       return `file:///${path.replace(/\\/g,"/")}`;
@@ -96,6 +123,8 @@
         const key = matchKey(match, idx);
         const prev = prevMatches.get(key);
         const changed = prev && JSON.stringify(prev) !== JSON.stringify(match);
+        const team1Data = getTeam(match, 1);
+        const team2Data = getTeam(match, 2);
 
         const matchEl = document.createElement("div");
         matchEl.className = "match" + (changed ? " flash" : "");
@@ -115,16 +144,16 @@
         team1.className = "team";
         const t1logo = document.createElement("div");
         t1logo.className = "logo";
-        const t1logoPath = logoUrl(match.team1?.logo || "");
+        const t1logoPath = logoUrl(team1Data.logo || "");
         if(t1logoPath){
           t1logo.style.backgroundImage = `url('${t1logoPath}?_=${Date.now()}')`;
         }
         const t1name = document.createElement("div");
-        t1name.textContent = match.team1?.abbr || match.team1?.name || "TBD";
+        t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
         const t1score = document.createElement("div");
         t1score.className = "score";
-        t1score.textContent = match.score1 ?? 0;
-        if(prev && prev.score1 !== match.score1) t1score.classList.add("flash");
+        t1score.textContent = getScore(match, 1);
+        if(prev && getScore(prev, 1) !== getScore(match, 1)) t1score.classList.add("flash");
         team1.appendChild(t1logo);
         team1.appendChild(t1name);
         team1.appendChild(t1score);
@@ -134,16 +163,16 @@
         team2.className = "team";
         const t2logo = document.createElement("div");
         t2logo.className = "logo";
-        const t2logoPath = logoUrl(match.team2?.logo || "");
+        const t2logoPath = logoUrl(team2Data.logo || "");
         if(t2logoPath){
           t2logo.style.backgroundImage = `url('${t2logoPath}?_=${Date.now()}')`;
         }
         const t2name = document.createElement("div");
-        t2name.textContent = match.team2?.abbr || match.team2?.name || "TBD";
+        t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
         const t2score = document.createElement("div");
         t2score.className = "score";
-        t2score.textContent = match.score2 ?? 0;
-        if(prev && prev.score2 !== match.score2) t2score.classList.add("flash");
+        t2score.textContent = getScore(match, 2);
+        if(prev && getScore(prev, 2) !== getScore(match, 2)) t2score.classList.add("flash");
         team2.appendChild(t2logo);
         team2.appendChild(t2name);
         team2.appendChild(t2score);
@@ -159,7 +188,7 @@
 
   async function load(){
     try{
-      const res = await fetch(`bracket.json?_=${Date.now()}`);
+      const res = await fetch(`${BRACKET_JSON}?_=${Date.now()}`);
       if(!res.ok) return;
       const data = await res.json();
       render(data);
