@@ -163,8 +163,8 @@ video.video-player.active{ opacity:1; }
     </div>
   </div>
   <div class="video-wrap">
-    <video id="playerA" class="video-player active" autoplay muted playsinline preload="auto"></video>
-    <video id="playerB" class="video-player" autoplay muted playsinline preload="auto"></video>
+    <video id="playerA" class="video-player active" muted playsinline preload="auto"></video>
+    <video id="playerB" class="video-player" muted playsinline preload="auto"></video>
     <div id="noVideo" class="novideo" style="display:none;">NO VIDEOS CONFIGURED</div>
   </div>
   <div class="ticker">
@@ -519,18 +519,22 @@ async function upTimer(){
     });
   }
 
-  function setSource(player, src){
-    if (player.dataset.src === src) return;
+  function setSource(player, src, forceReload = false){
+    if (!forceReload && player.dataset.src === src) return;
+    player.pause();
     player.dataset.src = src;
     player.src = src;
     player.load();
+    try { player.currentTime = 0; } catch(e) {}
   }
 
   async function prepareHiddenPlayer(nextIdx){
     if (playlist.length < 2) { preparedIndex = -1; return; }
     const hidden = players[1 - activePlayer];
     const nextSrc = playlist[nextIdx];
-    setSource(hidden, nextSrc);
+    setSource(hidden, nextSrc, true);
+    hidden.pause();
+    try { hidden.currentTime = 0; } catch(e) {}
     preparedIndex = nextIdx;
   }
 
@@ -560,7 +564,7 @@ async function upTimer(){
     if(playIndex<0 || playIndex>=playlist.length) playIndex = 0;
     const current = players[activePlayer];
     current.loop = playlist.length === 1;
-    setSource(current, playlist[playIndex]);
+    setSource(current, playlist[playIndex], true);
     syncPlayerVisibility();
     try{ await current.play(); }catch(e){}
     await prepareHiddenPlayer((playIndex + 1) % playlist.length);
@@ -575,6 +579,7 @@ async function upTimer(){
       playIndex = nextIdx;
       const current = players[activePlayer];
       current.loop = false;
+      try { current.currentTime = 0; } catch(e) {}
       syncPlayerVisibility();
       try{ await current.play(); }catch(e){}
       await prepareHiddenPlayer((playIndex + 1) % playlist.length);
