@@ -1134,6 +1134,7 @@ def _norm_rel(path: str, root: str) -> str:
 
 class WaitingTab(QWidget):
     updated = pyqtSignal()
+    timer_ticked = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -1159,31 +1160,66 @@ class WaitingTab(QWidget):
         lay_v.addWidget(self.use_default_chk)
         root.addWidget(box_v)
 
-        box_t = QGroupBox("Countdown timer")
-        lay_t = QHBoxLayout(box_t)
-        self.min_spin = QSpinBox(); self.min_spin.setRange(0, 999); self.min_spin.setValue(0)
-        self.sec_spin = QSpinBox(); self.sec_spin.setRange(0, 59);  self.sec_spin.setValue(0)
-        lay_t.addWidget(QLabel("Minutes:")); lay_t.addWidget(self.min_spin)
-        lay_t.addSpacing(16)
-        lay_t.addWidget(QLabel("Seconds:")); lay_t.addWidget(self.sec_spin)
-        lay_t.addStretch(1)
+        box_t = QGroupBox("Countdown Controls")
+        box_t_layout = QVBoxLayout(box_t)
+
+        # Main row: subtract buttons | timer display + controls | add buttons
+        main_row = QHBoxLayout()
+
+        left_col = QVBoxLayout()
+        left_col.setSpacing(4)
+        for label, secs in [("- 30s", -30), ("- 1m", -60), ("- 3m", -180), ("- 5m", -300)]:
+            btn = QPushButton(label)
+            btn.setFixedHeight(32)
+            btn.setStyleSheet("QPushButton{background:#c0392b;color:white;border:none;border-radius:4px;font-weight:bold;padding:0 8px;} QPushButton:hover{background:#e74c3c;}")
+            btn.clicked.connect(lambda _, s=secs: self._adjust_timer(s))
+            left_col.addWidget(btn)
+        main_row.addLayout(left_col)
+
+        center_col = QVBoxLayout()
+        center_col.setSpacing(6)
+        center_col.setAlignment(Qt.AlignCenter)
 
         self.live_label = QLabel("00:00")
-        self.live_label.setStyleSheet("QLabel{font: 900 26px 'Segoe UI';}")
+        self.live_label.setAlignment(Qt.AlignCenter)
+        self.live_label.setStyleSheet("QLabel{background:#c0392b;color:white;font:900 36px 'Segoe UI';border-radius:6px;padding:8px 24px;}")
+        center_col.addWidget(self.live_label)
 
-        self.btn_start = QPushButton("Start")
-        self.btn_pause = QPushButton("Pause")
-        self.btn_reset = QPushButton("Reset")
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(4)
+        ctrl_row.setAlignment(Qt.AlignCenter)
 
+        self.btn_start = QPushButton("\u25b6")
+        self.btn_start.setFixedSize(36, 36)
+        self.btn_start.setStyleSheet("QPushButton{background:#27ae60;color:white;border:none;border-radius:4px;font-size:14px;} QPushButton:hover{background:#2ecc71;}")
         self.btn_start.clicked.connect(self._start_timer)
+
+        self.btn_pause = QPushButton("\u25a0")
+        self.btn_pause.setFixedSize(36, 36)
+        self.btn_pause.setStyleSheet("QPushButton{background:#2c3e50;color:white;border:none;border-radius:4px;font-size:14px;} QPushButton:hover{background:#34495e;}")
         self.btn_pause.clicked.connect(self._pause_timer)
+
+        self.btn_reset = QPushButton("\u21ba")
+        self.btn_reset.setFixedSize(36, 36)
+        self.btn_reset.setStyleSheet("QPushButton{background:#7f8c8d;color:white;border:none;border-radius:4px;font-size:14px;} QPushButton:hover{background:#95a5a6;}")
         self.btn_reset.clicked.connect(self._reset_timer_clicked)
 
-        lay_t.addWidget(self.live_label)
-        lay_t.addWidget(self.btn_start)
-        lay_t.addWidget(self.btn_pause)
-        lay_t.addWidget(self.btn_reset)
+        for b in (self.btn_start, self.btn_pause, self.btn_reset):
+            ctrl_row.addWidget(b)
+        center_col.addLayout(ctrl_row)
+        main_row.addLayout(center_col)
 
+        right_col = QVBoxLayout()
+        right_col.setSpacing(4)
+        for label, secs in [("+ 30s", 30), ("+ 1m", 60), ("+ 3m", 180), ("+ 5m", 300)]:
+            btn = QPushButton(label)
+            btn.setFixedHeight(32)
+            btn.setStyleSheet("QPushButton{background:#7f8c8d;color:white;border:none;border-radius:4px;font-weight:bold;padding:0 8px;} QPushButton:hover{background:#95a5a6;}")
+            btn.clicked.connect(lambda _, s=secs: self._adjust_timer(s))
+            right_col.addWidget(btn)
+        main_row.addLayout(right_col)
+
+        box_t_layout.addLayout(main_row)
 
         root.addWidget(box_t)
 
@@ -1193,9 +1229,7 @@ class WaitingTab(QWidget):
         self._qtimer.timeout.connect(self._tick)
         self._preset_seconds = 0
         self._remaining_seconds = 0
-
-        for w in (self.min_spin, self.sec_spin):
-            w.valueChanged.connect(self._on_preset_changed)
+        self.live_label.setText(self._fmt(0))
 
         box_x = QGroupBox("On-screen texts")
         grid = QFormLayout(box_x)
@@ -1247,19 +1281,18 @@ class WaitingTab(QWidget):
         root.addStretch(1)
         
         self._on_use_default_toggled(self.use_default_chk.isChecked())
-        self._on_preset_changed()
         self._on_ticker_override_toggled(False)
 
     def _fmt(self, s:int)->str:
         s=max(0,int(s)); return f"{s//60:02d}:{s%60:02d}"
 
-    def _on_preset_changed(self, *_):
-        self._preset_seconds = int(self.min_spin.value())*60 + int(self.sec_spin.value())
+    def _adjust_timer(self, delta: int):
+        self._remaining_seconds = max(0, self._remaining_seconds + delta)
         if not self._qtimer.isActive():
-            self._remaining_seconds = self._preset_seconds
-            self.live_label.setText(self._fmt(self._remaining_seconds))
+            self._preset_seconds = self._remaining_seconds
+        self.live_label.setText(self._fmt(self._remaining_seconds))
         self.updated.emit()
-        
+
     def _start_timer(self):
         if self._remaining_seconds <= 0:
             self._remaining_seconds = self._preset_seconds
@@ -1285,7 +1318,7 @@ class WaitingTab(QWidget):
         self.live_label.setText(self._fmt(self._remaining_seconds))
         if self._remaining_seconds <= 0:
             self._qtimer.stop()
-        self.updated.emit()
+        self.timer_ticked.emit()
 
 
     def _on_use_default_toggled(self, checked: bool):
@@ -1305,7 +1338,6 @@ class WaitingTab(QWidget):
     def _reset_tab(self):
         self.use_default_chk.setChecked(True if self.default_videos_dir else False)
         self.videos_dir.clear()
-        self.min_spin.setValue(0); self.sec_spin.setValue(0)
         self.text_starting.setText("STARTING SOON!")
         self.text_brb.setText("BE RIGHT BACK!")
         self.text_end.setText("THANK YOU FOR WATCHING!")
@@ -1343,8 +1375,6 @@ class WaitingTab(QWidget):
         secs = int(getattr(s, "timer_seconds", 0) or 0)
         self._remaining_seconds = max(0, secs)
         self._preset_seconds = self._remaining_seconds
-        self.min_spin.setValue(self._preset_seconds // 60)
-        self.sec_spin.setValue(self._preset_seconds % 60)
         self.live_label.setText(self._fmt(self._remaining_seconds))
         vdir = getattr(s, "videos_dir", "") or ""
         if vdir:
@@ -2443,17 +2473,6 @@ class TournamentApp(QMainWindow):
         # ── Format bar ──
         fmt_bar = QHBoxLayout()
         fmt_bar.setSpacing(10)
-        fmt_bar.addWidget(QLabel("Format"))
-        self.match_format_combo = QComboBox()
-        self.match_format_combo.addItems(["First to", "Best of"])
-        self.match_format_combo.setFixedWidth(90)
-        fmt_bar.addWidget(self.match_format_combo)
-        self.match_format_value = QSpinBox()
-        self.match_format_value.setRange(1, 7)
-        self.match_format_value.setValue(2)
-        self.match_format_value.setFixedWidth(55)
-        fmt_bar.addWidget(self.match_format_value)
-        fmt_bar.addSpacing(16)
         fmt_bar.addWidget(QLabel("Maps"))
         self.match_maps_count = QSpinBox()
         self.match_maps_count.setRange(1, 7)
@@ -2469,11 +2488,7 @@ class TournamentApp(QMainWindow):
         self.match_num_players.setFixedWidth(55)
         self.match_num_players.valueChanged.connect(self._update_player_rows_visibility)
         fmt_bar.addWidget(self.match_num_players)
-        fmt_bar.addSpacing(16)
-        fmt_bar.addWidget(QLabel("Division"))
-        self.match_division = QLineEdit()
-        self.match_division.setPlaceholderText("Enter Division...")
-        fmt_bar.addWidget(self.match_division, 1)
+        fmt_bar.addStretch(1)
         match_root.addLayout(fmt_bar)
 
         splitter = QSplitter()
@@ -2529,6 +2544,7 @@ class TournamentApp(QMainWindow):
         # --- WAITING TAB ---
         self.waiting_tab = WaitingTab()
         self.waiting_tab.updated.connect(self._update_waiting_only)
+        self.waiting_tab.timer_ticked.connect(self._on_waiting_timer_tick)
         tabs.addTab(self.waiting_tab, "Waiting Screen")
 
         
@@ -3293,9 +3309,9 @@ class TournamentApp(QMainWindow):
                 "general.colors",
                 "t1.name","t1.score","t1.color","t1.logo","t1.ban","t1.abbr","t1.players",
                 "t2.name","t2.score","t2.color","t2.logo","t2.ban","t2.abbr","t2.players",
-                "general.caster1","general.caster2","general.host",
+                "general.caster1","general.caster2","general.host","general.logo","general.first_to","general.status",
                 "waiting.texts","waiting.timer","waiting.videos","waiting.socials",
-                "maps", "standings", "bracket"
+                "maps", "standings", "bracket", "matchtext"
             ]
 
         o1, n1 = old.get("team1", {}), new.get("team1", {})
@@ -3324,6 +3340,16 @@ class TournamentApp(QMainWindow):
         if (og.get("colors") or {}) != (ng.get("colors") or {}):
             keys.append("general.colors")
 
+        if int(og.get("maps_count") or 7) != int(ng.get("maps_count") or 7):
+            keys.append("general.first_to")
+
+        if (og.get("overlay_logo_path") or "") != (ng.get("overlay_logo_path") or "") or \
+                (og.get("transition_logo_path") or "") != (ng.get("transition_logo_path") or ""):
+            keys.append("general.logo")
+
+        if (og.get("status_text") or "").strip() != (ng.get("status_text") or "").strip():
+            keys.append("general.status")
+
         ow, nw = old.get("waiting", {}) or {}, new.get("waiting", {}) or {}
 
         if ((ow.get("text_starting") or "").strip() != (nw.get("text_starting") or "").strip() or
@@ -3340,6 +3366,10 @@ class TournamentApp(QMainWindow):
             
         if (ow.get("socials") or {}) != (nw.get("socials") or {}):
             keys.append("waiting.socials")
+
+        if ((ow.get("ticker_override") or "").strip() != (nw.get("ticker_override") or "").strip() or
+                bool(ow.get("ticker_override_enabled")) != bool(nw.get("ticker_override_enabled"))):
+            keys.append("matchtext")
 
         def cmp_team(prefix, o, n):
             if o.get("name") != n.get("name"): keys.append(f"{prefix}.name")
@@ -3392,6 +3422,9 @@ class TournamentApp(QMainWindow):
         if (old.get("bracket") or {}) != (new.get("bracket") or {}):
             keys.append("bracket")
 
+        _matchtext_triggers = {"maps", "t1.name", "t1.score", "t2.name", "t2.score", "t1.ban", "t2.ban"}
+        if any(k in _matchtext_triggers for k in keys):
+            keys.append("matchtext")
 
         return keys
 
@@ -3776,11 +3809,8 @@ class TournamentApp(QMainWindow):
         }
         general = self.general_tab.to_settings()
         # Inject match-tab bar fields into general settings
-        general.format_type = self.match_format_combo.currentText()
-        general.first_to = self.match_format_value.value()
         general.maps_count = self.match_maps_count.value()
         general.num_players = self.match_num_players.value()
-        general.division = self.match_division.text().strip()
         self.general_tab.maps_count.setValue(self.match_maps_count.value())
         state["general"] = asdict(general)
         waiting = self.waiting_tab.to_settings()
@@ -3849,16 +3879,10 @@ class TournamentApp(QMainWindow):
         gs = GeneralSettings(**safe_gdata)
         self.general_tab.from_settings(gs)
         # Restore match tab bar fields
-        fmt_type = getattr(gs, "format_type", "First to") or "First to"
-        ix = self.match_format_combo.findText(fmt_type)
-        self.match_format_combo.setCurrentIndex(ix if ix >= 0 else 0)
-        self.match_format_value.setValue(max(1, min(7, int(gs.first_to or 2))))
-        # maps_count: new field; fall back to old first_to for legacy saves
         raw_mc = getattr(gs, "maps_count", None)
         maps_c = int(raw_mc) if raw_mc else max(1, min(7, int(gdata.get("first_to", 7) or 7)))
         self.match_maps_count.setValue(max(1, min(7, maps_c)))
         self.match_num_players.setValue(max(1, min(8, int(getattr(gs, "num_players", 5) or 5))))
-        self.match_division.setText(getattr(gs, "division", "") or "")
         self._update_map_cards_visibility(self.match_maps_count.value())
         self._update_player_rows_visibility(self.match_num_players.value())
         
@@ -3997,6 +4021,7 @@ class TournamentApp(QMainWindow):
         
     def _update_general_only(self):
         g = asdict(self.general_tab.to_settings())
+        g["maps_count"] = self.match_maps_count.value()
         self._export_general(GeneralSettings(**g))
         self._export_status_text({"general": g})
         full = {
@@ -4014,6 +4039,7 @@ class TournamentApp(QMainWindow):
         w = asdict(self.waiting_tab.to_settings())
         self._export_waiting({"waiting": w})
         g = asdict(self.general_tab.to_settings())
+        g["maps_count"] = self.match_maps_count.value()
         self._export_status_text({"general": g})
         self._autosave(self._collect_state())
         full = {
@@ -4028,6 +4054,26 @@ class TournamentApp(QMainWindow):
         self._last_state_for_diff = full
         self._notify_overlays(changed)
 
+    def _on_waiting_timer_tick(self):
+        """Kirjoittaa vain timer-tiedostot — ei koske tekstikenttiin tai muihin kenttiin."""
+        root = self._scoreboard_root()
+        wdir = os.path.join(root, "Waiting")
+        os.makedirs(wdir, exist_ok=True)
+        secs = max(0, int(self.waiting_tab._remaining_seconds))
+        running = self.waiting_tab._qtimer.isActive()
+        changed = []
+        if self._write_txt(os.path.join(wdir, "timer_seconds.txt"), str(secs)):
+            changed.append("waiting.timer")
+        if self._write_txt(os.path.join(wdir, "timer_running.txt"), "1" if running else "0"):
+            if "waiting.timer" not in changed:
+                changed.append("waiting.timer")
+        if changed:
+            self._notify_overlays(changed)
+        if hasattr(self, "_last_state_for_diff") and self._last_state_for_diff:
+            w = self._last_state_for_diff.get("waiting")
+            if isinstance(w, dict):
+                w["timer_seconds"] = secs
+                w["timer_running"] = running
 
     # ---------------------
     # Save/Load helpers

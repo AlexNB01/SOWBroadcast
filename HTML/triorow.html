@@ -226,7 +226,7 @@ async function upStatus(){
           if(ch.some(k=>k.startsWith("t1."))) await upT1();
           if(ch.some(k=>k.startsWith("t2."))) await upT2();
           if(ch.some(k=>k.startsWith("general."))) await upStaff();
-		  await upStatus();
+          if(ch.some(k=>k==="maps" || k==="general.status")) await upStatus();
           toggleScoreBoxes();
         }catch{}
       };

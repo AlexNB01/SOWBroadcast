@@ -230,6 +230,7 @@ async function upStatus(){
           if(ch.some(k=>k.startsWith("t1."))) await upT1();
           if(ch.some(k=>k.startsWith("t2."))) await upT2();
           if(ch.some(k=>k.startsWith("general."))) await upCasters();
+          if(ch.some(k=>k==="general.status")) await upStatus();
           toggleScoreBoxes();
         }catch{}
       };
