@@ -140,6 +140,20 @@ video{ width:100%; height:100%; background:#000; object-fit:cover; }
 }
 .social-icon{ width:1em; height:1em; flex:0 0 auto; filter: invert(1) brightness(1000%); }
 .social-chip span{ white-space:nowrap; }
+
+/* === Scene transition animations === */
+.left-column, .video-wrap, .ticker, #socials {
+  will-change: transform, opacity;
+  transition: transform 750ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease;
+}
+body:not(.visible) .left-column,
+body.leaving       .left-column { transform: translateX(-50px); opacity: 0; }
+body:not(.visible) .video-wrap,
+body.leaving       .video-wrap  { transform: translateX(50px);  opacity: 0; }
+body:not(.visible) .ticker,
+body.leaving       .ticker      { transform: translateY(calc(799px + 12px)) translateX(50px); opacity: 0; }
+body:not(.visible) #socials,
+body.leaving       #socials     { transform: translateY(30px);  opacity: 0; }
 </style>
 </head>
 <body>
@@ -521,6 +535,23 @@ function startSSE(){
   fitBigText();
   startSSE();
 })();
+
+function getStingerStartMs(){
+  const qs=new URLSearchParams(location.search);
+  const q=parseInt(qs.get("stinger")||qs.get("delay")||"",10);
+  if(!isNaN(q)&&q>=0) return q;
+  return 1800;
+}
+function setOverlayVisible(v){
+  document.body.classList.toggle("visible",!!v);
+  document.body.classList.toggle("leaving",!v);
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>setOverlayVisible(true),getStingerStartMs());
+});
+document.addEventListener("visibilitychange",()=>{
+  setOverlayVisible(!document.hidden);
+});
 </script>
 </body>
 </html>

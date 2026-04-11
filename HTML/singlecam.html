@@ -137,6 +137,19 @@
 }
 .channel{ background-position:right; }
 
+/* === Scene transition animations === */
+.scoreboardwrapper {
+  will-change: transform, opacity;
+  transition: transform 750ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease;
+}
+.wrapper {
+  will-change: transform, opacity;
+  transition: transform 750ms cubic-bezier(.2,.8,.2,1) 80ms, opacity 700ms ease 80ms;
+}
+body:not(.visible) .scoreboardwrapper,
+body.leaving       .scoreboardwrapper { transform: translateY(-40px); opacity: 0; }
+body:not(.visible) .wrapper,
+body.leaving       .wrapper { transform: translateY(40px); opacity: 0; }
 </style>
 
 </head>
@@ -283,6 +296,22 @@
 	  finally { startSSE(); }
 	})();
 
+function getStingerStartMs(){
+  const qs=new URLSearchParams(location.search);
+  const q=parseInt(qs.get("stinger")||qs.get("delay")||"",10);
+  if(!isNaN(q)&&q>=0) return q;
+  return 1800;
+}
+function setOverlayVisible(v){
+  document.body.classList.toggle("visible",!!v);
+  document.body.classList.toggle("leaving",!v);
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>setOverlayVisible(true),getStingerStartMs());
+});
+document.addEventListener("visibilitychange",()=>{
+  setOverlayVisible(!document.hidden);
+});
 </script>
 </body>
 </html>

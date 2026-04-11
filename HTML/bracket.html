@@ -53,6 +53,14 @@
   @keyframes flashScore{
     0%{color:#fff;}50%{color:var(--accent);}100%{color:#fff;}
   }
+
+/* === Scene transition animations === */
+.frame {
+  will-change: transform, opacity;
+  transition: transform 750ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease;
+}
+body:not(.visible) .frame,
+body.leaving       .frame { transform: translateY(32px); opacity: 0; }
 </style>
 </head>
 <body>
@@ -494,6 +502,23 @@
   load();
   startSSE();
   window.addEventListener("resize", fitRounds);
+
+function getStingerStartMs(){
+  const qs=new URLSearchParams(location.search);
+  const q=parseInt(qs.get("stinger")||qs.get("delay")||"",10);
+  if(!isNaN(q)&&q>=0) return q;
+  return 1800;
+}
+function setOverlayVisible(v){
+  document.body.classList.toggle("visible",!!v);
+  document.body.classList.toggle("leaving",!v);
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>setOverlayVisible(true),getStingerStartMs());
+});
+document.addEventListener("visibilitychange",()=>{
+  setOverlayVisible(!document.hidden);
+});
 </script>
 </body>
 </html>
