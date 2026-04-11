@@ -9,8 +9,8 @@
 ; ============================================================
 
 #define AppName      "SOWBroadcast"
-#define AppVersion   "1.0.0"
-#define AppPublisher "SOWBroadcast"
+#define AppVersion   "2.0.0"
+#define AppPublisher "Suomi OW"
 #define AppExeName   "SOWBroadcast.exe"
 #define ServerExe    "SOWServer.exe"
 #define LauncherBat  "launch.bat"
@@ -23,12 +23,12 @@ AppPublisher={#AppPublisher}
 AppPublisherURL=https://github.com/AlexNB01/SOWBroadcast
 AppSupportURL=https://github.com/AlexNB01/SOWBroadcast/issues
 AppUpdatesURL=https://github.com/AlexNB01/SOWBroadcast/releases
-DefaultDirName={autopf}\{#AppName}
+DefaultDirName=C:\{#AppName}
 DefaultGroupName={#AppName}
 LicenseFile=LICENSE
 OutputDir=installer
 OutputBaseFilename=SOWBroadcast-{#AppVersion}-Setup
-SetupIconFile=
+SetupIconFile=icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -95,6 +95,14 @@ Source: "Scoreboard\General\Icons\*"; \
 ; ---- Asetusten pohjatiedosto ----
 ; assets.json asennetaan vain jos kohdetta ei vielä ole (säilyttää käyttäjän muutokset)
 Source: "assets.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+
+; Scenekonfiguraatio – asennetaan vain jos kohdetta ei vielä ole (säilyttää käyttäjän muutokset)
+Source: "sowbroadcastscenes.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+
+; ---- Musiikki ----
+Source: "Music\*"; \
+  DestDir: "{app}\Music"; \
+  Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 ; Luodaan käyttäjädatakansiot valmiiksi (sovellus luo ne muutenkin, mutta siistimpää näin)
