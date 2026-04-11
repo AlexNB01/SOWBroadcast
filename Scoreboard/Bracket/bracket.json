@@ -1,6 +1,144 @@
 {
   "title": "",
   "stage": "",
-  "rounds": [],
+  "rounds": [
+    {
+      "name": "Quarterfinals",
+      "side": "upper",
+      "matches": [
+        {
+          "id": "m1775906747-2",
+          "bo_label": "",
+          "team1": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": ""
+        },
+        {
+          "id": "m1775906747-3",
+          "bo_label": "",
+          "team1": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": ""
+        },
+        {
+          "id": "m1775906747-4",
+          "bo_label": "",
+          "team1": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": ""
+        },
+        {
+          "id": "m1775906747-5",
+          "bo_label": "",
+          "team1": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": ""
+        }
+      ]
+    },
+    {
+      "name": "Semifinals",
+      "side": "upper",
+      "matches": [
+        {
+          "id": "m1775906747-6",
+          "bo_label": "",
+          "team1": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": ""
+        },
+        {
+          "id": "m1775906747-7",
+          "bo_label": "",
+          "team1": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": ""
+        }
+      ]
+    },
+    {
+      "name": "Final",
+      "side": "upper",
+      "matches": [
+        {
+          "id": "m1775906747-8",
+          "bo_label": "",
+          "team1": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": ""
+        }
+      ]
+    }
+  ],
   "double_elim_view": ""
 }

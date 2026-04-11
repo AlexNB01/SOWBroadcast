@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:/Suomi OW koodiprojektit/SOWBroadcast\" status)",
+      "Bash(git -C \"C:/Suomi OW koodiprojektit/SOWBroadcast\" log --oneline -5)",
+      "Bash(git -C \"C:/Suomi OW koodiprojektit/SOWBroadcast\" diff --stat HEAD)",
+      "Bash(git -C \"C:/Suomi OW koodiprojektit/SOWBroadcast\" checkout -b feature/ui-sse-improvements)",
+      "Bash(git -C \"C:/Suomi OW koodiprojektit/SOWBroadcast\" add .gitignore HTML/berightback.html HTML/duorow.html HTML/startingsoon.html HTML/thankyouforwatching.html HTML/triorow.html SOWBroadcast.py)",
+      "Bash(git -C 'C:/Suomi OW koodiprojektit/SOWBroadcast' commit -m ':*)",
+      "Bash(git -C \"C:/Suomi OW koodiprojektit/SOWBroadcast\" push -u origin feature/ui-sse-improvements)",
+      "Bash(gh pr create --base main --title 'UI and SSE improvements: countdown controls, socials, match tab cleanup' --body ':*)",
+      "Bash(grep -l \"visibilitychange\" \"C:/Suomi OW koodiprojektit/SOWBroadcast/HTML/\"*.html)",
+      "Bash(grep -l \"Scene transition animations\" \"C:/Suomi OW koodiprojektit/SOWBroadcast/HTML/\"*.html)",
+      "Bash(grep -E \"\\\\.\\(spec|cfg|toml|txt|ini\\)$\")"
+    ]
+  }
+}
