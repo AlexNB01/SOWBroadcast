@@ -14,8 +14,8 @@
   --quaternary:#2f3a43;
   --radius:16px;
   --shadow:0 10px 28px rgba(0,0,0,.35);
-  --social-font-min:16px;
-  --social-font-max:40px;
+  --social-font-min:14px;
+  --social-font-max:38px;
   --social-font:var(--social-font-max);
   --social-extra-pad:0px; 
 }
@@ -126,7 +126,7 @@ video{ width:100%; height:100%; background:#000; object-fit:cover; }
   position:absolute;
   right:20px;                 
   width:1420px;               
-  bottom:26px; height:80px;
+  bottom:20px; height:120px;
   display:flex; align-items:center;
   gap:12px; padding:0;
 }
@@ -143,7 +143,7 @@ video{ width:100%; height:100%; background:#000; object-fit:cover; }
   line-height:1.2;
 }
 .social-icon{ width:1em; height:1em; flex:0 0 auto; filter: invert(1) brightness(1000%); }
-.social-chip span{ overflow:hidden; text-overflow:ellipsis; }
+.social-chip span{ white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -553,8 +553,6 @@ function startSSE(){
 		}
 
         if(ch.some(k=>k==="matchtext")) await upTicker();
-
-        await upTicker();
       }catch{}
     };
   }catch{}

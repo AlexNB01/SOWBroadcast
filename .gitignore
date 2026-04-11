@@ -9,8 +9,8 @@ Music/
 autosave.json
 match.json
 Scoreboard/Match/
-Scoreboard/General/
-Scoreboard/Temp/
+Scoreboard/General/*
+!Scoreboard/General/Icons/
 
 # Pythonin välimuistit
 *.py[cod]
