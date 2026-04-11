@@ -88,7 +88,11 @@ class Team:
 # ---- General tab data ----
 @dataclass
 class GeneralSettings:
-    first_to: int = 3
+    first_to: int = 2
+    maps_count: int = 7
+    format_type: str = "First to"
+    num_players: int = 5
+    division: str = ""
     host: str = ""
     caster1: str = ""
     caster2: str = ""
@@ -755,42 +759,120 @@ class TeamPanel(QGroupBox):
 # -----------------------------
 # Map rows
 # -----------------------------
-class MapRow(QWidget):
-    def __init__(self, index: int, get_map_names, get_hero_names):
+class MapCard(QWidget):
+    """Card-style map widget shown in a grid on the Match tab."""
+
+    CARD_IMAGE_W = 220
+    CARD_IMAGE_H = 124
+
+    def __init__(self, index: int, get_map_names, get_hero_names, get_map_asset=None):
         super().__init__()
         self.get_map_names = get_map_names
         self.get_hero_names = get_hero_names
+        self.get_map_asset = get_map_asset  # callable(name) -> Asset | None
         self.index = index
 
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
+        self.setStyleSheet("""
+            MapCard {
+                border: 1px solid #CCCCCC;
+                border-radius: 6px;
+                background: #F8F8F8;
+            }
+        """)
 
-        self.label = QLabel(f"Map {index}")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(6, 6, 6, 6)
+        root.setSpacing(4)
 
-        self.map_combo = QComboBox(); self.refresh_maps()
+        # ── Top row: M{n} label | pick combo | map name combo ──
+        top = QHBoxLayout()
+        top.setSpacing(4)
+        self.label = QLabel(f"M{index}")
+        self.label.setStyleSheet("font-weight: bold;")
+        self.pick = QComboBox()
+        self.pick.addItems(["TBA", "T1", "T2"])
+        self.pick.setFixedWidth(55)
+        self.map_combo = QComboBox()
+        self.refresh_maps()
+        self.map_combo.currentTextChanged.connect(self._update_image)
+        top.addWidget(self.label)
+        top.addWidget(self.pick)
+        top.addWidget(self.map_combo, 1)
+        root.addLayout(top)
+
+        # ── Map image ──
+        self.image_label = QLabel()
+        self.image_label.setFixedSize(self.CARD_IMAGE_W, self.CARD_IMAGE_H)
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setStyleSheet(
+            "background:#333; border-radius:4px; color:#888;"
+        )
+        self.image_label.setText("TBA")
+        root.addWidget(self.image_label, alignment=Qt.AlignHCenter)
+
+        # ── Score row ──
+        score_row = QHBoxLayout()
+        score_row.setSpacing(4)
         self.t1score = QSpinBox(); self.t1score.setRange(0, 200)
         self.t2score = QSpinBox(); self.t2score.setRange(0, 200)
+        score_row.addStretch(1)
+        score_row.addWidget(self.t1score)
+        score_row.addWidget(QLabel("-"))
+        score_row.addWidget(self.t2score)
+        score_row.addStretch(1)
+        root.addLayout(score_row)
 
-        self.pick = QComboBox()
-        self.pick.addItems(["—", "T1", "T2"])
-
+        # ── Not Played / Completed toggle ──
         self.completed = QCheckBox("Completed")
+        root.addWidget(self.completed, alignment=Qt.AlignHCenter)
 
+        # ── Hero bans (compact) ──
+        bans_row = QHBoxLayout()
+        bans_row.setSpacing(4)
         self.t1ban = QComboBox(); self.refresh_hero_list(self.t1ban)
         self.t2ban = QComboBox(); self.refresh_hero_list(self.t2ban)
+        bans_row.addWidget(QLabel("T1 Ban:"))
+        bans_row.addWidget(self.t1ban, 1)
+        bans_row.addWidget(QLabel("T2 Ban:"))
+        bans_row.addWidget(self.t2ban, 1)
+        root.addLayout(bans_row)
 
-        row.addWidget(self.label)
-        row.addWidget(self.map_combo, 2)
-        row.addWidget(self.t1score)
-        row.addWidget(QLabel("-"))
-        row.addWidget(self.t2score)
-        row.addWidget(QLabel("Pick"))
-        row.addWidget(self.pick)
-        row.addWidget(QLabel("T1 Ban"))
-        row.addWidget(self.t1ban, 2)
-        row.addWidget(QLabel("T2 Ban"))
-        row.addWidget(self.t2ban, 2)
-        row.addWidget(self.completed)
+    # ── pick combo stores "—" / "T1" / "T2" internally ──
+    # but displays "TBA" / "T1" / "T2" to the user.
+    # We keep the internal values consistent with the old MapRow by mapping on read/write.
+
+    def _pick_text_to_data(self, text: str) -> str:
+        return "—" if text == "TBA" else text
+
+    def _pick_data_to_index(self, data: str) -> int:
+        mapping = {"—": 0, "TBA": 0, "T1": 1, "T2": 2}
+        return mapping.get(data, 0)
+
+    def get_pick_data(self) -> str:
+        """Return pick value in legacy format ('—', 'T1', 'T2')."""
+        return self._pick_text_to_data(self.pick.currentText())
+
+    def set_pick_data(self, data: str):
+        self.pick.setCurrentIndex(self._pick_data_to_index(data))
+
+    def _update_image(self, name: str):
+        if not name or not self.get_map_asset:
+            self.image_label.setPixmap(QPixmap())
+            self.image_label.setText("TBA")
+            return
+        asset = self.get_map_asset(name)
+        img_path = (asset.source_path or asset.image_path) if asset else None
+        if img_path and os.path.exists(img_path):
+            pix = QPixmap(img_path)
+            if not pix.isNull():
+                self.image_label.setPixmap(
+                    pix.scaled(self.CARD_IMAGE_W, self.CARD_IMAGE_H,
+                               Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                )
+                self.image_label.setText("")
+                return
+        self.image_label.setPixmap(QPixmap())
+        self.image_label.setText(name[:12] if name else "TBA")
 
     def refresh_maps(self):
         current = self.map_combo.currentText() if hasattr(self, "map_combo") else ""
@@ -812,7 +894,6 @@ class MapRow(QWidget):
             ix = combo.findText(current)
             combo.setCurrentIndex(ix if ix >= 0 else 0)
 
-
     def reset(self):
         self.map_combo.setCurrentIndex(0)
         self.t1score.setValue(0)
@@ -821,6 +902,8 @@ class MapRow(QWidget):
         self.pick.setCurrentIndex(0)
         self.t1ban.setCurrentIndex(0)
         self.t2ban.setCurrentIndex(0)
+        self.image_label.setPixmap(QPixmap())
+        self.image_label.setText("TBA")
 
         
 class GeneralTab(QWidget):
@@ -843,15 +926,10 @@ class GeneralTab(QWidget):
         super().__init__()
         root = QVBoxLayout(self)
 
-        bo_box = QGroupBox("Number of Maps")
-        bo_lay = QHBoxLayout(bo_box)
+        # maps_count spinbox kept as hidden attribute for backward compat with to_settings/from_settings
         self.maps_count = QSpinBox()
         self.maps_count.setRange(1, 7)
-        self.maps_count.setValue(3)
-        bo_lay.addWidget(QLabel("Maps:"))
-        bo_lay.addWidget(self.maps_count)
-        bo_lay.addStretch(1)
-        root.addWidget(bo_box)
+        self.maps_count.setValue(7)
 
         people_box = QGroupBox("Casters & Host")
         people = QGridLayout(people_box)
@@ -979,6 +1057,8 @@ class GeneralTab(QWidget):
             overlay_logo_path=self.overlay_logo_path,
             transition_logo_path=self.transition_logo_path,
             colors=dict(self._colors),
+            # format_type / num_players / division are owned by the match tab bar
+            # and injected into the state by _collect_state(); defaults here.
         )
 
 
@@ -2360,6 +2440,42 @@ class TournamentApp(QMainWindow):
         match_tab = QWidget()
         match_root = QVBoxLayout(match_tab)
 
+        # ── Format bar ──
+        fmt_bar = QHBoxLayout()
+        fmt_bar.setSpacing(10)
+        fmt_bar.addWidget(QLabel("Format"))
+        self.match_format_combo = QComboBox()
+        self.match_format_combo.addItems(["First to", "Best of"])
+        self.match_format_combo.setFixedWidth(90)
+        fmt_bar.addWidget(self.match_format_combo)
+        self.match_format_value = QSpinBox()
+        self.match_format_value.setRange(1, 7)
+        self.match_format_value.setValue(2)
+        self.match_format_value.setFixedWidth(55)
+        fmt_bar.addWidget(self.match_format_value)
+        fmt_bar.addSpacing(16)
+        fmt_bar.addWidget(QLabel("Maps"))
+        self.match_maps_count = QSpinBox()
+        self.match_maps_count.setRange(1, 7)
+        self.match_maps_count.setValue(7)
+        self.match_maps_count.setFixedWidth(55)
+        self.match_maps_count.valueChanged.connect(self._update_map_cards_visibility)
+        fmt_bar.addWidget(self.match_maps_count)
+        fmt_bar.addSpacing(16)
+        fmt_bar.addWidget(QLabel("Players"))
+        self.match_num_players = QSpinBox()
+        self.match_num_players.setRange(1, 8)
+        self.match_num_players.setValue(5)
+        self.match_num_players.setFixedWidth(55)
+        self.match_num_players.valueChanged.connect(self._update_player_rows_visibility)
+        fmt_bar.addWidget(self.match_num_players)
+        fmt_bar.addSpacing(16)
+        fmt_bar.addWidget(QLabel("Division"))
+        self.match_division = QLineEdit()
+        self.match_division.setPlaceholderText("Enter Division...")
+        fmt_bar.addWidget(self.match_division, 1)
+        match_root.addLayout(fmt_bar)
+
         splitter = QSplitter()
         self.team1_panel = TeamPanel("Team 1", self._hero_names, default_color="#55aaff")
         self.team2_panel = TeamPanel("Team 2", self._hero_names, default_color="#ff557f")
@@ -2368,24 +2484,24 @@ class TournamentApp(QMainWindow):
         splitter.setSizes([700, 700])
         match_root.addWidget(splitter, 6)
 
+        # ── Map cards grid ──
         maps_box = QGroupBox("Maps")
-        maps_layout = QVBoxLayout(maps_box)
+        maps_box_layout = QVBoxLayout(maps_box)
 
-        self.map_rows: List[MapRow] = []
-        for i in range(1, 8):
-            mr = MapRow(i, self._map_names, self._hero_names)
-            self.map_rows.append(mr)
-            maps_layout.addWidget(mr)
+        maps_grid_widget = QWidget()
+        self._maps_grid = QGridLayout(maps_grid_widget)
+        self._maps_grid.setSpacing(8)
 
-        current_row = QHBoxLayout()
-        current_row.addWidget(QLabel("Current:"))
-        self.current_map_buttons: List[QRadioButton] = []
+        self.map_rows: List[MapCard] = []
         for i in range(1, 8):
-            rb = QRadioButton(str(i))
-            self.current_map_buttons.append(rb)
-            current_row.addWidget(rb)
-        current_row.addStretch()
-        maps_layout.addLayout(current_row)
+            mc = MapCard(i, self._map_names, self._hero_names, self._get_map_asset)
+            self.map_rows.append(mc)
+            row_pos = (i - 1) // 3
+            col_pos = (i - 1) % 3
+            self._maps_grid.addWidget(mc, row_pos, col_pos)
+
+        maps_box_layout.addWidget(maps_grid_widget)
+
 
         match_root.addWidget(maps_box, 4)
 
@@ -2433,7 +2549,10 @@ class TournamentApp(QMainWindow):
         tabs.addTab(self.bracket_tab, "Bracket")
         
         self._ensure_default_assets_installed()
-        self._auto_discover_assets()  
+        self._auto_discover_assets()
+        # Apply initial visibility based on default spinbox values
+        self._update_map_cards_visibility(self.match_maps_count.value())
+        self._update_player_rows_visibility(self.match_num_players.value())
 
         self._load_autosave()
         self._last_state_for_diff = None
@@ -2896,14 +3015,28 @@ class TournamentApp(QMainWindow):
             mr.refresh_maps()
             mr.refresh_hero_list(mr.t1ban)
             mr.refresh_hero_list(mr.t2ban)
+            # Refresh map image for currently selected map
+            mr._update_image(mr.map_combo.currentText())
         if hasattr(self, "draft_tab"):
             self.draft_tab.reload()
+
+    def _get_map_asset(self, name: str):
+        return self.maps.get(name)
 
     def _hero_names(self) -> List[str]:
         return sorted(self.heroes.keys())
 
     def _map_names(self) -> List[str]:
         return sorted(self.maps.keys())
+
+    def _update_map_cards_visibility(self, count: int):
+        for i, mc in enumerate(self.map_rows):
+            mc.setVisible(i < count)
+
+    def _update_player_rows_visibility(self, count: int):
+        for panel in (self.team1_panel, self.team2_panel):
+            for i, pr in enumerate(panel.player_rows):
+                pr.setVisible(i < count)
     
     def _write_txt(self, path: str, text: str) -> bool:
         """
@@ -3451,7 +3584,8 @@ class TournamentApp(QMainWindow):
         self._write_txt(os.path.join(gen_dir, "host.txt"),     settings.host or "")
         self._write_txt(os.path.join(gen_dir, "caster1.txt"),  settings.caster1 or "")
         self._write_txt(os.path.join(gen_dir, "caster2.txt"),  settings.caster2 or "")
-        self._write_txt(os.path.join(gen_dir, "first_to.txt"), str(settings.first_to))
+        # maps.html reads first_to.txt as the total number of maps to display
+        self._write_txt(os.path.join(gen_dir, "first_to.txt"), str(getattr(settings, "maps_count", settings.first_to)))
 
         with open(os.path.join(gen_dir, "colors.txt"), "w", encoding="utf-8") as f:
             for k, v in (settings.colors or {}).items():
@@ -3549,8 +3683,6 @@ class TournamentApp(QMainWindow):
         self.team2_panel.reset()
         self.team1_panel.color_hex = "#55aaff"; self.team1_panel._apply_color_style()
         self.team2_panel.color_hex = "#ff557f"; self.team2_panel._apply_color_style()
-        for i, rb in enumerate(self.current_map_buttons, start=1):
-            rb.setChecked(i == 1)
         for mr in self.map_rows:
             mr.reset()
         self._autosave(self._collect_state())
@@ -3607,9 +3739,10 @@ class TournamentApp(QMainWindow):
         t1 = self.team1_panel.to_team()
         t2 = self.team2_panel.to_team()
 
+        # Current map = first non-completed map
         current_ix = None
-        for i, rb in enumerate(self.current_map_buttons, start=1):
-            if rb.isChecked():
+        for i, mr in enumerate(self.map_rows, start=1):
+            if mr.isVisible() and not mr.completed.isChecked():
                 current_ix = i
                 break
 
@@ -3621,7 +3754,7 @@ class TournamentApp(QMainWindow):
                 "t1": mr.t1score.value(),
                 "t2": mr.t2score.value(),
                 "completed": mr.completed.isChecked(),
-                "pick": mr.pick.currentText(),
+                "pick": mr.get_pick_data(),
                 "t1_ban": ("" if mr.t1ban.currentText() == "— Hero —" else mr.t1ban.currentText()),
                 "t2_ban": ("" if mr.t2ban.currentText() == "— Hero —" else mr.t2ban.currentText()),
                 "winner": ("t1" if mr.t1score.value() > mr.t2score.value()
@@ -3642,6 +3775,13 @@ class TournamentApp(QMainWindow):
             }
         }
         general = self.general_tab.to_settings()
+        # Inject match-tab bar fields into general settings
+        general.format_type = self.match_format_combo.currentText()
+        general.first_to = self.match_format_value.value()
+        general.maps_count = self.match_maps_count.value()
+        general.num_players = self.match_num_players.value()
+        general.division = self.match_division.text().strip()
+        self.general_tab.maps_count.setValue(self.match_maps_count.value())
         state["general"] = asdict(general)
         waiting = self.waiting_tab.to_settings()
         state["waiting"] = asdict(waiting)
@@ -3684,9 +3824,7 @@ class TournamentApp(QMainWindow):
                 mr.completed.setChecked(bool(item.get("completed", False)))
 
                 txt = (item.get("pick") or "")
-                if txt == "T1": mr.pick.setCurrentIndex(1)
-                elif txt == "T2": mr.pick.setCurrentIndex(2)
-                else: mr.pick.setCurrentIndex(0)
+                mr.set_pick_data(txt)
 
 
                 t1b = (item.get("t1_ban") or "")
@@ -3702,12 +3840,27 @@ class TournamentApp(QMainWindow):
                 else:
                     mr.t2ban.setCurrentIndex(0)
 
-        cur = state.get("current_map")
-        for i, rb in enumerate(self.current_map_buttons, start=1):
-            rb.setChecked(i == cur)
+        # current_map is now auto-computed; nothing to restore
         
         gdata = state.get("general", {})
-        self.general_tab.from_settings(GeneralSettings(**gdata))
+        # Filter to only known GeneralSettings fields to avoid __init__ errors
+        known_general_fields = set(GeneralSettings.__dataclass_fields__)
+        safe_gdata = {k: v for k, v in gdata.items() if k in known_general_fields}
+        gs = GeneralSettings(**safe_gdata)
+        self.general_tab.from_settings(gs)
+        # Restore match tab bar fields
+        fmt_type = getattr(gs, "format_type", "First to") or "First to"
+        ix = self.match_format_combo.findText(fmt_type)
+        self.match_format_combo.setCurrentIndex(ix if ix >= 0 else 0)
+        self.match_format_value.setValue(max(1, min(7, int(gs.first_to or 2))))
+        # maps_count: new field; fall back to old first_to for legacy saves
+        raw_mc = getattr(gs, "maps_count", None)
+        maps_c = int(raw_mc) if raw_mc else max(1, min(7, int(gdata.get("first_to", 7) or 7)))
+        self.match_maps_count.setValue(max(1, min(7, maps_c)))
+        self.match_num_players.setValue(max(1, min(8, int(getattr(gs, "num_players", 5) or 5))))
+        self.match_division.setText(getattr(gs, "division", "") or "")
+        self._update_map_cards_visibility(self.match_maps_count.value())
+        self._update_player_rows_visibility(self.match_num_players.value())
         
         wdata = state.get("waiting", {}) or {}
         self.waiting_tab.from_settings(WaitingSettings(**wdata))
