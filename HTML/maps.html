@@ -378,7 +378,7 @@ const shouldShowScore = !!m.name && (m.t1 > 0 || m.t2 > 0 || m.completed);
 	  card.appendChild(scoreDiv);
 	}
 
-if (m.t1ban || m.t2ban) {
+if (m.name) {
   const bans = document.createElement("div");
   bans.className = "map-bans";
 
@@ -401,12 +401,19 @@ if (m.t1ban || m.t2ban) {
     return wrap;
   }
 
-  if (m.t1ban) bans.appendChild(await makeBanWrap(m.t1ban));
+  // T1 ban (or empty spacer to keep grid layout)
+  if (m.t1ban) {
+    bans.appendChild(await makeBanWrap(m.t1ban));
+  } else {
+    const spacer = document.createElement("div");
+    bans.appendChild(spacer);
+  }
 
+  // Mode icon always in center
   const modeDiv = document.createElement("div");
   modeDiv.className = "mode-icon";
   let modeSlug = "";
-  if (m.name) {
+  {
     const mslug = slug(m.name);
     const meta = mapsBySlug[mslug];
     const modeName = (meta?.mode || "").toLowerCase();
@@ -418,7 +425,13 @@ if (m.t1ban || m.t2ban) {
   }
   bans.appendChild(modeDiv);
 
-  if (m.t2ban) bans.appendChild(await makeBanWrap(m.t2ban));
+  // T2 ban (or empty spacer to keep grid layout)
+  if (m.t2ban) {
+    bans.appendChild(await makeBanWrap(m.t2ban));
+  } else {
+    const spacer = document.createElement("div");
+    bans.appendChild(spacer);
+  }
 
   card.appendChild(bans);
 }
