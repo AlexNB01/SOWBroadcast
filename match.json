@@ -1,8 +1,8 @@
 {
   "team1": {
-    "name": "GoaTricks",
-    "abbr": "GT",
-    "logo_path": "C:/Suomi OW koodiprojektit/SOWBroadcast/Scoreboard/Temp/Team Logos/ESM/goatricks.png",
+    "name": "",
+    "abbr": "",
+    "logo_path": null,
     "score": 0,
     "color_hex": "#55aaff",
     "players": [
@@ -50,8 +50,8 @@
     "banned_hero": ""
   },
   "team2": {
-    "name": "fsdfgdfgfdgdfs",
-    "abbr": "fds",
+    "name": "",
+    "abbr": "",
     "logo_path": null,
     "score": 0,
     "color_hex": "#ff557f",
@@ -106,9 +106,9 @@
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "T2",
-      "t1_ban": "Ashe",
-      "t2_ban": "Brigitte",
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
       "winner": ""
     },
     {
@@ -117,7 +117,7 @@
       "t1": 0,
       "t2": 0,
       "completed": false,
-      "pick": "T1",
+      "pick": "—",
       "t1_ban": "",
       "t2_ban": "",
       "winner": ""
@@ -178,40 +178,40 @@
       "winner": ""
     }
   ],
-  "current_map": 2,
+  "current_map": 1,
   "map_pool": [
-    "Aatlis",
-    "Antarctic Peninsula",
-    "Blizzard World",
+    "Antartic Peninsula",
     "Busan",
-    "Circuit Royal",
-    "Colosseo",
-    "Dorado",
-    "Eichenwalde",
-    "Esperanca",
-    "Havana",
-    "Hollywood",
     "Ilios",
-    "Junkertown",
-    "King S Row",
     "Lijiang Tower",
-    "Midtown",
     "Nepal",
-    "New Junk City",
-    "New Queen Street",
-    "Numbani",
     "Oasis",
-    "Paraiso",
+    "Samoa",
+    "Circuit Royal",
+    "Dorado",
+    "Havana",
+    "Junkertown",
     "Rialto",
     "Route 66",
-    "Runasapi",
-    "Samoa",
     "Shambali Monastery",
+    "Watchpoint: Gibraltar",
+    "Aatlis",
+    "New Junk City",
     "Suravasa",
-    "Watchpoint Gibraltar"
+    "Blizzard World",
+    "Eichenwalde",
+    "Hollywood",
+    "King's Row",
+    "Midtown",
+    "Numbani",
+    "Paraíso",
+    "Colosseo",
+    "Esperança",
+    "New Queen Street",
+    "Runasapi"
   ],
   "general": {
-    "first_to": 5,
+    "first_to": 3,
     "host": "",
     "caster1": "",
     "caster2": "",
@@ -219,7 +219,7 @@
     "overlay_logo_path": null,
     "transition_logo_path": null,
     "colors": {
-      "primary": "#ffffff",
+      "primary": "#FFFFFF",
       "secondary": "#000000",
       "tertiary": "#55aaff",
       "quaternary": "#006ea1",
@@ -232,16 +232,116 @@
   "waiting": {
     "videos_dir": "",
     "timer_seconds": 0,
-    "text_starting": "STARTING SOON!fdsfds",
+    "text_starting": "STARTING SOON!",
     "text_brb": "BE RIGHT BACK!",
-    "text_end": "THANK YOU FOR WATCHING",
+    "text_end": "THANK YOU FOR WATCHING!",
     "timer_running": false,
-    "socials": {
-      "twitch": "suomiow",
-      "twitter": "testidsfa",
-      "youtube": "testidsfd"
+    "socials": {},
+    "ticker_override": "",
+    "ticker_override_enabled": false
+  },
+  "standings": {
+    "title": "",
+    "subtitle": "",
+    "columns": {
+      "mode": "map_diff"
     },
-    "ticker_override": "Moi mitä kuuluu dfasddfdsfdsd",
-    "ticker_override_enabled": true
+    "rows": [],
+    "groups": [
+      {
+        "key": "group_1",
+        "name": "Group 1",
+        "rows": []
+      }
+    ],
+    "display_group": "__all__"
+  },
+  "bracket": {
+    "title": "",
+    "stage": "",
+    "rounds": [],
+    "double_elim_view": "",
+    "teams": [
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      }
+    ]
   }
 }
