@@ -42,6 +42,16 @@
     from{ transform:translateX(60px); clip-path:polygon(0 0,0 0,0 100%,0 100%); opacity:0; }
     to  { transform:none;             clip-path:polygon(0 0,100% 0,100% 100%,0 100%); opacity:1; }
   }
+
+/* === Scene transition animations === */
+video, .replaytext {
+  will-change: opacity;
+  transition: opacity 700ms ease;
+}
+body:not(.visible) video,
+body.leaving       video       { opacity: 0; }
+body:not(.visible) .replaytext,
+body.leaving       .replaytext { opacity: 0; }
 </style>
 </head>
 <body>
@@ -117,6 +127,28 @@
   }
 
   document.addEventListener("DOMContentLoaded", init);
+
+function getStingerStartMs(){
+  const qs=new URLSearchParams(location.search);
+  const q=parseInt(qs.get("stinger")||qs.get("delay")||"",10);
+  if(!isNaN(q)&&q>=0) return q;
+  return 1800;
+}
+function setOverlayVisible(v){
+  document.body.classList.toggle("visible",!!v);
+  document.body.classList.toggle("leaving",!v);
+  if(v){
+    // re-trigger badge slide animation
+    const badge=document.querySelector(".badge");
+    if(badge){ badge.style.animation="none"; void badge.offsetWidth; badge.style.animation=""; }
+  }
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>setOverlayVisible(true),getStingerStartMs());
+});
+document.addEventListener("visibilitychange",()=>{
+  setOverlayVisible(!document.hidden);
+});
 </script>
 </body>
 </html>

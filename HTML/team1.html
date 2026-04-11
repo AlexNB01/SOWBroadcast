@@ -286,6 +286,13 @@ function applyStagger(){
   }
 
   (async()=>{ await render(); startSSE(); })();
+
+function setOverlayVisible(v){
+  if(v) applyStagger();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden) setOverlayVisible(true);
+});
 </script>
 </body>
 </html>
