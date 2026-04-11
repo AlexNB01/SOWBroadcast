@@ -1,0 +1,37 @@
+# Pyytämäsi
+OBS/
+__pycache__/
+.gitignore
+Highlights/
+Music/
+
+# Sovelluksen ajonaikaiset datatiedostot
+autosave.json
+match.json
+Scoreboard/Match/
+Scoreboard/General/
+Scoreboard/Temp/
+
+# Pythonin välimuistit
+*.py[cod]
+*$py.class
+
+# Virtuaaliympäristöt
+.venv/
+venv/
+
+# Rakennusartifaktit
+build/
+dist/
+*.spec
+
+# Lokit
+*.log
+
+# Editorit
+.vscode/
+.idea/
+
+# OSin roskaa
+.DS_Store
+Thumbs.db
