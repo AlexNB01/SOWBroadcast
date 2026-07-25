@@ -1,9 +1,10 @@
 import sys, os, json, re, shutil, time, threading, unicodedata, shutil
 import server as _sb__force_include
+import draft_link
 from dataclasses import dataclass, asdict
 from typing import Callable, Dict, List, Optional
 
-from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal
+from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal, QObject, QEvent
 from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -11,8 +12,61 @@ from PyQt5.QtWidgets import (
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
     QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
-    QTableWidget, QHeaderView, QDialogButtonBox
+    QTableWidget, QHeaderView, QDialogButtonBox, QCompleter
 )
+
+
+class _ComboClickToSearch(QObject):
+    """Makes an editable combo's line edit behave like a normal dropdown on
+    click (opens the full list, like before) while still leaving it ready for
+    the user to just start typing to search: a click selects the whole current
+    text so the first keystroke replaces it instead of requiring it to be
+    cleared by hand first."""
+    def __init__(self, combo: QComboBox):
+        super().__init__(combo)
+        self.combo = combo
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            self.combo.lineEdit().selectAll()
+            self.combo.showPopup()
+            return True
+        return False
+
+
+def make_combo_searchable(combo: QComboBox) -> QComboBox:
+    """Turns a QComboBox into a type-to-filter searchable one: typing filters the
+    popup to matching items (case-insensitive, substring match) instead of only
+    prefix-matching. Typed text that doesn't match any item reverts to the last
+    valid selection on focus-out, so this can't smuggle free text into fields
+    that are only ever supposed to hold one of the combo's real items. Clicking
+    it still opens the full list like a regular dropdown, with the current text
+    pre-selected so typing immediately starts a fresh search."""
+    combo.setEditable(True)
+    combo.setInsertPolicy(QComboBox.NoInsert)
+
+    completer = QCompleter(combo.model(), combo)
+    completer.setCaseSensitivity(Qt.CaseInsensitive)
+    completer.setFilterMode(Qt.MatchContains)
+    completer.setCompletionMode(QCompleter.PopupCompletion)
+    combo.setCompleter(completer)
+
+    combo._last_valid_index = combo.currentIndex()
+
+    def _remember_valid(ix):
+        if ix >= 0:
+            combo._last_valid_index = ix
+    combo.currentIndexChanged.connect(_remember_valid)
+
+    def _snap_to_valid():
+        ix = combo.findText(combo.currentText(), Qt.MatchFixedString)
+        combo.setCurrentIndex(ix if ix >= 0 else combo._last_valid_index)
+    combo.lineEdit().editingFinished.connect(_snap_to_valid)
+
+    combo._click_to_search_filter = _ComboClickToSearch(combo)
+    combo.lineEdit().installEventFilter(combo._click_to_search_filter)
+
+    return combo
 
 # -----------------------------
 # Data models
@@ -286,7 +340,7 @@ class BracketMatchWidget(QWidget):
 
     def _build_team_combo(self, initial: str) -> QComboBox:
         combo = QComboBox()
-        combo.setEditable(False)
+        make_combo_searchable(combo)
         combo.setMinimumWidth(140)
         self._populate_combo(combo, initial)
         return combo
@@ -450,6 +504,7 @@ class AssetManagerDialog(QDialog):
         self.mode_combo = None
         if self.title == "Maps":
             self.mode_combo = QComboBox()
+            make_combo_searchable(self.mode_combo)
             for n in sorted(self._mode_names):
                 self.mode_combo.addItem(n)
             form.addRow("Mode", self.mode_combo)
@@ -596,8 +651,9 @@ class PlayerRow(QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         self.label = QLabel(f"Player {index}")
         self.name = QLineEdit(); self.name.setPlaceholderText("Name")
-        self.hero = QComboBox(); self.refresh_heroes()
+        self.hero = QComboBox(); make_combo_searchable(self.hero); self.refresh_heroes()
         self.role = QComboBox()
+        make_combo_searchable(self.role)
         self.role.addItem("- Role -")
         self.role.addItems(ROLES)
         row.addWidget(self.label)
@@ -790,9 +846,11 @@ class MapCard(QWidget):
         self.label = QLabel(f"M{index}")
         self.label.setStyleSheet("font-weight: bold;")
         self.pick = QComboBox()
+        make_combo_searchable(self.pick)
         self.pick.addItems(["TBA", "T1", "T2"])
         self.pick.setFixedWidth(55)
         self.map_combo = QComboBox()
+        make_combo_searchable(self.map_combo)
         self.refresh_maps()
         self.map_combo.currentTextChanged.connect(self._update_image)
         top.addWidget(self.label)
@@ -829,8 +887,8 @@ class MapCard(QWidget):
         # ── Hero bans (compact) ──
         bans_row = QHBoxLayout()
         bans_row.setSpacing(4)
-        self.t1ban = QComboBox(); self.refresh_hero_list(self.t1ban)
-        self.t2ban = QComboBox(); self.refresh_hero_list(self.t2ban)
+        self.t1ban = QComboBox(); make_combo_searchable(self.t1ban); self.refresh_hero_list(self.t1ban)
+        self.t2ban = QComboBox(); make_combo_searchable(self.t2ban); self.refresh_hero_list(self.t2ban)
         bans_row.addWidget(QLabel("T1 Ban:"))
         bans_row.addWidget(self.t1ban, 1)
         bans_row.addWidget(QLabel("T2 Ban:"))
@@ -1534,6 +1592,7 @@ class StandingsTab(QWidget):
         group_layout = QGridLayout(group_box)
         self.add_group_btn = QPushButton("Add Group")
         self.display_combo = QComboBox()
+        make_combo_searchable(self.display_combo)
         self.display_combo.addItem("All groups", "__all__")
         group_layout.addWidget(self.add_group_btn, 0, 0)
         group_layout.addWidget(QLabel("Show in standings.html"), 0, 1)
@@ -1766,6 +1825,7 @@ class StandingsTab(QWidget):
         table.setCellWidget(row, 6, points_spin)
 
         status_combo = QComboBox()
+        make_combo_searchable(status_combo)
         status_combo.addItem("")
         status_combo.addItems(["qualified", "eliminated"])
         status = (getattr(row_data, "status", "") or "").strip().lower()
@@ -1950,6 +2010,7 @@ class BracketTab(QWidget):
         controls = QGroupBox("Bracket Controls")
         controls_layout = QHBoxLayout(controls)
         self.template_combo = QComboBox()
+        make_combo_searchable(self.template_combo)
         self.template_combo.addItems([
             "4 team single elimination",
             "6 team single elimination (top 2 start round 2)",
@@ -1965,6 +2026,7 @@ class BracketTab(QWidget):
         controls_layout.addWidget(self.load_template_btn)
         self.double_elim_view_label = QLabel("Double elim view")
         self.double_elim_view_combo = QComboBox()
+        make_combo_searchable(self.double_elim_view_combo)
         self.double_elim_view_combo.addItems([
             "Upper Bracket",
             "Lower Bracket",
@@ -2378,6 +2440,7 @@ class BulkImportRow(QWidget):
         self.mode_combo = None
         if kind == "Map":
             self.mode_combo = QComboBox()
+            make_combo_searchable(self.mode_combo)
             self.mode_combo.addItem("")
             for m in sorted(mode_names or []):
                 self.mode_combo.addItem(m)
@@ -2498,6 +2561,29 @@ class TournamentApp(QMainWindow):
         splitter.addWidget(self.team2_panel)
         splitter.setSizes([700, 700])
         match_root.addWidget(splitter, 6)
+
+        # ── SOWDraft live link ──
+        link_box = QGroupBox("SOWDraft Live Link")
+        link_root = QVBoxLayout(link_box)
+        link_row = QHBoxLayout()
+        self.link_url_edit = QLineEdit()
+        self.link_url_edit.setPlaceholderText("Liitä SOWDraftin stream-linkki (esim. https://.../stream?matchId=...)")
+        self.link_btn = QPushButton("Link")
+        self.link_btn.clicked.connect(self._on_link_draft_room)
+        self.unlink_btn = QPushButton("Unlink")
+        self.unlink_btn.setEnabled(False)
+        self.unlink_btn.clicked.connect(self._on_unlink_draft_room)
+        self.link_status_label = QLabel("Ei linkitetty")
+        link_row.addWidget(self.link_url_edit, 1)
+        link_row.addWidget(self.link_btn)
+        link_row.addWidget(self.unlink_btn)
+        link_row.addWidget(self.link_status_label)
+        link_root.addLayout(link_row)
+        match_root.addWidget(link_box)
+
+        self._draft_link = draft_link.DraftLinkClient()
+        self._draft_link.signals.status_changed.connect(self._on_draft_link_status)
+        self._draft_link.signals.state_received.connect(self._on_draft_link_state)
 
         # ── Map cards grid ──
         maps_box = QGroupBox("Maps")
@@ -3766,6 +3852,166 @@ class TournamentApp(QMainWindow):
 
 
     # ---------------------
+    # SOWDraft live link
+    # ---------------------
+    def _on_link_draft_room(self):
+        url = self.link_url_edit.text().strip()
+        if not url:
+            QMessageBox.warning(self, "Link Draft Room", "Liitä ensin SOWDraftin stream-linkki.")
+            return
+        try:
+            self._draft_link.connect(url)
+        except ValueError as e:
+            QMessageBox.warning(self, "Link Draft Room", str(e))
+
+    def _on_unlink_draft_room(self):
+        self._draft_link.disconnect()
+        for mr in self.map_rows:
+            mr.reset()
+        self._update()
+
+    def _on_draft_link_status(self, status: str):
+        labels = {
+            "connecting": "Yhdistetään…",
+            "connected": "Linkitetty",
+            "disconnected": "Ei linkitetty",
+        }
+        if status.startswith("error:"):
+            text = f"Virhe: {status[len('error:'):]}"
+        else:
+            text = labels.get(status, status)
+        self.link_status_label.setText(text)
+
+        is_linked_or_pending = self._draft_link.match_id is not None
+        self.link_btn.setEnabled(not is_linked_or_pending)
+        self.unlink_btn.setEnabled(is_linked_or_pending)
+        self.link_url_edit.setEnabled(not is_linked_or_pending)
+
+    @staticmethod
+    def _find_combo_text(combo: QComboBox, name: str) -> int:
+        """findText, but falls back to a punctuation/case-insensitive match.
+        SOWDraft and SOWBroadcast don't always spell a map/hero name identically
+        (e.g. SOWBroadcast's asset list has "King S Row" for what SOWDraft sends
+        as "King's Row") — an exact-match-only lookup would silently leave the
+        combo unset even though the row itself was correctly identified."""
+        if not name:
+            return -1
+        ix = combo.findText(name)
+        if ix >= 0:
+            return ix
+        target = re.sub(r'[^a-z0-9]', '', name.lower())
+        if not target:
+            return -1
+        for i in range(combo.count()):
+            if re.sub(r'[^a-z0-9]', '', combo.itemText(i).lower()) == target:
+                return i
+        return -1
+
+    @staticmethod
+    def _decided_map_details(summary: list) -> list:
+        """Per finished, non-draw map, in play order: the round's real score and
+        which SOWDraft team picked it, pulled from the 'result' entry and the
+        round's own 'pickedBy' that SOWDraft attaches to each summary round.
+        Draws are excluded, same as SOWDraft's own previousMaps, so the two line
+        up index-for-index."""
+        details = []
+        for round_entry in summary or []:
+            result = next((e for e in (round_entry.get("entries") or []) if e.get("type") == "result"), None)
+            if result and result.get("winner") != "draw":
+                details.append({
+                    "team1Score": result.get("team1Score"),
+                    "team2Score": result.get("team2Score"),
+                    "pickedBy": round_entry.get("pickedBy"),
+                })
+        return details
+
+    def _on_draft_link_state(self, payload: dict):
+        """Soittaa SOWDraftin julkisen 'stream'-roolin update-state-tapahtumasta.
+        Synkkaa vain kartat ja hahmobannit — joukkueiden nimet/logot ohitetaan
+        tarkoituksella, koska ne on helpompi (ja turvallisempi puolenvaihtojen
+        kannalta) pitää manuaalisina."""
+        def norm(s):
+            return (s or "").strip().lower()
+
+        sow_t1 = norm(payload.get("team1Name"))
+        sow_t2 = norm(payload.get("team2Name"))
+        my_t1 = norm(self.team1_panel.team_name.text())
+        my_t2 = norm(self.team2_panel.team_name.text())
+
+        # SOWDraftin joukkuenimi -> SOWBroadcastin puoli ("t1"/"t2"). Jos nimet eivät
+        # täsmää kummallakaan tavalla, jätetään bannit/voittajat asettamatta sen sijaan
+        # että arvattaisiin väärä puoli.
+        side_for_sow_team = {}
+        if my_t1 and my_t2 and sow_t1 and sow_t2:
+            if sow_t1 == my_t1 and sow_t2 == my_t2:
+                side_for_sow_team = {sow_t1: "t1", sow_t2: "t2"}
+            elif sow_t1 == my_t2 and sow_t2 == my_t1:
+                side_for_sow_team = {sow_t1: "t2", sow_t2: "t1"}
+
+        previous_maps = payload.get("previousMaps") or []
+        selected_map = payload.get("selectedMap")
+        current_picker = payload.get("selectedMapTeam")
+        hero_bans = payload.get("heroBans") or []
+        decided_details = self._decided_map_details(payload.get("summary"))
+
+        # team1Score/team2Score in SOWDraft's summary always refer to SOWDraft's own
+        # team1/team2 (fixed for the whole match) — whether that lines up with
+        # SOWBroadcast's t1/t2 or is flipped is a single, match-wide fact, not
+        # something that varies per map/winner.
+        names_matched = bool(side_for_sow_team)
+        sides_swapped = side_for_sow_team.get(sow_t1) == "t2"
+
+        ordered_maps = [pm.get("map") for pm in previous_maps]
+        if selected_map:
+            ordered_maps.append(selected_map)
+
+        for i, mr in enumerate(self.map_rows):
+            if i >= len(ordered_maps):
+                break
+
+            name = ordered_maps[i]
+            ix = self._find_combo_text(mr.map_combo, name)
+            if ix >= 0:
+                mr.map_combo.setCurrentIndex(ix)
+
+            is_decided = i < len(previous_maps)
+            mr.completed.setChecked(is_decided)
+            detail = decided_details[i] if is_decided and i < len(decided_details) else None
+
+            if names_matched:
+                picker_name = detail.get("pickedBy") if detail else current_picker
+                picker_side = side_for_sow_team.get(norm(picker_name)) if picker_name else None
+                mr.set_pick_data("T1" if picker_side == "t1" else "T2" if picker_side == "t2" else "TBA")
+
+            if is_decided and names_matched:
+                winner_side = side_for_sow_team.get(norm(previous_maps[i].get("winner")))
+                t1_score = detail.get("team1Score") if detail else None
+                t2_score = detail.get("team2Score") if detail else None
+                if t1_score is not None and t2_score is not None:
+                    # Kartalla oli oikea numeerinen tulos (esim. Control 3-1).
+                    if sides_swapped:
+                        mr.t1score.setValue(t2_score); mr.t2score.setValue(t1_score)
+                    else:
+                        mr.t1score.setValue(t1_score); mr.t2score.setValue(t2_score)
+                elif winner_side == "t1":
+                    mr.t1score.setValue(1); mr.t2score.setValue(0)
+                elif winner_side == "t2":
+                    mr.t1score.setValue(0); mr.t2score.setValue(1)
+            elif not is_decided:
+                # Nykyinen pelattava kartta: näytä tämän kierroksen bannit.
+                for ban in hero_bans:
+                    side = side_for_sow_team.get(norm(ban.get("team")))
+                    hero = ban.get("hero")
+                    if not hero or side not in ("t1", "t2"):
+                        continue
+                    combo = mr.t1ban if side == "t1" else mr.t2ban
+                    ix = self._find_combo_text(combo, hero)
+                    if ix >= 0:
+                        combo.setCurrentIndex(ix)
+
+        self._update()
+
+    # ---------------------
     # Update: export JSON for persistence/OBS & autosave
     # ---------------------
     def _collect_state(self):
@@ -3821,10 +4067,12 @@ class TournamentApp(QMainWindow):
         if hasattr(self, "bracket_tab"):
             bracket = self.bracket_tab.to_settings()
             state["bracket"] = asdict(bracket)
+        state["draft_link_url"] = self.link_url_edit.text().strip()
         return state
 
 
     def _apply_state(self, state: dict):
+        self.link_url_edit.setText(state.get("draft_link_url", "") or "")
         assets = state.get("assets", {})
         self.heroes = {k: Asset(**v) for k, v in assets.get("heroes", {}).items()}
         self.maps = {k: Asset(**v) for k, v in assets.get("maps", {}).items()}
@@ -4135,6 +4383,7 @@ class TournamentApp(QMainWindow):
             QMessageBox.critical(self, "Load failed", str(e))
 
     def closeEvent(self, event):
+        self._draft_link.disconnect()
         self._autosave()
         super().closeEvent(event)
 def _start_http_server(bind="127.0.0.1", port=8324):
