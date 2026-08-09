@@ -59,16 +59,25 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     color:var(--secondary); text-align:center;
   }
+  /* Same reasoning as .mappick-wrap: stay in the flex flow, hidden via
+     visibility, so the team name doesn't jump when scores first appear. */
   .scorebox{
     flex:0 0 105px; height:100%; display:flex; align-items:center; justify-content:center;
     background:var(--quaternary);
+    visibility:hidden;
   }
+  .scorebox.shown{ visibility:visible; }
   .teamscore{ font-size:68px; font-weight:900; line-height:1; color:#fff; }
 
-  /* MAP PICK badge */
+  /* MAP PICK badge — kept in the flex flow at all times (hidden via
+     visibility, not display) so it always reserves its width; toggling
+     display:none instead would resize the flex:1 team name next to it and
+     make it visibly jump sideways whenever a pick badge appears/disappears. */
   .mappick-wrap{
     flex-shrink:0; height:100%; display:flex; align-items:center;
+    visibility:hidden;
   }
+  .mappick-wrap.shown{ visibility:visible; }
   .mappick-badge{
     display:flex; align-items:center; gap:8px;
     padding:0 16px; height:56%;
@@ -162,19 +171,6 @@
     z-index:3; pointer-events:none;
   }
 
-  /* ==== Transitions ==== */
-  .scoreboardwrapper{
-    will-change:transform, opacity;
-    transition:transform 750ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease;
-  }
-  .draft-scene{
-    will-change:transform, opacity;
-    transition:transform 750ms cubic-bezier(.2,.8,.2,1) 80ms, opacity 700ms ease 80ms;
-  }
-  body:not(.visible) .scoreboardwrapper,
-  body.leaving       .scoreboardwrapper { transform:translateY(-40px); opacity:0; }
-  body:not(.visible) .draft-scene,
-  body.leaving       .draft-scene { transform:translateY(40px); opacity:0; }
 </style>
 </head>
 <body>
@@ -183,15 +179,17 @@
 <div class="scoreboardwrapper">
   <div class="scorebar">
 
-    <!-- Team 1 (left) -->
+    <!-- Team 1 (left) — score then map-pick badge, so the badge (which
+         appears/disappears per map) ends up right next to the VS box
+         instead of leaving a gap between it and center-info. -->
     <div class="team team1">
       <div class="teamlogo" id="t1logo"></div>
       <div class="teamname" id="t1name">TEAM 1</div>
-      <div id="mappick-t1-wrap" class="mappick-wrap" style="display:none">
-        <div class="mappick-badge t1"><span class="arrows">◀◀</span> MAP PICK</div>
-      </div>
-      <div class="scorebox" id="t1scorebox" style="display:none">
+      <div class="scorebox" id="t1scorebox">
         <span class="teamscore" id="t1score">0</span>
+      </div>
+      <div id="mappick-t1-wrap" class="mappick-wrap">
+        <div class="mappick-badge t1"><span class="arrows">◀◀</span> MAP PICK</div>
       </div>
     </div>
 
@@ -201,15 +199,15 @@
       <div class="center-format" id="centerFormat"></div>
     </div>
 
-    <!-- Team 2 (right, row-reverse) — DOM order: logo, name, mappick, score → displays as: score, mappick, name, logo -->
+    <!-- Team 2 (right, row-reverse) — DOM order: logo, name, score, mappick → displays as: mappick, score, name, logo -->
     <div class="team team2">
       <div class="teamlogo" id="t2logo"></div>
       <div class="teamname" id="t2name">TEAM 2</div>
-      <div id="mappick-t2-wrap" class="mappick-wrap" style="display:none">
-        <div class="mappick-badge t2">MAP PICK <span class="arrows">▶▶</span></div>
-      </div>
-      <div class="scorebox" id="t2scorebox" style="display:none">
+      <div class="scorebox" id="t2scorebox">
         <span class="teamscore" id="t2score">0</span>
+      </div>
+      <div id="mappick-t2-wrap" class="mappick-wrap">
+        <div class="mappick-badge t2">MAP PICK <span class="arrows">▶▶</span></div>
       </div>
     </div>
 
@@ -310,8 +308,8 @@ function toggleScoreBoxes(){
   const a=parseInt(document.getElementById("t1score").textContent,10)||0;
   const b=parseInt(document.getElementById("t2score").textContent,10)||0;
   const show=a!==0||b!==0;
-  document.getElementById("t1scorebox").style.display=show?"flex":"none";
-  document.getElementById("t2scorebox").style.display=show?"flex":"none";
+  document.getElementById("t1scorebox").classList.toggle("shown",show);
+  document.getElementById("t2scorebox").classList.toggle("shown",show);
 }
 
 /* Main scene */
@@ -366,11 +364,11 @@ async function renderScene(state){
   const w1=document.getElementById("mappick-t1-wrap");
   const w2=document.getElementById("mappick-t2-wrap");
   if(pick==="T1"||pick==="TEAM 1"||pick==="1"){
-    w1.style.display="flex"; w2.style.display="none";
+    w1.classList.add("shown"); w2.classList.remove("shown");
   } else if(pick==="T2"||pick==="TEAM 2"||pick==="2"){
-    w1.style.display="none"; w2.style.display="flex";
+    w1.classList.remove("shown"); w2.classList.add("shown");
   } else {
-    w1.style.display="none"; w2.style.display="none";
+    w1.classList.remove("shown"); w2.classList.remove("shown");
   }
 
   // Center info
@@ -409,23 +407,6 @@ async function tick(){
 }
 
 tick();
-
-function getStingerStartMs(){
-  const qs=new URLSearchParams(location.search);
-  const q=parseInt(qs.get("stinger")||qs.get("delay")||"",10);
-  if(!isNaN(q)&&q>=0) return q;
-  return 1800;
-}
-function setOverlayVisible(v){
-  document.body.classList.toggle("visible",!!v);
-  document.body.classList.toggle("leaving",!v);
-}
-document.addEventListener("DOMContentLoaded",()=>{
-  setTimeout(()=>setOverlayVisible(true),getStingerStartMs());
-});
-document.addEventListener("visibilitychange",()=>{
-  setOverlayVisible(!document.hidden);
-});
 </script>
 </body>
 </html>

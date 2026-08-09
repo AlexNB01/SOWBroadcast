@@ -15,6 +15,7 @@ Scoreboard/Replay/*.txt
 Scoreboard/Replay/Playlist/
 Scoreboard/Standings/
 Scoreboard/Bracket/
+Scoreboard/TournamentLogos/
 Scoreboard/__last_gui_touch.txt
 
 # Auto-discovered asset catalogues (the images themselves stay tracked).

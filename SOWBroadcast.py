@@ -1,8 +1,11 @@
-import sys, os, json, re, shutil, time, threading, unicodedata, shutil
+import sys, os, json, re, shutil, time, threading, unicodedata, shutil, hashlib
+import urllib.request
 import server as _sb__force_include
 import draft_link
+import tournament_link
 from dataclasses import dataclass, asdict
 from typing import Callable, Dict, List, Optional
+from urllib.parse import urljoin, urlparse
 
 from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal, QObject, QEvent
 from PyQt5.QtGui import QPixmap, QColor
@@ -118,6 +121,35 @@ class Asset:
     image_path: Optional[str] = None
     mode: Optional[str] = None
     source_path: Optional[str] = None
+    # Heroes only: full-body cutout shown by MapDraft.html when this hero is
+    # banned (Scoreboard/HeroesBody/<heroBodyFilename>.png). Unused for Maps
+    # and Game Modes.
+    body_image_path: Optional[str] = None
+    body_source_path: Optional[str] = None
+
+
+# MapDraft.html's heroBodyFile() JS function names hero-body cutouts
+# Title_Case_With_Underscores instead of the lowercase-hyphen slugs used for
+# portraits (Scoreboard/Heroes) - this table and function must stay in sync
+# with that JS so a hero added here resolves to the same filename MapDraft.html
+# looks up when showing a ban.
+_HERO_BODY_OVERRIDES = {
+    "d.va": "Dva", "dva": "Dva",
+    "lúcio": "Lucio", "lucio": "Lucio",
+    "soldier: 76": "Soldier_76", "soldier 76": "Soldier_76", "soldier:76": "Soldier_76",
+    "wrecking ball": "Wrecking_Ball",
+    "junker queen": "Junker_Queen",
+    "jetpack cat": "Jetpack_Cat",
+    "torbjörn": "Torbjörn", "torbjorn": "Torbjörn",
+}
+
+
+def _hero_body_filename(name: str) -> str:
+    lo = (name or "").strip().lower()
+    if lo in _HERO_BODY_OVERRIDES:
+        return _HERO_BODY_OVERRIDES[lo]
+    words = (name or "").strip().split()
+    return "_".join(w[:1].upper() + w[1:] for w in words) or "Hero"
 
 @dataclass
 class Player:
@@ -191,6 +223,14 @@ class StandingsRow:
     points: int = 0
     status: str = ""
     rank: int = 0
+    # Extended match stats (played/draws/scored-for/scored-against). Left as
+    # None for manually-entered rows, which have no UI for them; only the
+    # SOWDraft league-stage live link populates these, and standings.html
+    # only renders the extra P/D/SF/SA columns when they're present.
+    played: Optional[int] = None
+    draws: Optional[int] = None
+    sf: Optional[int] = None
+    sa: Optional[int] = None
 
 @dataclass
 class StandingsSettings:
@@ -297,6 +337,267 @@ class BracketSettings:
             self.rounds = []
         if self.teams is None:
             self.teams = []
+
+
+# ---------------------
+# SOWDraft tournament link: convert /api/tournament-system/:id payloads into
+# the same StandingsSettings/BracketSettings shapes the manual tabs use, so
+# _export_standings/_export_bracket and the overlays need no changes.
+# ---------------------
+
+def _resolve_logo(origin: str, url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    return urljoin(origin + "/", url)
+
+
+def _tournament_stages(t: dict) -> list:
+    """Most active sowdraft tournaments (e.g. a League group stage feeding a
+    Double Elimination playoff) use the multi-stage system: `tournament.stages`
+    is a JSON-encoded list, and each match carries the owning stage's id in
+    `stage_id`. Older/simple tournaments have no stages at all, in which case
+    the top-level `tournament.format` and `matches[].bracket` describe
+    everything directly - see the non-staged fallback branches below."""
+    raw = t.get("stages")
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, list) else []
+        except Exception:
+            return []
+    return []
+
+
+def _sow_standings_rows(entries: list, team_logo: Dict[str, str]) -> List[StandingsRow]:
+    """From the server's own tiebreak-sorted `standings` field (non-staged
+    tournaments only - see computeStandings() in sowdraft/lib/bracketEngine.js)."""
+    rows = []
+    for i, e in enumerate(entries or []):
+        rows.append(StandingsRow(
+            team_name=e.get("name", "") or "",
+            abbr="",
+            logo_path=team_logo.get(e.get("id")),
+            wins=int(e.get("wins", 0) or 0),
+            losses=int(e.get("losses", 0) or 0),
+            map_diff=int(e.get("mapDiff", 0) or 0),
+            points=int(e.get("points", 0) or 0),
+            status="",
+            rank=i + 1,
+        ))
+    return rows
+
+
+def _stage_standings_rows(stage_matches: list, team_logo: Dict[str, str], team_names: Dict[str, str]) -> List[StandingsRow]:
+    """Mirrors sowdraft's own public-page standings for a stage
+    (computeStageStandings() in sowdraft/public/tournament.js): 3 points per
+    win, sorted by points then score diff then scored-for. Also tracks
+    played/draws/scored-for/scored-against so standings.html can render the
+    same full stat line (P/W/D/L/SF/SA/+/-/Pts) shown on sowdraft's own
+    tournament page - sowdraft's own function leaves draws unhandled since
+    decisive-result formats rarely produce one, but a completed match with no
+    winner_team_id is a draw, so it's counted properly here."""
+    stats: Dict[str, dict] = {}
+
+    def ensure(team_id):
+        if team_id not in stats:
+            stats[team_id] = {"id": team_id, "played": 0, "wins": 0, "draws": 0, "losses": 0, "sf": 0, "sa": 0, "points": 0}
+        return stats[team_id]
+
+    playable = [m for m in stage_matches if m.get("team1_id") and m.get("team2_id") and m.get("status") != "bye"]
+    for m in playable:
+        ensure(m["team1_id"])
+        ensure(m["team2_id"])
+    for m in playable:
+        if m.get("status") != "completed":
+            continue
+        t1, t2 = stats[m["team1_id"]], stats[m["team2_id"]]
+        s1 = m.get("score1") or 0
+        s2 = m.get("score2") or 0
+        winner = m.get("winner_team_id")
+        t1["played"] += 1; t2["played"] += 1
+        t1["sf"] += s1; t1["sa"] += s2
+        t2["sf"] += s2; t2["sa"] += s1
+        if not winner:
+            t1["draws"] += 1; t2["draws"] += 1
+        elif winner == m["team1_id"]:
+            t1["wins"] += 1; t1["points"] += 3; t2["losses"] += 1
+        else:
+            t2["wins"] += 1; t2["points"] += 3; t1["losses"] += 1
+
+    ordered = sorted(stats.values(), key=lambda s: (-s["points"], -(s["sf"] - s["sa"]), -s["sf"]))
+    rows = []
+    for i, s in enumerate(ordered):
+        rows.append(StandingsRow(
+            team_name=team_names.get(s["id"], "") or "",
+            abbr="",
+            logo_path=team_logo.get(s["id"]),
+            wins=s["wins"],
+            losses=s["losses"],
+            map_diff=s["sf"] - s["sa"],
+            points=s["points"],
+            status="",
+            rank=i + 1,
+            played=s["played"],
+            draws=s["draws"],
+            sf=s["sf"],
+            sa=s["sa"],
+        ))
+    return rows
+
+
+def _sow_to_standings_settings(data: dict, cache_logo: Optional[Callable[[Optional[str]], Optional[str]]] = None) -> StandingsSettings:
+    origin = data.get("_origin") or ""
+    teams = data.get("teams") or []
+    resolve = (lambda u: cache_logo(_resolve_logo(origin, u))) if cache_logo else (lambda u: _resolve_logo(origin, u))
+    team_logo = {t.get("id"): resolve(t.get("logo_url")) for t in teams}
+    team_names = {t.get("id"): t.get("name", "") or "" for t in teams}
+    t = data.get("tournament") or {}
+    matches = data.get("matches") or []
+    stages = _tournament_stages(t)
+
+    groups: List[StandingsGroup] = []
+    standings_stages = [s for s in stages if (s.get("format") or "") in ("round_robin", "swiss", "league", "group_stage")]
+
+    if standings_stages:
+        for s in standings_stages:
+            stage_matches = [m for m in matches if m.get("stage_id") == s.get("id")]
+            if (s.get("format") or "") == "group_stage":
+                group_matches = [m for m in stage_matches if m.get("bracket") == "group"]
+                group_names = sorted({m.get("group_name") for m in group_matches if m.get("group_name")})
+                for gname in group_names:
+                    gmatches = [m for m in group_matches if m.get("group_name") == gname]
+                    groups.append(StandingsGroup(
+                        key=f"{s.get('id')}_{gname}",
+                        name=f"{s.get('name') or 'Stage'} - Group {gname}",
+                        rows=_stage_standings_rows(gmatches, team_logo, team_names),
+                    ))
+            else:
+                groups.append(StandingsGroup(
+                    key=s.get("id") or f"stage_{len(groups) + 1}",
+                    name=s.get("name") or "Standings",
+                    rows=_stage_standings_rows(stage_matches, team_logo, team_names),
+                ))
+    else:
+        # Non-staged tournament: use the server-computed, tiebreak-sorted
+        # `standings` field directly.
+        standings = data.get("standings")
+        if isinstance(standings, dict):
+            for idx, (key, entries) in enumerate(standings.items(), start=1):
+                groups.append(StandingsGroup(
+                    key=key or f"group_{idx}",
+                    name=f"Group {key}" if key else f"Group {idx}",
+                    rows=_sow_standings_rows(entries, team_logo),
+                ))
+        elif isinstance(standings, list) and standings:
+            groups.append(StandingsGroup(key="group_1", name="Standings", rows=_sow_standings_rows(standings, team_logo)))
+
+    return StandingsSettings(
+        title=t.get("name", "") or "",
+        subtitle="",
+        columns={"mode": "map_diff"},
+        rows=groups[0].rows if groups else [],
+        groups=groups,
+        display_group=groups[0].key if groups else "",
+    )
+
+
+def _sow_bracket_side(bracket: str) -> str:
+    return {
+        "winners": "upper",
+        "losers": "lower",
+        "grand_final": "grand",
+    }.get(bracket or "", "upper")
+
+
+def _sow_round_name(side: str, round_no: int, max_round: int) -> str:
+    dist = max_round - round_no
+    if side == "grand":
+        return "Grand Final"
+    prefix = "Upper " if side == "upper" else ("Lower " if side == "lower" else "")
+    if dist == 0:
+        return f"{prefix}Final".strip()
+    if dist == 1:
+        return f"{prefix}Semifinals".strip()
+    if dist == 2:
+        return f"{prefix}Quarterfinals".strip()
+    return f"{prefix}Round {round_no}".strip()
+
+
+def _sow_to_bracket_settings(data: dict, cache_logo: Optional[Callable[[Optional[str]], Optional[str]]] = None) -> BracketSettings:
+    origin = data.get("_origin") or ""
+    teams = data.get("teams") or []
+    team_by_id = {t.get("id"): t for t in teams}
+    t = data.get("tournament") or {}
+    all_matches = data.get("matches") or []
+    stages = _tournament_stages(t)
+    resolve = (lambda u: cache_logo(_resolve_logo(origin, u))) if cache_logo else (lambda u: _resolve_logo(origin, u))
+
+    def team_ref(team_id) -> TeamRef:
+        team = team_by_id.get(team_id) or {}
+        return TeamRef(
+            name=team.get("name", "") or "",
+            abbr="",
+            logo_path=resolve(team.get("logo_url")),
+        )
+
+    bracket_stages = [s for s in stages if (s.get("format") or "") in ("single_elimination", "double_elimination", "group_stage")]
+    multi_stage = len(bracket_stages) > 1
+    rounds: List[BracketRound] = []
+
+    def add_rounds(stage_matches: list, stage_label: str, best_of):
+        bo_label = f"BO{int(best_of)}" if best_of else ""
+        filtered = [
+            m for m in stage_matches
+            if m.get("team1_id") and m.get("team2_id") and m.get("status") != "bye"
+            and (m.get("bracket") or "main") in ("main", "winners", "losers", "grand_final", "playoff")
+        ]
+        by_side_round: Dict[str, Dict[int, list]] = {}
+        for m in filtered:
+            side = _sow_bracket_side(m.get("bracket"))
+            by_side_round.setdefault(side, {}).setdefault(int(m.get("round") or 1), []).append(m)
+
+        for side in [sd for sd in ("upper", "lower", "grand") if sd in by_side_round]:
+            round_map = by_side_round[side]
+            max_round = max(round_map.keys())
+            for round_no in sorted(round_map.keys()):
+                bracket_matches = []
+                for m in sorted(round_map[round_no], key=lambda x: x.get("match_number") or 0):
+                    bracket_matches.append(BracketMatch(
+                        id=m.get("id", "") or "",
+                        bo_label=bo_label,
+                        team1=team_ref(m.get("team1_id")),
+                        team2=team_ref(m.get("team2_id")),
+                        score1=int(m.get("score1") or 0),
+                        score2=int(m.get("score2") or 0),
+                        status="",
+                    ))
+                name = _sow_round_name(side, round_no, max_round)
+                if multi_stage and stage_label:
+                    name = f"{stage_label}: {name}"
+                rounds.append(BracketRound(name=name, side=side, matches=bracket_matches))
+
+    if bracket_stages:
+        for s in bracket_stages:
+            stage_matches = [m for m in all_matches if m.get("stage_id") == s.get("id")]
+            if (s.get("format") or "") == "group_stage":
+                stage_matches = [m for m in stage_matches if (m.get("bracket") or "") in ("playoff", "main")]
+            add_rounds(stage_matches, s.get("name") or "", s.get("best_of") or t.get("best_of"))
+    else:
+        # Non-staged tournament: matches carry the classic fixed bracket enum
+        # directly (main/winners/losers/grand_final/playoff).
+        add_rounds(all_matches, "", t.get("best_of"))
+
+    roster = [team_ref(tm.get("id")) for tm in teams][:16]
+
+    return BracketSettings(
+        title=t.get("name", "") or "",
+        stage="",
+        rounds=rounds,
+        double_elim_view="upper",
+        teams=roster,
+    )
 
 
 class BracketMatchWidget(QWidget):
@@ -489,7 +790,7 @@ class AssetManagerDialog(QDialog):
         self.assets = assets
         self._mode_names = mode_names or []
 
-        self.resize(700, 420)
+        self.resize(700, 560 if self.title == "Heroes" else 420)
 
         root = QHBoxLayout(self)
 
@@ -525,6 +826,25 @@ class AssetManagerDialog(QDialog):
         self.preview.setStyleSheet("QLabel{border:1px solid #CCC;border-radius:8px;background:#FAFAFA}")
         right.addWidget(self.preview)
 
+        self.body_logo_edit = None
+        self.body_preview = None
+        if self.title == "Heroes":
+            body_form = QFormLayout()
+            body_row = QHBoxLayout()
+            self.body_logo_edit = QLineEdit(); self.body_logo_edit.setReadOnly(True)
+            body_browse = QPushButton("Browse…")
+            body_browse.clicked.connect(self._browse_body_image)
+            body_row.addWidget(self.body_logo_edit)
+            body_row.addWidget(body_browse)
+            body_form.addRow("Full Body Image", body_row)
+            right.addLayout(body_form)
+
+            self.body_preview = QLabel("No Image")
+            self.body_preview.setAlignment(Qt.AlignCenter)
+            self.body_preview.setFixedHeight(140)
+            self.body_preview.setStyleSheet("QLabel{border:1px solid #CCC;border-radius:8px;background:#FAFAFA}")
+            right.addWidget(self.body_preview)
+
         btns = QHBoxLayout()
         self.add_btn = QPushButton("Add / Update")
         self.add_btn.clicked.connect(self._add_or_update)
@@ -552,26 +872,36 @@ class AssetManagerDialog(QDialog):
         if asset:
             p = asset.source_path or asset.image_path or ""
             self.logo_edit.setText(p)
-            self._load_preview(p)
+            self._load_preview(self.preview, p)
             if self.title == "Maps" and self.mode_combo:
                 ix = self.mode_combo.findText(asset.mode or "", Qt.MatchExactly)
                 self.mode_combo.setCurrentIndex(ix if ix >= 0 else 0)
+            if self.body_logo_edit:
+                bp = asset.body_source_path or asset.body_image_path or ""
+                self.body_logo_edit.setText(bp)
+                self._load_preview(self.body_preview, bp)
 
 
     def _browse_image(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select image", "", "Images (*.png *.jpg *.jpeg *.webp)")
         if path:
             self.logo_edit.setText(path)
-            self._load_preview(path)
+            self._load_preview(self.preview, path)
 
-    def _load_preview(self, path: Optional[str]):
+    def _browse_body_image(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Select full body image", "", "Images (*.png *.jpg *.jpeg *.webp)")
+        if path:
+            self.body_logo_edit.setText(path)
+            self._load_preview(self.body_preview, path)
+
+    def _load_preview(self, label: QLabel, path: Optional[str]):
         if path:
             pix = QPixmap(path)
             if not pix.isNull():
-                self.preview.setPixmap(pix.scaled(self.preview.width(), self.preview.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                label.setPixmap(pix.scaled(label.width(), label.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
                 return
-        self.preview.setText("No Image")
-        self.preview.setPixmap(QPixmap())
+        label.setText("No Image")
+        label.setPixmap(QPixmap())
 
     def _add_or_update(self):
         name = self.name_edit.text().strip()
@@ -594,11 +924,39 @@ class AssetManagerDialog(QDialog):
 
         source_path = self.logo_edit.text().strip() or None
 
+        body_image_path = None
+        body_source_path = None
+        if self.title == "Heroes":
+            body_source_path = self.body_logo_edit.text().strip() or None
+            hero_body_name = _hero_body_filename(name)
+            body_image_path = os.path.join("Scoreboard", "HeroesBody", f"{hero_body_name}.png")
+
+            if not body_source_path:
+                # Nothing newly picked - fall back to whatever's already
+                # resolved instead of forcing a re-upload every time: a file
+                # already sitting at the conventional HeroesBody path (either
+                # from a prior save, or the bundled default roster), or a
+                # source this hero already had tracked.
+                body_dest_abs = os.path.join(self.parent()._scoreboard_root(), "HeroesBody", f"{hero_body_name}.png")
+                existing_asset = self.assets.get(name)
+                if os.path.isfile(body_dest_abs):
+                    body_source_path = body_dest_abs
+                elif existing_asset and existing_asset.body_source_path:
+                    body_source_path = existing_asset.body_source_path
+                else:
+                    QMessageBox.warning(
+                        self, "Missing body image",
+                        "Please also upload a full body image of the hero - it's shown in MapDraft.html when this hero is banned."
+                    )
+                    return
+
         self.assets[name] = Asset(
             name=name,
             image_path=image_path,
             mode=mode,
-            source_path=source_path
+            source_path=source_path,
+            body_image_path=body_image_path,
+            body_source_path=body_source_path,
         )
         self._reload()
         matches = self.listw.findItems(name, Qt.MatchExactly)
@@ -638,7 +996,10 @@ class AssetManagerDialog(QDialog):
         self._reload()
         self.name_edit.clear()
         self.logo_edit.clear()
-        self._load_preview(None)
+        self._load_preview(self.preview, None)
+        if self.body_logo_edit:
+            self.body_logo_edit.clear()
+            self._load_preview(self.body_preview, None)
 
 # -----------------------------
 # Team Panel
@@ -1574,6 +1935,8 @@ class DraftTab(QWidget):
 
 class StandingsTab(QWidget):
     updated = pyqtSignal()
+    link_requested = pyqtSignal(str)
+    unlink_requested = pyqtSignal()
 
     HEADERS = [
         "Rank", "Team", "Abbr", "W", "L", "+/-", "Points", "Status", "Logo"
@@ -1588,6 +1951,35 @@ class StandingsTab(QWidget):
         self._group_counter = 1
         self._loading_groups = False
 
+        # ── SOWDraft tournament live link (teams, standings, bracket) ──
+        # Kept outside _editable_container so Link/Unlink stay clickable even
+        # while a live link has locked the rest of this tab read-only.
+        tlink_box = QGroupBox("SOWDraft Tournament Live Link")
+        tlink_root = QVBoxLayout(tlink_box)
+        tlink_row = QHBoxLayout()
+        self.tournament_link_url_edit = QLineEdit()
+        self.tournament_link_url_edit.setPlaceholderText("Liitä SOWDraftin turnauslinkki (esim. https://.../tournament/<id>)")
+        self.tournament_link_btn = QPushButton("Link")
+        self.tournament_link_btn.clicked.connect(self._on_link_clicked)
+        self.tournament_unlink_btn = QPushButton("Unlink")
+        self.tournament_unlink_btn.setEnabled(False)
+        self.tournament_unlink_btn.clicked.connect(self.unlink_requested)
+        self.tournament_link_status_label = QLabel("Ei linkitetty")
+        tlink_row.addWidget(self.tournament_link_url_edit, 1)
+        tlink_row.addWidget(self.tournament_link_btn)
+        tlink_row.addWidget(self.tournament_unlink_btn)
+        tlink_row.addWidget(self.tournament_link_status_label)
+        tlink_root.addLayout(tlink_row)
+        root.addWidget(tlink_box)
+
+        # Everything below is disabled as a block while a tournament is
+        # linked (see set_editable_locked), since it becomes a read-only
+        # mirror of the live data instead of a manual editor.
+        self._editable_container = QWidget()
+        editable = QVBoxLayout(self._editable_container)
+        editable.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self._editable_container, 1)
+
         group_box = QGroupBox("Standings Groups")
         group_layout = QGridLayout(group_box)
         self.add_group_btn = QPushButton("Add Group")
@@ -1598,7 +1990,7 @@ class StandingsTab(QWidget):
         group_layout.addWidget(QLabel("Show in standings.html"), 0, 1)
         group_layout.addWidget(self.display_combo, 0, 2)
         group_layout.setColumnStretch(2, 1)
-        root.addWidget(group_box)
+        editable.addWidget(group_box)
 
         self.groups_area = QScrollArea()
         self.groups_area.setWidgetResizable(True)
@@ -1607,7 +1999,7 @@ class StandingsTab(QWidget):
         self.groups_layout.setContentsMargins(0, 0, 0, 0)
         self.groups_layout.setSpacing(12)
         self.groups_area.setWidget(self.groups_container)
-        root.addWidget(self.groups_area, 2)
+        editable.addWidget(self.groups_area, 2)
 
         title_box = QGroupBox("Standings Title")
         title_form = QFormLayout(title_box)
@@ -1615,7 +2007,7 @@ class StandingsTab(QWidget):
         self.subtitle_edit = QLineEdit()
         title_form.addRow("Title", self.title_edit)
         title_form.addRow("Subtitle / Group", self.subtitle_edit)
-        root.addWidget(title_box)
+        editable.addWidget(title_box)
 
         action_row = QHBoxLayout()
         action_row.addStretch(1)
@@ -1623,13 +2015,21 @@ class StandingsTab(QWidget):
         self.update_btn = QPushButton("Update + sort")
         action_row.addWidget(self.reset_btn)
         action_row.addWidget(self.update_btn)
-        root.addLayout(action_row)
+        editable.addLayout(action_row)
 
         self.reset_btn.clicked.connect(self.reset_tab)
         self.update_btn.clicked.connect(self._update_and_sort)
         self.add_group_btn.clicked.connect(self._add_group)
 
         self._add_group(initial=True)
+
+    def _on_link_clicked(self):
+        self.link_requested.emit(self.tournament_link_url_edit.text().strip())
+
+    def set_editable_locked(self, locked: bool):
+        """Greys out everything except the live-link controls themselves,
+        so Unlink always stays reachable while a tournament link is active."""
+        self._editable_container.setEnabled(not locked)
 
     def _make_spin(self, minv: int, maxv: int) -> QSpinBox:
         s = QSpinBox()
@@ -1800,6 +2200,16 @@ class StandingsTab(QWidget):
 
         rank_spin = self._make_spin(0, 99)
         rank_spin.setValue(int(getattr(row_data, "rank", 0) or 0))
+        # No dedicated UI columns for these (operators never type them by
+        # hand) - stashed on the rank widget so a from_settings -> to_settings
+        # round-trip (e.g. every _update() while a tournament link is active)
+        # doesn't silently drop them back to None.
+        rank_spin._extended_stats = {
+            "played": getattr(row_data, "played", None),
+            "draws": getattr(row_data, "draws", None),
+            "sf": getattr(row_data, "sf", None),
+            "sa": getattr(row_data, "sa", None),
+        }
         table.setCellWidget(row, 0, rank_spin)
 
         team_edit = QLineEdit(getattr(row_data, "team_name", "") or "")
@@ -1846,7 +2256,9 @@ class StandingsTab(QWidget):
         self._update_table_height(table)
 
     def _row_data(self, table: QTableWidget, row: int) -> StandingsRow:
-        rank = int(table.cellWidget(row, 0).value())
+        rank_widget = table.cellWidget(row, 0)
+        rank = int(rank_widget.value())
+        extended = getattr(rank_widget, "_extended_stats", {}) or {}
         team_name = table.cellWidget(row, 1).text().strip()
         abbr = table.cellWidget(row, 2).text().strip()
         wins = int(table.cellWidget(row, 3).value())
@@ -1866,6 +2278,10 @@ class StandingsTab(QWidget):
             points=points,
             status=status,
             rank=rank,
+            played=extended.get("played"),
+            draws=extended.get("draws"),
+            sf=extended.get("sf"),
+            sa=extended.get("sa"),
         )
 
     def _rows(self, table: QTableWidget) -> List[StandingsRow]:
@@ -2644,6 +3060,13 @@ class TournamentApp(QMainWindow):
         self.standings_tab.updated.connect(self._update)
         tabs.addTab(self.standings_tab, "Standings")
 
+        self._tournament_link = tournament_link.TournamentLinkClient()
+        self._tournament_link_logo_cache: Dict[str, Optional[str]] = {}
+        self._tournament_link.signals.status_changed.connect(self._on_tournament_link_status)
+        self._tournament_link.signals.data_received.connect(self._on_tournament_link_data)
+        self.standings_tab.link_requested.connect(self._on_link_tournament)
+        self.standings_tab.unlink_requested.connect(self._on_unlink_tournament)
+
         # --- BRACKET TAB ---
         self.bracket_tab = BracketTab()
         self.bracket_tab.updated.connect(self._update)
@@ -2850,7 +3273,7 @@ class TournamentApp(QMainWindow):
             payload_rows = []
             for r in source_rows or []:
                 diff = int(r.map_diff or 0)
-                payload_rows.append({
+                row_payload = {
                     "team": r.team_name,
                     "abbr": r.abbr,
                     "logo": self._normalize_logo_path(r.logo_path),
@@ -2860,7 +3283,19 @@ class TournamentApp(QMainWindow):
                     "points": int(r.points or 0),
                     "status": r.status or "",
                     "rank": int(r.rank or 0),
-                })
+                }
+                # Extended P/D/SF/SA stats - only present for live-linked
+                # league-stage rows (see StandingsRow), so standings.html can
+                # tell manually-entered rows apart and keep its simpler layout.
+                if r.played is not None:
+                    row_payload["played"] = int(r.played)
+                if r.draws is not None:
+                    row_payload["draws"] = int(r.draws)
+                if r.sf is not None:
+                    row_payload["sf"] = int(r.sf)
+                if r.sa is not None:
+                    row_payload["sa"] = int(r.sa)
+                payload_rows.append(row_payload)
             return payload_rows
 
         groups_payload = []
@@ -3543,11 +3978,29 @@ class TournamentApp(QMainWindow):
                 if not name:
                     continue
 
+                body_image_path = None
+                body_source_path = None
+                if category == "Heroes":
+                    body_rel = (it.get("body_image") or "").replace("/", os.sep)
+                    body_abs = os.path.join(root, body_rel) if body_rel else None
+                    if body_abs and os.path.isfile(body_abs):
+                        body_image_path, body_source_path = body_rel, body_abs
+                    else:
+                        # Falls back to the conventional HeroesBody filename even
+                        # if this entry predates body-image tracking - covers the
+                        # bundled default roster, which already ships one there.
+                        fallback_rel = os.path.join("HeroesBody", f"{_hero_body_filename(name)}.png")
+                        fallback_abs = os.path.join(root, fallback_rel)
+                        if os.path.isfile(fallback_abs):
+                            body_image_path, body_source_path = fallback_rel, fallback_abs
+
                 target_dict[name] = Asset(
                     name=name,
                     image_path=img_rel if img_rel else None,
                     mode=mode,
-                    source_path=img_abs if (img_abs and os.path.isfile(img_abs)) else None
+                    source_path=img_abs if (img_abs and os.path.isfile(img_abs)) else None,
+                    body_image_path=body_image_path,
+                    body_source_path=body_source_path,
                 )
             return True
         except Exception:
@@ -3673,6 +4126,30 @@ class TournamentApp(QMainWindow):
             except Exception as e:
                 print(f"[Maps] copy failed {src} -> {out_png}: {e}")
 
+        body_dir = None
+        if category_name == "Heroes":
+            body_dir = os.path.join(root, "HeroesBody")
+            self._ensure_dir(body_dir)
+            for name, asset in assets.items():
+                if not asset.body_source_path or not os.path.exists(asset.body_source_path):
+                    continue
+                out_body_png = os.path.join(body_dir, f"{_hero_body_filename(name)}.png")
+                if os.path.abspath(asset.body_source_path) == os.path.abspath(out_body_png):
+                    continue
+                try:
+                    need_copy = True
+                    try:
+                        st_src = os.stat(asset.body_source_path)
+                        st_dst = os.stat(out_body_png)
+                        if st_dst.st_size == st_src.st_size and int(st_dst.st_mtime) >= int(st_src.st_mtime):
+                            need_copy = False
+                    except FileNotFoundError:
+                        pass
+                    if need_copy:
+                        shutil.copy2(asset.body_source_path, out_body_png)
+                except Exception as e:
+                    print(f"[HeroesBody] copy failed {asset.body_source_path} -> {out_body_png}: {e}")
+
         if category_name in {"Maps", "Heroes", "Gametypes"}:
             items = []
             for name, asset in assets.items():
@@ -3683,6 +4160,10 @@ class TournamentApp(QMainWindow):
                 item = {"name": name, "slug": slug, "image": img_rel}
                 if category_name == "Maps":
                     item["mode"] = (asset.mode or "")
+                if category_name == "Heroes" and body_dir:
+                    out_body_png = os.path.join(body_dir, f"{_hero_body_filename(name)}.png")
+                    if os.path.isfile(out_body_png):
+                        item["body_image"] = _norm_rel(out_body_png, root)
                 items.append(item)
 
             index_json_path = os.path.join(cat_dir, "index.json")
@@ -3887,6 +4368,94 @@ class TournamentApp(QMainWindow):
         self.unlink_btn.setEnabled(is_linked_or_pending)
         self.link_url_edit.setEnabled(not is_linked_or_pending)
 
+    # ---------------------
+    # SOWDraft tournament live link
+    # ---------------------
+    def _on_link_tournament(self, url: str):
+        url = (url or "").strip()
+        if not url:
+            QMessageBox.warning(self, "Link Tournament", "Liitä ensin SOWDraftin turnauslinkki.")
+            return
+        try:
+            # Ei vielä yhtään dataa tälle yhdistämisyritykselle - estää seuraavan
+            # 'connected'-statuksen väittämästä linkitystä valmiiksi ennen kuin
+            # REST-haku on oikeasti onnistunut.
+            self._tournament_link_has_data = False
+            self._tournament_link.connect(url)
+        except ValueError as e:
+            QMessageBox.warning(self, "Link Tournament", str(e))
+
+    def _on_unlink_tournament(self):
+        self._tournament_link.disconnect()
+        self._tournament_link_has_data = False
+        if hasattr(self, "standings_tab"):
+            self.standings_tab.set_editable_locked(False)
+        if hasattr(self, "bracket_tab"):
+            self.bracket_tab.setEnabled(True)
+
+    def _on_tournament_link_status(self, status: str):
+        if status.startswith("error:"):
+            text = f"Virhe: {status[len('error:'):]}"
+        elif status == "connecting":
+            text = "Yhdistetään…"
+        elif status == "connected":
+            # Socket.io-yhteys on auki, mutta se ei vielä tarkoita että
+            # turnausdata on saatu haettua - älä väitä "Linkitetty" ennen sitä,
+            # tai piilotamme mahdollisen (esim. HTTP 403/timeout) hakuvirheen.
+            text = "Linkitetty" if getattr(self, "_tournament_link_has_data", False) else "Yhdistetty, haetaan dataa…"
+        elif status == "disconnected":
+            text = "Ei linkitetty"
+        else:
+            text = status
+        self.standings_tab.tournament_link_status_label.setText(text)
+
+        is_linked_or_pending = self._tournament_link.tournament_id is not None
+        self.standings_tab.tournament_link_btn.setEnabled(not is_linked_or_pending)
+        self.standings_tab.tournament_unlink_btn.setEnabled(is_linked_or_pending)
+        self.standings_tab.tournament_link_url_edit.setEnabled(not is_linked_or_pending)
+
+    def _cache_tournament_logo(self, url: Optional[str]) -> Optional[str]:
+        """Downloads a sowdraft team logo into Scoreboard/TournamentLogos and
+        returns the local path. Browsers (OBS's included) enforce the
+        Cross-Origin-Resource-Policy: same-origin header sowdraft.fi sends on
+        its uploads, which silently blocks hotlinking the image straight into
+        standings.html/bracket.html even though it's otherwise public - so the
+        overlay has to load its own local copy instead of the remote URL."""
+        if not url:
+            return None
+        if url in self._tournament_link_logo_cache:
+            return self._tournament_link_logo_cache[url]
+        try:
+            cache_dir = os.path.join(self._scoreboard_root(), "TournamentLogos")
+            os.makedirs(cache_dir, exist_ok=True)
+            ext = os.path.splitext(urlparse(url).path)[1] or ".png"
+            digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
+            local_path = os.path.join(cache_dir, f"{digest}{ext}")
+            if not os.path.exists(local_path):
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; SOWBroadcast)"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    content = resp.read()
+                with open(local_path, "wb") as f:
+                    f.write(content)
+            self._tournament_link_logo_cache[url] = local_path
+            return local_path
+        except Exception:
+            self._tournament_link_logo_cache[url] = None
+            return None
+
+    def _on_tournament_link_data(self, data: dict):
+        self._tournament_link_has_data = True
+        s_settings = _sow_to_standings_settings(data, self._cache_tournament_logo)
+        b_settings = _sow_to_bracket_settings(data, self._cache_tournament_logo)
+        if hasattr(self, "standings_tab"):
+            self.standings_tab.from_settings(s_settings)
+            self.standings_tab.set_editable_locked(True)
+            self.standings_tab.tournament_link_status_label.setText("Linkitetty")
+        if hasattr(self, "bracket_tab"):
+            self.bracket_tab.from_settings(b_settings)
+            self.bracket_tab.setEnabled(False)
+        self._update()
+
     @staticmethod
     def _find_combo_text(combo: QComboBox, name: str) -> int:
         """findText, but falls back to a punctuation/case-insensitive match.
@@ -4047,6 +4616,10 @@ class TournamentApp(QMainWindow):
             "maps": maps,
             "current_map": current_ix,
             "map_pool": self.draft_tab.get_pool() if hasattr(self, "draft_tab") else [],
+            # Kept here (not for restoring - see _apply_state) purely so
+            # _diff_for_scoreboard() can detect edits made through the Asset
+            # Manager dialog (which mutates self.heroes/maps/modes directly)
+            # and still trigger _export_assets_category for them.
             "assets": {
                 "heroes": {k: asdict(v) for k, v in self.heroes.items()},
                 "maps": {k: asdict(v) for k, v in self.maps.items()},
@@ -4068,15 +4641,22 @@ class TournamentApp(QMainWindow):
             bracket = self.bracket_tab.to_settings()
             state["bracket"] = asdict(bracket)
         state["draft_link_url"] = self.link_url_edit.text().strip()
+        if hasattr(self, "standings_tab"):
+            state["tournament_link_url"] = self.standings_tab.tournament_link_url_edit.text().strip()
         return state
 
 
     def _apply_state(self, state: dict):
         self.link_url_edit.setText(state.get("draft_link_url", "") or "")
-        assets = state.get("assets", {})
-        self.heroes = {k: Asset(**v) for k, v in assets.get("heroes", {}).items()}
-        self.maps = {k: Asset(**v) for k, v in assets.get("maps", {}).items()}
-        self.modes = {k: Asset(**v) for k, v in assets.get("modes", {}).items()}
+        if hasattr(self, "standings_tab"):
+            self.standings_tab.tournament_link_url_edit.setText(state.get("tournament_link_url", "") or "")
+        # Heroes/Maps/Game Modes are NOT restored from here - Scoreboard/<Category>/
+        # index.json (loaded by _auto_discover_assets() at startup, before this
+        # ever runs) is the single source of truth for that catalogue. This state
+        # dict used to carry its own copy too, which meant any load of a stale
+        # autosave/.sowbroadcast.json save silently overwrote maps/heroes/modes
+        # with whatever they were at save time - including their `mode`/game-type
+        # fields - clobbering hand-edits made directly to index.json since.
         self._on_assets_changed()
 
         t1 = Team(**{k: v for k, v in state.get("team1", {}).items() if k != "players"})
@@ -4384,6 +4964,7 @@ class TournamentApp(QMainWindow):
 
     def closeEvent(self, event):
         self._draft_link.disconnect()
+        self._tournament_link.disconnect()
         self._autosave()
         super().closeEvent(event)
 def _start_http_server(bind="127.0.0.1", port=8324):

@@ -53,22 +53,22 @@
   .vs{ height:100%; display:flex; align-items:center; justify-content:center; padding:0 30px; background:var(--tertiary); color:var(--primary); font-size:68px; font-weight:900; }
 
 .maps-area{
-  position:absolute; top:var(--sb-h); bottom:100px; left:0px; right:0px;
+  position:absolute; top:var(--sb-h); bottom:0px; left:0px; right:0px;
   display:grid;
   grid-auto-flow:column;
   grid-auto-columns:1fr;
   justify-content:stretch;
-  align-items:start;
+  align-items:stretch;
   gap:0;
 }
   .map-wrap{
     display:flex; flex-direction:column; align-items:stretch;
-    min-width:0;
+    min-width:0; min-height:0;
   }
 
   .map-card{
-	height:775px;
-    position:relative; flex:1 1 auto;
+    flex:1 1 0%; min-height:0;
+    position:relative;
     background:#222 center/cover no-repeat;
     box-shadow:var(--shadow);
     overflow:hidden; isolation:isolate;
@@ -149,52 +149,18 @@
 }
 
   .map-caption{
-    margin-top:0px; padding:10px 16px;
+    margin-top:0px; padding:0 16px; height:64px; flex:0 0 64px;
     background:rgba(0,0,0,.70); color:#fff; text-align:center;
+    display:flex; align-items:center; justify-content:center;
     font-size:40px; font-weight:900; letter-spacing:.4px;
+    white-space:nowrap; overflow:hidden;
   }
   .map-card.waiting { background: var(--tertiary) center/cover no-repeat; }
 .mode-icon{ width:100px; height:100px; background:center/contain no-repeat; opacity:.95; }
-#status{
-  position:absolute;
-  left:50%; bottom:20px; transform:translateX(-50%);
-  display:none;
-
-  max-width:80vw;
-  padding:14px 28px;
-  line-height:1.2;
-
-  background:var(--primary);
-  border-left:8px solid var(--tertiary);
-  border-right:8px solid var(--tertiary);
-  border-radius:12px;
-  box-shadow:0 8px 22px rgba(0,0,0,.25);
-
-  font-size:40px; font-weight:900; letter-spacing:.6px;
-  color:var(--secondary);
-  text-align:center; text-transform:uppercase;
-
-  white-space:pre-wrap; word-break:break-word;
-}
-
-
 
 
 .map-card.waiting{ background: var(--tertiary) center/cover no-repeat; }
 
-/* === Scene transition animations === */
-.scoreboardwrapper {
-  will-change: transform, opacity;
-  transition: transform 750ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease;
-}
-.maps-area {
-  will-change: transform, opacity;
-  transition: transform 750ms cubic-bezier(.2,.8,.2,1) 80ms, opacity 700ms ease 80ms;
-}
-body:not(.visible) .scoreboardwrapper,
-body.leaving       .scoreboardwrapper { transform: translateY(-40px); opacity: 0; }
-body:not(.visible) .maps-area,
-body.leaving       .maps-area { transform: translateY(40px); opacity: 0; }
 </style>
 </head>
 <body>
@@ -214,7 +180,6 @@ body.leaving       .maps-area { transform: translateY(40px); opacity: 0; }
   </div>
 </div>
 <div class="maps-area" id="maps"></div>
-<div id="status"></div>
 <script>
 const ROOT="..";
 const SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes", MAPS=SB+"/Maps";
@@ -230,27 +195,6 @@ function hexToRgb(hexStr){ const m=(hexStr||"").trim().replace(/^#/,'').toLowerC
   const s=m.length===3?m.split('').map(c=>c+c).join(''):m; const n=parseInt(s,16);
   if(isNaN(n)||s.length!==6) return null; return [(n>>16)&255,(n>>8)&255,n&255]; }
 const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
-
-function adjustMapsBottom(){
-  const statusEl = document.getElementById("status");
-  const mapsEl   = document.getElementById("maps");
-  if (!mapsEl) return;
-
-  if (statusEl.style.display === "none") {
-    mapsEl.style.bottom = "20px";
-  } else {
-    const h = statusEl.getBoundingClientRect().height;
-    mapsEl.style.bottom = (h + 40) + "px";
-  }
-}
-
-async function upStatus(){
-  const el  = document.getElementById("status");
-  const txt = (await read(MATCH + "/status.txt")).trim();
-  el.textContent = txt;
-  el.style.display = txt ? "block" : "none";
-  adjustMapsBottom();
-}
 
 async function resolveOverlayLogo(){
   const cands = [
@@ -335,6 +279,24 @@ async function renderMaps(){
   const sig = JSON.stringify(items);
   if(sig === _prevSig) return;
   _prevSig = sig;
+
+  // Measuring caption width before the Rajdhani webfont has finished loading
+  // uses the wider fallback font's metrics, over-shrinking every caption
+  // (even short ones) down to the minimum size. document.fonts.ready alone
+  // isn't enough - it only tracks fonts a paint has already triggered a
+  // request for, and on a cold page load this can run before that's
+  // happened, resolving as a no-op. Explicitly requesting the two declared
+  // weights forces the load to actually start; all of this is a no-op once
+  // the font is cached from an earlier render.
+  if (document.fonts) {
+    try {
+      await Promise.all([
+        document.fonts.load("700 40px Rajdhani"),
+        document.fonts.load("400 40px Rajdhani"),
+      ]);
+      await document.fonts.ready;
+    } catch {}
+  }
 
   root.innerHTML = "";
 
@@ -458,6 +420,26 @@ if (m.name) {
     wrap.appendChild(cap);
     root.appendChild(wrap);
   }
+
+  // Fitting must happen after every column exists: each map's async image
+  // check (above) resolves at a different time, so the grid's 1fr column
+  // width is still provisional mid-loop and only settles once all columns
+  // are in the DOM - fitting per-card during the loop measured against a
+  // width that was about to change once the remaining columns landed.
+  root.querySelectorAll(".map-caption").forEach(cap => fitCaptionText(cap));
+}
+
+// Shrinks a single-line, no-wrap caption's font size until it fits its
+// column instead of wrapping to a second row or getting clipped - needs to
+// run after the element is attached to the DOM so scrollWidth/clientWidth
+// reflect its real, laid-out column width.
+function fitCaptionText(el, maxSize=40, minSize=18){
+  el.style.fontSize = maxSize + "px";
+  let size = maxSize;
+  while(el.scrollWidth > el.clientWidth && size > minSize){
+    size -= 2;
+    el.style.fontSize = size + "px";
+  }
 }
 
 async function refreshHeader(){
@@ -497,29 +479,11 @@ async function tick(){
 	await applyColors();
     await refreshHeader();
     await renderMaps();
-	await upStatus();
   }finally{
     setTimeout(tick, 1000);
   }
 }
 tick();
-
-function getStingerStartMs(){
-  const qs=new URLSearchParams(location.search);
-  const q=parseInt(qs.get("stinger")||qs.get("delay")||"",10);
-  if(!isNaN(q)&&q>=0) return q;
-  return 1800;
-}
-function setOverlayVisible(v){
-  document.body.classList.toggle("visible",!!v);
-  document.body.classList.toggle("leaving",!v);
-}
-document.addEventListener("DOMContentLoaded",()=>{
-  setTimeout(()=>setOverlayVisible(true),getStingerStartMs());
-});
-document.addEventListener("visibilitychange",()=>{
-  setOverlayVisible(!document.hidden);
-});
 </script>
 </body>
 </html>

@@ -23,7 +23,10 @@
     --qualified:#33d17a;
     --eliminated:#ff5c5c;
     --flash:rgba(255,255,255,0.3);
-    --row-bg:rgba(0,0,0,0.15);
+    --row-bg:rgba(255,255,255,0.10);
+    --rs:1;
+    --stat-pos:#33d17a;
+    --stat-neg:#ff5c5c;
   }
   .canvas{width:1920px;height:1080px;transform:scale(min(calc(100vw / 1920), calc(100vh / 1080)));transform-origin:top left;}
   .frame{box-sizing:border-box;padding:80px 90px;display:flex;flex-direction:column;gap:18px;height:100%;}
@@ -37,19 +40,23 @@
   .tables.multi{display:grid;grid-auto-rows:auto;gap:24px;align-content:start;}
   .table{background:var(--primary);border-radius:18px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
   .table-scale{transform-origin:top left;width:100%;height:100%;}
-  .table-inner{display:flex;flex-direction:column;gap:12px;flex:1;}
+  .table-inner{display:flex;flex-direction:column;gap:calc(12px * var(--rs));flex:1;}
   .group-title{font-size:32px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;margin-left:10px;}
-  .row{display:grid;align-items:center;gap:16px;padding:10px 4px;border-radius:12px;transition:background 0.6s ease;}
-  .row.header{font-size:30px;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;border-bottom:1px solid var(--line);color:secondary;font-weight:600;}
-  .row.body{font-size:28px;background:var(--);}
+  .row{display:grid;align-items:center;gap:calc(16px * var(--rs));padding:calc(10px * var(--rs)) calc(10px * var(--rs));border-radius:calc(12px * var(--rs));transition:background 0.6s ease;}
+  .row.header{font-size:calc(26px * var(--rs));text-transform:uppercase;letter-spacing:1px;padding-bottom:calc(6px * var(--rs));border-bottom:1px solid var(--line);color:var(--text);font-weight:600;opacity:0.75;}
+  .row.body{font-size:calc(28px * var(--rs));background:transparent;}
+  .rows .row.body:nth-child(odd){background:var(--row-bg);}
   .row.placeholder{visibility:hidden;}
-  .rows{display:flex;flex-direction:column;gap:6px;}
+  .rows{display:flex;flex-direction:column;gap:calc(6px * var(--rs));}
   .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .rank{text-align:center;}
+  .rank{text-align:center;font-weight:700;opacity:0.75;}
   .center{text-align:center;}
-  .team{display:flex;align-items:center;gap:16px;min-width:0;}
-  .logo{width:48px;height:48px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:10px;background-color:transparent;}
-  .status{padding:6px 12px;border-radius:999px;font-size:18px;text-transform:uppercase;letter-spacing:1px;justify-self:left;text-align:center;}
+  .team{display:flex;align-items:center;gap:calc(16px * var(--rs));min-width:0;}
+  .team-name{font-weight:600;}
+  .logo{width:calc(48px * var(--rs));height:calc(48px * var(--rs));background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:calc(10px * var(--rs));background-color:transparent;box-shadow:0 2px 6px rgba(0,0,0,0.35);flex-shrink:0;}
+  .stat-pos{color:var(--stat-pos);font-weight:700;}
+  .stat-neg{color:var(--stat-neg);font-weight:700;}
+  .status{padding:6px 12px;border-radius:999px;font-size:calc(18px * var(--rs));text-transform:uppercase;letter-spacing:1px;justify-self:left;text-align:center;}
   .status.qualified{background:rgba(51,209,122,0.2);color:var(--qualified);}
   .status.eliminated{background:rgba(255,92,92,0.2);color:var(--eliminated);}
   .flash{animation:flash 1.2s ease;}
@@ -165,6 +172,18 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
     return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
   }
 
+  // Tinting a background with a low-alpha copy of itself (the old approach)
+  // is invisible - pick a black or white overlay depending on how light the
+  // table background actually is, so the stripe always reads regardless of
+  // whether the configured theme is light or dark.
+  function rowStripeColor(primaryHex){
+    const rgb = hexToRgb(primaryHex);
+    if(!rgb) return "rgba(0,0,0,0.15)";
+    const [r, g, b] = rgb;
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance > 0.5 ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)";
+  }
+
   async function applyColors(){
     const kv = {};
     (await read(`${GENERAL}/colors.txt`)).split(/\r?\n/).forEach(line=>{
@@ -186,30 +205,66 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
     root.style.setProperty("--accent", tertiary);
     root.style.setProperty("--line", rgbaFromHex(secondary, 0.08, "rgba(255,255,255,0.08)"));
     root.style.setProperty("--flash", rgbaFromHex(secondary, 0.3, "rgba(255,255,255,0.3)"));
-    root.style.setProperty("--row-bg", rgbaFromHex(primary, 0.15, "rgba(0,0,0,0.15)"));
+    root.style.setProperty("--row-bg", rowStripeColor(primary));
   }
 
 
-  function buildHeader(showStatus){
+  function hasExtendedStats(rows){
+    return (rows || []).some(row => row.played !== undefined && row.played !== null);
+  }
+
+  function gridColumns(showStatus, showExtended, rowScale){
+    // Wide enough to spell out full words instead of abbreviations - also
+    // fills more of the row width when only one table is on screen, instead
+    // of leaving a wide empty gap next to a handful of narrow letter columns.
+    // Scales with rowScale so columns stay proportional to the enlarged
+    // row height/font on a short single-group table.
+    const rs = rowScale || 1;
+    const px = n => `${Math.round(n * rs)}px`;
+    const cols = showExtended
+      ? [px(60), "1fr", px(130), px(85), px(110), px(95), px(85), px(150), px(75), px(120)]
+      : [px(60), "1fr", px(85), px(95), px(75), px(120)];
+    if(showStatus) cols.push(px(110));
+    return cols.join(" ");
+  }
+
+  // Few teams in the only table on screen -> grow rows (font/padding/logos,
+  // via the --rs CSS variable) instead of leaving a small table floating in
+  // a lot of empty space. Caps out at 2x so a 4-team stage doesn't get
+  // comically oversized text.
+  function computeRowScale(rowCount, isSingleTable){
+    if(!isSingleTable) return 1;
+    return Math.min(2, Math.max(1, 8 / Math.max(rowCount, 1)));
+  }
+
+  function buildHeader(showStatus, showExtended, rowScale){
     const header = document.createElement("div");
     header.className = "row header";
-    const labels = ["#","Team","W","L","+/-","Pts"];
+    const labels = showExtended
+      ? ["#","Team","Played","Won","Drawn","Lost","For","Against","+/-","Points"]
+      : ["#","Team","Won","Lost","+/-","Points"];
     if(showStatus){
       labels.push("Status");
     }
+    const centered = ["#","Rank","Played","Won","Drawn","Lost","For","Against","+/-","Points","Status"];
     labels.forEach(label=>{
       const div = document.createElement("div");
       div.className = "cell";
-      if(["#","Rank","W","L","+/-","Pts","Points","Status"].includes(label)){
+      if(centered.includes(label)){
         div.classList.add("center");
       }
       div.textContent = label;
       header.appendChild(div);
     });
-    header.style.gridTemplateColumns = showStatus
-      ? "60px 1fr 60px 60px 65px 80px 110px"
-      : "60px 1fr 60px 60px 65px 80px";
+    header.style.gridTemplateColumns = gridColumns(showStatus, showExtended, rowScale);
     return header;
+  }
+
+  function statClass(value){
+    const n = Number(value) || 0;
+    if(n > 0) return "stat-pos";
+    if(n < 0) return "stat-neg";
+    return "";
   }
 
   function normalizeGroups(data){
@@ -284,9 +339,12 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
         displayRows.push({ __placeholder: true });
       }
       const showStatus = rows.some(row=>String(row.status || "").trim());
+      const showExtended = hasExtendedStats(rows);
+      const rowScale = computeRowScale(displayRows.length, activeGroups.length === 1);
 
       const table = document.createElement("div");
       table.className = "table";
+      table.style.setProperty("--rs", rowScale.toFixed(3));
 
       const scaleWrap = document.createElement("div");
       scaleWrap.className = "table-scale";
@@ -301,7 +359,7 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
         inner.appendChild(groupTitle);
       }
 
-      inner.appendChild(buildHeader(showStatus));
+      inner.appendChild(buildHeader(showStatus, showExtended, rowScale));
 
       const rowsWrap = document.createElement("div");
       rowsWrap.className = "rows";
@@ -330,20 +388,23 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
         ((prev.losses ?? 0) !== (row.losses ?? 0)) ||
         ((prev.map_diff ?? 0) !== (row.map_diff ?? 0)) ||
         ((prev.points ?? 0) !== (row.points ?? 0)) ||
-        ((prev.status ?? "") !== (row.status ?? ""))
+        ((prev.status ?? "") !== (row.status ?? "")) ||
+        ((prev.played ?? 0) !== (row.played ?? 0)) ||
+        ((prev.draws ?? 0) !== (row.draws ?? 0)) ||
+        ((prev.sf ?? 0) !== (row.sf ?? 0)) ||
+        ((prev.sa ?? 0) !== (row.sa ?? 0))
       );
 
       const moved = !isPlaceholder && prevOrder.has(key) && prevOrder.get(key) !== idx;
+      const rankNum = isPlaceholder ? 0 : (row.rank || idx + 1);
 
       const rowEl = document.createElement("div");
       rowEl.className = `row body${isPlaceholder ? " placeholder" : ""}` + ((changed || moved) ? " flash" : "");
-      rowEl.style.gridTemplateColumns = showStatus
-        ? "60px 1fr 60px 60px 65px 80px 110px"
-        : "60px 1fr 60px 60px 65px 80px";
+      rowEl.style.gridTemplateColumns = gridColumns(showStatus, showExtended, rowScale);
 
       const rank = document.createElement("div");
       rank.className = "cell rank center";
-      rank.textContent = isPlaceholder ? "" : (row.rank || idx + 1);
+      rank.textContent = isPlaceholder ? "" : rankNum;
       rowEl.appendChild(rank);
 
       const team = document.createElement("div");
@@ -358,10 +419,18 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
       const teamName = getTeamName(row);
       const name = document.createElement("div");
       name.textContent = isPlaceholder ? "" : teamName;
-      name.className = (!isPlaceholder && changed) ? "flash-cell" : "";
+      name.className = "team-name" + ((!isPlaceholder && changed) ? " flash-cell" : "");
       team.appendChild(logo);
       team.appendChild(name);
       rowEl.appendChild(team);
+
+      if(showExtended){
+        const played = document.createElement("div");
+        played.className = "cell center";
+        played.textContent = isPlaceholder ? "" : (row.played ?? 0);
+        if(prev && prev.played !== row.played) played.classList.add("flash-cell");
+        rowEl.appendChild(played);
+      }
 
       const w = document.createElement("div");
       w.className = "cell center";
@@ -369,15 +438,38 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
       if(prev && prev.wins !== row.wins) w.classList.add("flash-cell");
       rowEl.appendChild(w);
 
+      if(showExtended){
+        const draws = document.createElement("div");
+        draws.className = "cell center";
+        draws.textContent = isPlaceholder ? "" : (row.draws ?? 0);
+        if(prev && prev.draws !== row.draws) draws.classList.add("flash-cell");
+        rowEl.appendChild(draws);
+      }
+
       const l = document.createElement("div");
       l.className = "cell center";
       l.textContent = isPlaceholder ? "" : (row.losses ?? 0);
       if(prev && prev.losses !== row.losses) l.classList.add("flash-cell");
       rowEl.appendChild(l);
 
+      if(showExtended){
+        const sf = document.createElement("div");
+        sf.className = "cell center";
+        sf.textContent = isPlaceholder ? "" : (row.sf ?? 0);
+        if(prev && prev.sf !== row.sf) sf.classList.add("flash-cell");
+        rowEl.appendChild(sf);
+
+        const sa = document.createElement("div");
+        sa.className = "cell center";
+        sa.textContent = isPlaceholder ? "" : (row.sa ?? 0);
+        if(prev && prev.sa !== row.sa) sa.classList.add("flash-cell");
+        rowEl.appendChild(sa);
+      }
+
       const md = document.createElement("div");
-      md.className = "cell center";
-      md.textContent = isPlaceholder ? "" : (row.map_diff ?? 0);
+      const diffVal = row.map_diff ?? 0;
+      md.className = "cell center" + (isPlaceholder ? "" : ` ${statClass(diffVal)}`);
+      md.textContent = isPlaceholder ? "" : (diffVal > 0 ? `+${diffVal}` : `${diffVal}`);
       if(prev && prev.map_diff !== row.map_diff) md.classList.add("flash-cell");
       rowEl.appendChild(md);
 
