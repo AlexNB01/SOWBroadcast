@@ -179,17 +179,16 @@
 <div class="scoreboardwrapper">
   <div class="scorebar">
 
-    <!-- Team 1 (left) — score then map-pick badge, so the badge (which
-         appears/disappears per map) ends up right next to the VS box
-         instead of leaving a gap between it and center-info. -->
+    <!-- Team 1 (left) — map-pick badge sits between the team name and the
+         score box, right next to the team it belongs to. -->
     <div class="team team1">
       <div class="teamlogo" id="t1logo"></div>
       <div class="teamname" id="t1name">TEAM 1</div>
-      <div class="scorebox" id="t1scorebox">
-        <span class="teamscore" id="t1score">0</span>
-      </div>
       <div id="mappick-t1-wrap" class="mappick-wrap">
         <div class="mappick-badge t1"><span class="arrows">◀◀</span> MAP PICK</div>
+      </div>
+      <div class="scorebox" id="t1scorebox">
+        <span class="teamscore" id="t1score">0</span>
       </div>
     </div>
 
@@ -199,15 +198,15 @@
       <div class="center-format" id="centerFormat"></div>
     </div>
 
-    <!-- Team 2 (right, row-reverse) — DOM order: logo, name, score, mappick → displays as: mappick, score, name, logo -->
+    <!-- Team 2 (right, row-reverse) — DOM order: logo, name, mappick, score → displays as: score, mappick, name, logo -->
     <div class="team team2">
       <div class="teamlogo" id="t2logo"></div>
       <div class="teamname" id="t2name">TEAM 2</div>
-      <div class="scorebox" id="t2scorebox">
-        <span class="teamscore" id="t2score">0</span>
-      </div>
       <div id="mappick-t2-wrap" class="mappick-wrap">
         <div class="mappick-badge t2">MAP PICK <span class="arrows">▶▶</span></div>
+      </div>
+      <div class="scorebox" id="t2scorebox">
+        <span class="teamscore" id="t2score">0</span>
       </div>
     </div>
 
