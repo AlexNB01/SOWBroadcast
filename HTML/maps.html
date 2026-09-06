@@ -59,22 +59,35 @@
   grid-auto-columns:1fr;
   justify-content:stretch;
   align-items:stretch;
-  gap:0;
+  gap:var(--gap);
+  padding:var(--gap);
+  box-sizing:border-box;
 }
   .map-wrap{
     display:flex; flex-direction:column; align-items:stretch;
-    min-width:0; min-height:0;
+    min-width:0; min-height:0; gap:8px;
   }
 
   .map-card{
     flex:1 1 0%; min-height:0;
     position:relative;
     background:#222 center/cover no-repeat;
+    border-radius:var(--radius);
     box-shadow:var(--shadow);
     overflow:hidden; isolation:isolate;
     display:flex; align-items:center; justify-content:center;
   }
   
+.next-map-badge{
+  position:absolute; top:0; left:50%; transform:translateX(-50%);
+  background:var(--tertiary); color:var(--primary);
+  font:900 22px/1 'Rajdhani', sans-serif; letter-spacing:1.5px;
+  padding:8px 20px;
+  border-radius:0 0 10px 10px;
+  z-index:5;
+  box-shadow:0 4px 10px rgba(0,0,0,.35);
+}
+
 .map-card .map-score{
   position:absolute;
   left:50%;
@@ -151,15 +164,16 @@
   .map-caption{
     margin-top:0px; padding:0 16px; height:64px; flex:0 0 64px;
     background:rgba(0,0,0,.70); color:#fff; text-align:center;
+    border-radius:var(--radius);
     display:flex; align-items:center; justify-content:center;
     font-size:40px; font-weight:900; letter-spacing:.4px;
     white-space:nowrap; overflow:hidden;
   }
-  .map-card.waiting { background: var(--tertiary) center/cover no-repeat; }
+  /* Fixed neutral dark, not var(--primary) - that role is fully operator-
+     configurable via colors.txt and can end up light (e.g. a white-branded
+     tournament), which would defeat the point of an "empty state" tone. */
+  .map-card.waiting { background: #14161c center/cover no-repeat; }
 .mode-icon{ width:100px; height:100px; background:center/contain no-repeat; opacity:.95; }
-
-
-.map-card.waiting{ background: var(--tertiary) center/cover no-repeat; }
 
 </style>
 </head>
@@ -253,6 +267,7 @@ async function renderMaps(){
   const root = document.getElementById("maps");
   const n = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 3;
   const count = Math.max(1, Math.min(7, n));
+  const curIdx = parseInt((await read(MATCH + "/CurrentMap.txt")).trim(), 10) || 0;
 
   const items = [];
   for(let i=1;i<=count;i++){
@@ -276,7 +291,7 @@ async function renderMaps(){
 	});
   }
 
-  const sig = JSON.stringify(items);
+  const sig = JSON.stringify({items, curIdx});
   if(sig === _prevSig) return;
   _prevSig = sig;
 
@@ -324,6 +339,15 @@ async function renderMaps(){
 		card.appendChild(ph);
 	  }
 	}
+
+    // The map currently being played (and not yet decided) gets a badge -
+    // once it's completed the winner overlay below takes over instead.
+    if(m.name && !m.completed && m.idx === curIdx){
+      const badge = document.createElement("div");
+      badge.className = "next-map-badge";
+      badge.textContent = "NEXT MAP";
+      card.appendChild(badge);
+    }
 
     if(m.completed){
       let win = "";
