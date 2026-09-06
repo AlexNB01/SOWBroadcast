@@ -37,16 +37,19 @@
   .round{width:280px;display:flex;flex-direction:column;gap:12px;position:relative;}
   .round.grand{align-self:center;}
   .rounds.has-lower .round.grand{grid-row:1 / span 2;align-self:center;}
-  .round-title{font-size:22px;text-transform:uppercase;letter-spacing:1px;padding:10px 14px;border-left:6px solid var(--accent);background:var(--primary);border-radius:12px;box-shadow:0 10px 22px rgba(0,0,0,0.25);position:absolute;left:0;top:var(--title-offset, 0);transform:translateY(calc(-100% - 8px));}
+  .round-title{font-size:22px;line-height:1;text-transform:uppercase;letter-spacing:1px;padding:5px 14px;border-left:6px solid var(--accent);background:var(--primary);border-radius:12px;box-shadow:0 10px 22px rgba(0,0,0,0.25);position:absolute;left:0;top:var(--title-offset, 0);transform:translateY(calc(-100% - 8px));}
   .matches{position:relative;display:grid;grid-template-rows:repeat(var(--rows,1),var(--row-height));align-items:start;align-content:start;row-gap:0;}
   .match{background:var(--primary);color:var(--secondary);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;transition:background 0.6s ease;border:1px solid var(--line);box-shadow:0 10px 22px rgba(0,0,0,0.2);position:relative;min-height:84px;z-index:1;}
-  .connector{display:none;}
-  .connector.right{right:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
-  .connector.left{left:calc(-1 * var(--round-gap) / 2);width:calc(var(--round-gap) / 2);}
-  .connector.left::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:var(--connector-height, 0);background:var(--line);}
+  /* Drawn post-layout from each match's real measured position (see drawConnectors)
+     instead of guessed from the CSS grid math, so segments always meet exactly. */
+  .connectors{position:absolute;inset:0;pointer-events:none;}
+  .conn-line{position:absolute;background:var(--accent);}
   .meta{display:flex;justify-content:space-between;font-size:16px;opacity:0.7;letter-spacing:0.5px;}
   .team{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:700;}
+  .team.winner{color:var(--accent);}
+  .team.loser{opacity:0.55;}
   .team .logo{width:32px;height:32px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;background-color:rgba(0,0,0,0.08);}
+  .team .logo.has-logo{background-color:transparent;}
   .score{margin-left:auto;font-size:22px;font-weight:800;min-width:24px;text-align:center;}
   .score.flash{animation:flashScore 1.2s ease;}
   .status{font-size:16px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;}
@@ -152,6 +155,14 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     return alt ?? 0;
   }
 
+  // A 0-0 line is meaningless noise for a match that hasn't started yet (it's
+  // 0-0 because nothing has been played, not because of any actual result),
+  // so leave both score cells blank until at least one side has a point.
+  function formatScore(match, slot){
+    if(getScore(match, 1) === 0 && getScore(match, 2) === 0) return "";
+    return getScore(match, slot);
+  }
+
   function isAbsolute(path){
     return /^(https?:|file:|data:)/i.test(path) || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("/") || path.startsWith("\\\\");
   }
@@ -181,6 +192,121 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     return match.id || `${match.team1?.name || ""}-${match.team2?.name || ""}-${idx}`;
   }
 
+  // "BO5" -> "FT3" (first team to reach 3 wins the Bo5). Falls back to the
+  // raw label untouched if it doesn't look like a BOx label.
+  function formatBoLabel(label){
+    if(!label) return "";
+    const m = String(label).match(/(\d+)/);
+    if(!m) return label;
+    const n = parseInt(m[1], 10);
+    if(!n) return label;
+    return `FT${Math.ceil(n / 2)}`;
+  }
+
+  function formatMatchTime(ts){
+    if(!ts) return "";
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return "";
+    const day = d.getDate();
+    const month = d.getMonth() + 1;
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${day}.${month}. ${hh}:${mm}`;
+  }
+
+  function formatMatchMeta(match){
+    return [formatBoLabel(match.bo_label), formatMatchTime(match.scheduled_at)].filter(Boolean).join(" · ");
+  }
+
+  // Ties (including 0-0 for a match that hasn't been played yet) mark neither
+  // side, so only a match with an actual score difference gets highlighted.
+  function markWinner(team1El, team2El, score1, score2){
+    if(score1 === score2) return;
+    if(score1 > score2){
+      team1El.classList.add("winner");
+      team2El.classList.add("loser");
+    }else{
+      team2El.classList.add("winner");
+      team1El.classList.add("loser");
+    }
+  }
+
+  // Draws one elbow connector (source's right edge -> midpoint -> target's left
+  // edge) between two match cards, from their real measured positions - never
+  // from guessed CSS grid math, so the segments always meet exactly instead of
+  // leaving gaps at the joins.
+  function addElbowConnector(layer, x1, y1, x2, y2){
+    const thickness = 4;
+    const half = thickness / 2;
+    const midX = (x1 + x2) / 2;
+    const line = (left, top, width, height)=>{
+      const el = document.createElement("div");
+      el.className = "conn-line";
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.width = `${width}px`;
+      el.style.height = `${height}px`;
+      layer.appendChild(el);
+    };
+    line(Math.min(x1, midX), y1 - half, Math.abs(midX - x1), thickness);
+    if(Math.abs(y2 - y1) > 0.5){
+      line(midX - half, Math.min(y1, y2), thickness, Math.abs(y2 - y1));
+    }
+    line(Math.min(midX, x2), y2 - half, Math.abs(x2 - midX), thickness);
+  }
+
+  // roundsMatchEls: array of rounds (in order), each an array of that round's
+  // match <div> elements. Connects every match in round i to the match(es) in
+  // round i+1 it feeds into (2-to-1 for a halving bracket, 1-to-1 when a round
+  // doesn't reduce the match count, e.g. some lower-bracket rounds).
+  function drawConnectors(roundsWrap, upperMatchEls, lowerMatchEls, grandMatchEls){
+    // getBoundingClientRect() must be read with no transform on roundsWrap, or
+    // the already-scaled distances would get scaled a second time once this
+    // layer is scaled along with everything else by fitRounds().
+    const prevTransform = roundsWrap.style.transform;
+    roundsWrap.style.transform = "none";
+
+    const layer = document.createElement("div");
+    layer.className = "connectors";
+    roundsWrap.insertBefore(layer, roundsWrap.firstChild);
+
+    const origin = roundsWrap.getBoundingClientRect();
+    function edges(el){
+      const r = el.getBoundingClientRect();
+      return { left: r.left - origin.left, right: r.right - origin.left, centerY: r.top - origin.top + r.height / 2 };
+    }
+
+    function connect(sourceEls, targetEls){
+      if(!sourceEls.length || !targetEls.length) return;
+      const ratio = Math.max(1, Math.round(sourceEls.length / targetEls.length));
+      targetEls.forEach((targetEl, j)=>{
+        const target = edges(targetEl);
+        sourceEls.slice(j * ratio, j * ratio + ratio).forEach(sourceEl=>{
+          const source = edges(sourceEl);
+          addElbowConnector(layer, source.right, source.centerY, target.left, target.centerY);
+        });
+      });
+    }
+
+    function connectSection(roundsMatchEls){
+      for(let i = 1; i < roundsMatchEls.length; i++){
+        connect(roundsMatchEls[i - 1], roundsMatchEls[i]);
+      }
+    }
+
+    connectSection(upperMatchEls);
+    connectSection(lowerMatchEls);
+
+    if(grandMatchEls.length){
+      const finalSources = [];
+      if(upperMatchEls.length) finalSources.push(...upperMatchEls[upperMatchEls.length - 1]);
+      if(lowerMatchEls.length) finalSources.push(...lowerMatchEls[lowerMatchEls.length - 1]);
+      connect(finalSources, grandMatchEls);
+    }
+
+    roundsWrap.style.transform = prevTransform;
+  }
+
   function fitRounds(){
     const roundsWrap = document.getElementById("rounds");
     const container = document.getElementById("rounds-container");
@@ -196,10 +322,27 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     const minScale = hasLower ? 0.7 : 0.65;
     const clamped = Math.max(minScale, Math.min(scale, 1.4));
     const scaledWidth = contentWidth * clamped;
-    const scaledHeight = contentHeight * clamped;
     const offsetX = Math.max(0, (availableWidth - scaledWidth) / 2);
-    const offsetY = Math.max(0, (availableHeight - scaledHeight) / 2);
-    roundsWrap.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${clamped})`;
+
+    // Round titles are absolutely positioned above their own round (see
+    // .round-title's translateY(-100% - 8px)) and poke out above the top of
+    // .rounds itself - scrollHeight never counts that (browsers don't include
+    // negative-direction overflow in it), so it's invisible to the fit-scale
+    // math above. Anchoring to the top (instead of the old vertical centering,
+    // which happened to leave enough headroom to hide this) means that
+    // overshoot now lands above the container's own top edge and gets clipped
+    // by its overflow:hidden. Measure it for real post-scale and nudge the
+    // whole wrapper down by just that much so every title stays fully visible.
+    roundsWrap.style.transform = `scale(${clamped})`;
+    const wrapTop = roundsWrap.getBoundingClientRect().top;
+    let minTitleTop = wrapTop;
+    roundsWrap.querySelectorAll(".round-title").forEach(el => {
+      const top = el.getBoundingClientRect().top;
+      if(top < minTitleTop) minTitleTop = top;
+    });
+    const topOvershoot = Math.max(0, wrapTop - minTitleTop);
+
+    roundsWrap.style.transform = `translate(${offsetX}px, ${topOvershoot}px) scale(${clamped})`;
   }
 
   function render(data){
@@ -247,6 +390,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     function addSection(sectionRounds, rowIndex, columnOffset = 0, rowOffset = 0){
       const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
       const totalRows = maxMatches * 2;
+      const sectionMatchEls = [];
       sectionRounds.forEach((round, roundIndex)=>{
         const roundEl = document.createElement("div");
         roundEl.className = "round";
@@ -266,9 +410,6 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
 
         const matchCount = (round.matches || []).length || 1;
         const block = totalRows / matchCount;
-        const prevMatchCount = roundIndex > 0 ? (sectionRounds[roundIndex - 1].matches || []).length || 1 : matchCount;
-        const prevBlock = totalRows / prevMatchCount;
-        const connectorHeight = prevMatchCount === matchCount ? 0 : prevBlock * rowHeightValue;
         const titleRow = Math.max(1, Math.round(block / 2));
         matchesWrap.style.setProperty("--title-offset", `${(titleRow - 1) * rowHeightValue}px`);
 
@@ -277,6 +418,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
         title.textContent = round.name || "";
         matchesWrap.appendChild(title);
 
+        const roundMatchEls = [];
         (round.matches || []).forEach((match, idx)=>{
           const key = matchKey(match, idx);
           const prev = prevMatches.get(key);
@@ -291,23 +433,12 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
           const computedRow = Math.round(block / 2 + idx * block);
           const maxStart = Math.max(1, totalRows - 1);
           matchEl.style.gridRow = `${Math.min(maxStart, computedRow)} / span 2`;
-
-          if(roundIndex > 0){
-            const leftConnector = document.createElement("span");
-            leftConnector.className = "connector left";
-            leftConnector.style.setProperty("--connector-height", `${connectorHeight}px`);
-            matchEl.appendChild(leftConnector);
-          }
-          if(roundIndex < sectionRounds.length - 1){
-            const rightConnector = document.createElement("span");
-            rightConnector.className = "connector right";
-            matchEl.appendChild(rightConnector);
-          }
+          roundMatchEls.push(matchEl);
 
           const meta = document.createElement("div");
           meta.className = "meta";
           const bo = document.createElement("div");
-          bo.textContent = match.bo_label || "";
+          bo.textContent = formatMatchMeta(match);
           const status = document.createElement("div");
           status.className = "status";
           status.textContent = match.status || "";
@@ -322,12 +453,13 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
           const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
           if(t1logoPath){
             t1logo.style.backgroundImage = `url('${t1logoPath}')`;
+            t1logo.classList.add("has-logo");
           }
           const t1name = document.createElement("div");
           t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
           const t1score = document.createElement("div");
           t1score.className = "score";
-          t1score.textContent = getScore(match, 1);
+          t1score.textContent = formatScore(match, 1);
           if(prev && getScore(prev, 1) !== getScore(match, 1)) t1score.classList.add("flash");
           team1.appendChild(t1logo);
           team1.appendChild(t1name);
@@ -341,24 +473,28 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
           const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
           if(t2logoPath){
             t2logo.style.backgroundImage = `url('${t2logoPath}')`;
+            t2logo.classList.add("has-logo");
           }
           const t2name = document.createElement("div");
           t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
           const t2score = document.createElement("div");
           t2score.className = "score";
-          t2score.textContent = getScore(match, 2);
+          t2score.textContent = formatScore(match, 2);
           if(prev && getScore(prev, 2) !== getScore(match, 2)) t2score.classList.add("flash");
           team2.appendChild(t2logo);
           team2.appendChild(t2name);
           team2.appendChild(t2score);
           matchEl.appendChild(team2);
+          markWinner(team1, team2, getScore(match, 1), getScore(match, 2));
 
           matchesWrap.appendChild(matchEl);
         });
 
         roundEl.appendChild(matchesWrap);
         roundsWrap.appendChild(roundEl);
+        sectionMatchEls.push(roundMatchEls);
       });
+      return sectionMatchEls;
     }
 
     const upperMaxMatches = Math.max(1, ...sections.upper.map(r=>(r.matches || []).length || 0));
@@ -372,18 +508,22 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     const lowerRowIndex = lowerIsBronzeOnly ? "1" : "2";
     const bronzeRowOffset = lowerIsBronzeOnly ? (upperMaxMatches + 1.7) * rowHeightValue : 0;
 
+    let upperMatchEls = [];
+    let lowerMatchEls = [];
     if(focusOnly){
       if(sections[focusSide].length){
-        addSection(sections[focusSide], "1");
+        const els = addSection(sections[focusSide], "1");
+        if(focusSide === "upper") upperMatchEls = els; else lowerMatchEls = els;
       }
     }else{
       if(sections.upper.length){
-        addSection(sections.upper, "1");
+        upperMatchEls = addSection(sections.upper, "1");
       }
       if(sections.lower.length){
-        addSection(sections.lower, lowerRowIndex, lowerColumnOffset, bronzeRowOffset);
+        lowerMatchEls = addSection(sections.lower, lowerRowIndex, lowerColumnOffset, bronzeRowOffset);
       }
     }
+    let grandMatchEls = [];
     if(sections.grand.length){
       const grandRound = sections.grand[0];
       const rowIndex = hasLower ? "1 / span 2" : "1";
@@ -418,7 +558,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
         const meta = document.createElement("div");
         meta.className = "meta";
         const bo = document.createElement("div");
-        bo.textContent = match.bo_label || "";
+        bo.textContent = formatMatchMeta(match);
         const status = document.createElement("div");
         status.className = "status";
         status.textContent = match.status || "";
@@ -433,12 +573,13 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
         const t1logoPath = logoUrlWithCache(team1Data.logo || "", prevTeam1?.logo || "");
         if(t1logoPath){
           t1logo.style.backgroundImage = `url('${t1logoPath}')`;
+          t1logo.classList.add("has-logo");
         }
         const t1name = document.createElement("div");
         t1name.textContent = team1Data.abbr || team1Data.name || "TBD";
         const t1score = document.createElement("div");
         t1score.className = "score";
-        t1score.textContent = getScore(match, 1);
+        t1score.textContent = formatScore(match, 1);
         if(prev && getScore(prev, 1) !== getScore(match, 1)) t1score.classList.add("flash");
         team1.appendChild(t1logo);
         team1.appendChild(t1name);
@@ -452,17 +593,20 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
         const t2logoPath = logoUrlWithCache(team2Data.logo || "", prevTeam2?.logo || "");
         if(t2logoPath){
           t2logo.style.backgroundImage = `url('${t2logoPath}')`;
+          t2logo.classList.add("has-logo");
         }
         const t2name = document.createElement("div");
         t2name.textContent = team2Data.abbr || team2Data.name || "TBD";
         const t2score = document.createElement("div");
         t2score.className = "score";
-        t2score.textContent = getScore(match, 2);
+        t2score.textContent = formatScore(match, 2);
         if(prev && getScore(prev, 2) !== getScore(match, 2)) t2score.classList.add("flash");
         team2.appendChild(t2logo);
         team2.appendChild(t2name);
         team2.appendChild(t2score);
         matchEl.appendChild(team2);
+        markWinner(team1, team2, getScore(match, 1), getScore(match, 2));
+        grandMatchEls.push(matchEl);
 
         matchesWrap.appendChild(matchEl);
       });
@@ -470,6 +614,9 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
       grandEl.appendChild(matchesWrap);
       roundsWrap.appendChild(grandEl);
     }
+
+    drawConnectors(roundsWrap, upperMatchEls, lowerMatchEls, grandMatchEls);
+
     previous = data;
     requestAnimationFrame(fitRounds);
   }

@@ -112,14 +112,8 @@
   will-change: transform, opacity;
   transition: transform 750ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease;
 }
-.trio {
-  will-change: transform, opacity;
-  transition: transform 750ms cubic-bezier(.2,.8,.2,1) 80ms, opacity 700ms ease 80ms;
-}
 body:not(.visible) .scoreboardwrapper,
 body.leaving       .scoreboardwrapper { transform: translateY(-40px); opacity: 0; }
-body:not(.visible) .trio,
-body.leaving       .trio { transform: translateY(40px); opacity: 0; }
 </style>
 </head>
 <body>
@@ -163,6 +157,27 @@ body.leaving       .trio { transform: translateY(40px); opacity: 0; }
   const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
   const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
 
+  // Shrinks a single-line, no-wrap team name's font size until it fits its
+  // reserved space instead of getting clipped by the ellipsis - must run
+  // after the text is set, since it measures the real laid-out width.
+  async function fitTeamName(el, maxSize=68, minSize=30){
+    if (document.fonts) {
+      try {
+        await Promise.all([
+          document.fonts.load(`900 ${maxSize}px Rajdhani`),
+          document.fonts.load(`700 ${maxSize}px Rajdhani`),
+        ]);
+        await document.fonts.ready;
+      } catch {}
+    }
+    el.style.fontSize = maxSize + "px";
+    let size = maxSize;
+    while(el.scrollWidth > el.clientWidth && size > minSize){
+      size -= 2;
+      el.style.fontSize = size + "px";
+    }
+  }
+
 async function upStatus(){
   const el  = document.getElementById("status");
   if (!el) return;
@@ -184,7 +199,9 @@ async function upStatus(){
   }
 
   async function upT1(){
-    document.getElementById("t1name").textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
+    const t1name=document.getElementById("t1name");
+    t1name.textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
+    await fitTeamName(t1name);
     document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0";
     const c = hex((await read(MATCH+"/T1Color.txt")).trim()) || "#27AAE1";
     document.documentElement.style.setProperty("--t1", c);
@@ -192,7 +209,9 @@ async function upStatus(){
     else document.getElementById("t1logo").style.backgroundImage="none";
   }
   async function upT2(){
-    document.getElementById("t2name").textContent=((await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2").toUpperCase();
+    const t2name=document.getElementById("t2name");
+    t2name.textContent=((await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2").toUpperCase();
+    await fitTeamName(t2name);
     document.getElementById("t2score").textContent=(await read(MATCH+"/T2Score.txt")).trim()||"0";
     const c = hex((await read(MATCH+"/T2Color.txt")).trim()) || "#C80013";
     document.documentElement.style.setProperty("--t2", c);

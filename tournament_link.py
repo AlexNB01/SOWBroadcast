@@ -111,6 +111,15 @@ class TournamentLinkClient:
             # on ehtinyt korvata sen sillä välin.
             if self.tournament_id != tournament_id:
                 return
+            # Linkki voi käyttää admin-sluggia (esim. /tournament/esm26), mutta
+            # palvelin lähettää 'tournament-update'-tapahtumat aina oikealla
+            # UUID:lla (ks. sowdraftin public/tournament.js). Jos emme vaihda
+            # tähän, _on_tournament_update-vertailu ei koskaan täsmää eikä live-
+            # päivitys koskaan laukea - ainoa keino nähdä uusi data olisi silloin
+            # unlink+link (uusi REST-haku, joka taas resolvoi sluggin).
+            real_id = (data.get("tournament") or {}).get("id")
+            if real_id:
+                self.tournament_id = real_id
             data["_origin"] = origin
             self.signals.data_received.emit(data)
         except Exception as e:

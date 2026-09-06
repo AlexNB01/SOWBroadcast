@@ -15,6 +15,7 @@ a = Analysis(
     hiddenimports=[
         'server',
         'draft_link',
+        'tournament_link',
         'engineio.async_drivers.threading',
         'websocket',
     ],

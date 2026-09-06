@@ -442,6 +442,23 @@ function fitCaptionText(el, maxSize=40, minSize=18){
   }
 }
 
+// Same idea as fitCaptionText, but for the scorebar team names, which (unlike
+// the map captions above, always fitted together after renderMaps() already
+// waited on the webfont once) can run on their own on a cold load - before
+// anything else has requested the font - so this waits for it itself.
+async function fitTeamName(el, maxSize=68, minSize=30){
+  if (document.fonts) {
+    try {
+      await Promise.all([
+        document.fonts.load(`900 ${maxSize}px Rajdhani`),
+        document.fonts.load(`700 ${maxSize}px Rajdhani`),
+      ]);
+      await document.fonts.ready;
+    } catch {}
+  }
+  fitCaptionText(el, maxSize, minSize);
+}
+
 async function refreshHeader(){
   const t1name = ((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
   const t2name = ((await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2").toUpperCase();
@@ -456,8 +473,11 @@ async function refreshHeader(){
   if(sig === _prevHeaderSig) return;
   _prevHeaderSig = sig;
 
-  document.getElementById("t1name").textContent = t1name;
-  document.getElementById("t2name").textContent = t2name;
+  const t1nameEl = document.getElementById("t1name");
+  const t2nameEl = document.getElementById("t2name");
+  t1nameEl.textContent = t1name;
+  t2nameEl.textContent = t2name;
+  await Promise.all([fitTeamName(t1nameEl), fitTeamName(t2nameEl)]);
   document.getElementById("t1score").textContent = t1score;
   document.getElementById("t2score").textContent = t2score;
 

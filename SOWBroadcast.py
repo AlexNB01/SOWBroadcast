@@ -8,66 +8,154 @@ from typing import Callable, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 from PyQt5.QtCore import Qt, QStandardPaths, pyqtSignal, QObject, QEvent
-from PyQt5.QtGui import QPixmap, QColor
+from PyQt5.QtGui import QPixmap, QColor, QKeySequence
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QSpinBox, QCheckBox,
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
     QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
-    QTableWidget, QHeaderView, QDialogButtonBox, QCompleter
+    QTableWidget, QHeaderView, QDialogButtonBox, QFrame, QShortcut
 )
 
 
-class _ComboClickToSearch(QObject):
-    """Makes an editable combo's line edit behave like a normal dropdown on
-    click (opens the full list, like before) while still leaving it ready for
-    the user to just start typing to search: a click selects the whole current
-    text so the first keystroke replaces it instead of requiring it to be
-    cleared by hand first."""
+class _SearchableComboPopup(QFrame):
+    """The dropdown a searchable combo opens instead of its native popup: a
+    dedicated filter box on top, and a list below it that's actually filtered
+    by what's typed (case-insensitive substring), not just prefix-completed
+    inline in the combo itself."""
+
     def __init__(self, combo: QComboBox):
-        super().__init__(combo)
+        super().__init__(combo.window(), Qt.Popup)
         self.combo = combo
+        self.setFrameStyle(QFrame.StyledPanel | QFrame.Plain)
+        self.setStyleSheet("QFrame{background:#ffffff;border:1px solid #aaaaaa;}")
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(4, 4, 4, 4)
+        lay.setSpacing(4)
+
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setPlaceholderText("Search…")
+        lay.addWidget(self.filter_edit)
+
+        self.listw = QListWidget()
+        self.listw.setUniformItemSizes(True)
+        lay.addWidget(self.listw)
+
+        self.filter_edit.textChanged.connect(self._apply_filter)
+        self.filter_edit.installEventFilter(self)
+        self.listw.itemClicked.connect(self._choose)
+
+        # A QShortcut fires regardless of exactly which child widget has
+        # focus - more reliable here than an Escape check inside the filter
+        # box's own key-event filter, which didn't consistently trigger.
+        QShortcut(QKeySequence(Qt.Key_Escape), self, activated=self.close)
+
+    def open_below(self):
+        self.listw.clear()
+        for i in range(self.combo.count()):
+            self.listw.addItem(self.combo.itemText(i))
+
+        self.filter_edit.blockSignals(True)
+        self.filter_edit.clear()
+        self.filter_edit.blockSignals(False)
+
+        current = self.combo.currentText()
+        matches = self.listw.findItems(current, Qt.MatchExactly)
+        if matches:
+            self.listw.setCurrentItem(matches[0])
+        elif self.listw.count():
+            self.listw.setCurrentRow(0)
+
+        visible_rows = min(10, max(3, self.listw.count()))
+        height = max(120, min(320, 40 + visible_rows * 22))
+        self.resize(max(self.combo.width(), 220), height)
+        self.move(self.combo.mapToGlobal(self.combo.rect().bottomLeft()))
+        self.show()
+        if matches:
+            self.listw.scrollToItem(matches[0])
+        self.filter_edit.setFocus()
+
+    def _apply_filter(self, text):
+        text = text.strip().lower()
+        first_visible = None
+        for i in range(self.listw.count()):
+            item = self.listw.item(i)
+            visible = text in item.text().lower()
+            item.setHidden(not visible)
+            if visible and first_visible is None:
+                first_visible = item
+        if first_visible is not None:
+            self.listw.setCurrentItem(first_visible)
+
+    def _choose(self, item):
+        if item is None or item.isHidden():
+            return
+        ix = self.combo.findText(item.text(), Qt.MatchExactly)
+        if ix >= 0:
+            self.combo.setCurrentIndex(ix)
+        self.close()
+
+    def _move_selection(self, delta):
+        rows = [i for i in range(self.listw.count()) if not self.listw.item(i).isHidden()]
+        if not rows:
+            return
+        current = self.listw.currentRow()
+        pos = rows.index(current) if current in rows else -1 if delta > 0 else len(rows)
+        pos = max(0, min(len(rows) - 1, pos + delta))
+        self.listw.setCurrentRow(rows[pos])
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
-            self.combo.lineEdit().selectAll()
-            self.combo.showPopup()
+        if obj is self.filter_edit and event.type() == QEvent.KeyPress:
+            key = event.key()
+            if key == Qt.Key_Down:
+                self._move_selection(1)
+                return True
+            if key == Qt.Key_Up:
+                self._move_selection(-1)
+                return True
+            if key in (Qt.Key_Return, Qt.Key_Enter):
+                item = self.listw.currentItem()
+                if item is not None:
+                    self._choose(item)
+                return True
+        return super().eventFilter(obj, event)
+
+
+class _ComboSearchTrigger(QObject):
+    """Opens the searchable popup instead of the combo's native dropdown,
+    both on click and on the usual keyboard shortcuts for opening a combo."""
+
+    _OPEN_KEYS = (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Down, Qt.Key_Up, Qt.Key_F4)
+
+    def __init__(self, combo: QComboBox, popup: _SearchableComboPopup):
+        super().__init__(combo)
+        self.popup = popup
+
+    def eventFilter(self, obj, event):
+        et = event.type()
+        if et == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            self.popup.open_below()
+            return True
+        if et == QEvent.KeyPress and event.key() in self._OPEN_KEYS:
+            self.popup.open_below()
             return True
         return False
 
 
 def make_combo_searchable(combo: QComboBox) -> QComboBox:
-    """Turns a QComboBox into a type-to-filter searchable one: typing filters the
-    popup to matching items (case-insensitive, substring match) instead of only
-    prefix-matching. Typed text that doesn't match any item reverts to the last
-    valid selection on focus-out, so this can't smuggle free text into fields
-    that are only ever supposed to hold one of the combo's real items. Clicking
-    it still opens the full list like a regular dropdown, with the current text
-    pre-selected so typing immediately starts a fresh search."""
-    combo.setEditable(True)
+    """Turns a QComboBox into a type-to-filter searchable one: clicking it (or
+    the usual keyboard shortcuts) opens a popup with a dedicated search box on
+    top and a list below that's actually filtered by what's typed
+    (case-insensitive substring), instead of the combo's native dropdown."""
+    combo.setEditable(False)
     combo.setInsertPolicy(QComboBox.NoInsert)
 
-    completer = QCompleter(combo.model(), combo)
-    completer.setCaseSensitivity(Qt.CaseInsensitive)
-    completer.setFilterMode(Qt.MatchContains)
-    completer.setCompletionMode(QCompleter.PopupCompletion)
-    combo.setCompleter(completer)
-
-    combo._last_valid_index = combo.currentIndex()
-
-    def _remember_valid(ix):
-        if ix >= 0:
-            combo._last_valid_index = ix
-    combo.currentIndexChanged.connect(_remember_valid)
-
-    def _snap_to_valid():
-        ix = combo.findText(combo.currentText(), Qt.MatchFixedString)
-        combo.setCurrentIndex(ix if ix >= 0 else combo._last_valid_index)
-    combo.lineEdit().editingFinished.connect(_snap_to_valid)
-
-    combo._click_to_search_filter = _ComboClickToSearch(combo)
-    combo.lineEdit().installEventFilter(combo._click_to_search_filter)
+    popup = _SearchableComboPopup(combo)
+    combo._searchable_popup = popup
+    combo._search_trigger = _ComboSearchTrigger(combo, popup)
+    combo.installEventFilter(combo._search_trigger)
 
     return combo
 
@@ -75,6 +163,28 @@ def make_combo_searchable(combo: QComboBox) -> QComboBox:
 # Data models
 # -----------------------------
 ROLES = ["Tank", "Damage", "Support", "Flex"]
+
+# Hero -> role, so picking a hero can auto-fill the role instead of making the
+# user set both every time. Covers the full OW2 roster plus this community's
+# custom heroes (Anran, Domina, Emre, Jetpack Cat, Mizuki, Sierra, Vendetta).
+HERO_ROLES = {
+    "D.Va": "Tank", "Domina": "Tank", "Doomfist": "Tank", "Hazard": "Tank",
+    "Junker Queen": "Tank", "Mauga": "Tank", "Orisa": "Tank", "Ramattra": "Tank",
+    "Reinhardt": "Tank", "Roadhog": "Tank", "Sigma": "Tank", "Winston": "Tank",
+    "Wrecking Ball": "Tank", "Zarya": "Tank",
+
+    "Anran": "Damage", "Ashe": "Damage", "Bastion": "Damage", "Cassidy": "Damage",
+    "Echo": "Damage", "Emre": "Damage", "Freja": "Damage", "Genji": "Damage",
+    "Hanzo": "Damage", "Junkrat": "Damage", "Mei": "Damage", "Pharah": "Damage",
+    "Reaper": "Damage", "Sierra": "Damage", "Sojourn": "Damage", "Soldier": "Damage",
+    "Sombra": "Damage", "Symmetra": "Damage", "Torbjorn": "Damage", "Tracer": "Damage",
+    "Venture": "Damage", "Vendetta": "Damage", "Widowmaker": "Damage",
+
+    "Ana": "Support", "Baptiste": "Support", "Brigitte": "Support", "Illari": "Support",
+    "Jetpack Cat": "Support", "Juno": "Support", "Kiriko": "Support", "Lifeweaver": "Support",
+    "Lúcio": "Support", "Mercy": "Support", "Moira": "Support", "Mizuki": "Support",
+    "Wuyang": "Support", "Zenyatta": "Support",
+}
 
 DEV_ASSET_DIRS = {
     "maps":      r"C:\Suomi OW koodiprojektit\SOWBroadcast\Scoreboard\Maps",
@@ -126,6 +236,9 @@ class Asset:
     # and Game Modes.
     body_image_path: Optional[str] = None
     body_source_path: Optional[str] = None
+    # Heroes only: one of ROLES (Tank/Damage/Support/Flex), used to auto-fill
+    # a player's role when this hero is picked in the roster (see PlayerRow).
+    role: Optional[str] = None
 
 
 # MapDraft.html's heroBodyFile() JS function names hero-body cutouts
@@ -307,6 +420,7 @@ class BracketMatch:
     score1: int = 0
     score2: int = 0
     status: str = ""
+    scheduled_at: int = 0  # epoch ms, 0 = not scheduled
 
     def __post_init__(self):
         if self.team1 is None:
@@ -550,7 +664,7 @@ def _sow_to_bracket_settings(data: dict, cache_logo: Optional[Callable[[Optional
         bo_label = f"BO{int(best_of)}" if best_of else ""
         filtered = [
             m for m in stage_matches
-            if m.get("team1_id") and m.get("team2_id") and m.get("status") != "bye"
+            if m.get("status") != "bye"
             and (m.get("bracket") or "main") in ("main", "winners", "losers", "grand_final", "playoff")
         ]
         by_side_round: Dict[str, Dict[int, list]] = {}
@@ -572,6 +686,7 @@ def _sow_to_bracket_settings(data: dict, cache_logo: Optional[Callable[[Optional
                         score1=int(m.get("score1") or 0),
                         score2=int(m.get("score2") or 0),
                         status="",
+                        scheduled_at=int(m.get("scheduled_at") or 0),
                     ))
                 name = _sow_round_name(side, round_no, max_round)
                 if multi_stage and stage_label:
@@ -810,6 +925,14 @@ class AssetManagerDialog(QDialog):
                 self.mode_combo.addItem(n)
             form.addRow("Mode", self.mode_combo)
 
+        self.role_combo = None
+        if self.title == "Heroes":
+            self.role_combo = QComboBox()
+            make_combo_searchable(self.role_combo)
+            self.role_combo.addItem("- Role -")
+            self.role_combo.addItems(ROLES)
+            form.addRow("Role", self.role_combo)
+
 
         logo_row = QHBoxLayout()
         self.logo_edit = QLineEdit(); self.logo_edit.setReadOnly(True)
@@ -868,6 +991,11 @@ class AssetManagerDialog(QDialog):
         if not items:
             return
         name = items[0].text()
+        # This was previously missing entirely, so the Name field kept
+        # whatever was last typed (or stayed blank) after selecting an
+        # existing entry - clicking Add/Update then saved it under that
+        # stale name instead of updating the selected one.
+        self.name_edit.setText(name)
         asset = self.assets.get(name)
         if asset:
             p = asset.source_path or asset.image_path or ""
@@ -876,6 +1004,14 @@ class AssetManagerDialog(QDialog):
             if self.title == "Maps" and self.mode_combo:
                 ix = self.mode_combo.findText(asset.mode or "", Qt.MatchExactly)
                 self.mode_combo.setCurrentIndex(ix if ix >= 0 else 0)
+            if self.role_combo:
+                # Falls back to the well-known default for this hero name if
+                # it doesn't have a role saved yet, so opening an existing
+                # hero for the first time under this feature pre-fills a
+                # sensible value instead of showing blank.
+                role = asset.role or HERO_ROLES.get(name, "")
+                ix = self.role_combo.findText(role, Qt.MatchExactly) if role else 0
+                self.role_combo.setCurrentIndex(ix if ix >= 0 else 0)
             if self.body_logo_edit:
                 bp = asset.body_source_path or asset.body_image_path or ""
                 self.body_logo_edit.setText(bp)
@@ -911,6 +1047,11 @@ class AssetManagerDialog(QDialog):
         mode = None
         if self.title == "Maps" and self.mode_combo:
             mode = self.mode_combo.currentText().strip()
+        role = None
+        if self.title == "Heroes" and self.role_combo:
+            role = self.role_combo.currentText().strip()
+            if role == "- Role -":
+                role = None
         slug = TournamentApp._slugify(name)
 
         if self.title == "Heroes":
@@ -957,6 +1098,7 @@ class AssetManagerDialog(QDialog):
             source_path=source_path,
             body_image_path=body_image_path,
             body_source_path=body_source_path,
+            role=role,
         )
         self._reload()
         matches = self.listw.findItems(name, Qt.MatchExactly)
@@ -997,6 +1139,8 @@ class AssetManagerDialog(QDialog):
         self.name_edit.clear()
         self.logo_edit.clear()
         self._load_preview(self.preview, None)
+        if self.role_combo:
+            self.role_combo.setCurrentIndex(0)
         if self.body_logo_edit:
             self.body_logo_edit.clear()
             self._load_preview(self.body_preview, None)
@@ -1005,22 +1149,33 @@ class AssetManagerDialog(QDialog):
 # Team Panel
 # -----------------------------
 class PlayerRow(QWidget):
-    def __init__(self, index: int, get_hero_names):
+    def __init__(self, index: int, get_hero_names, get_hero_role=None):
         super().__init__()
         self.get_hero_names = get_hero_names
+        self.get_hero_role = get_hero_role
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         self.label = QLabel(f"Player {index}")
         self.name = QLineEdit(); self.name.setPlaceholderText("Name")
-        self.hero = QComboBox(); make_combo_searchable(self.hero); self.refresh_heroes()
         self.role = QComboBox()
         make_combo_searchable(self.role)
         self.role.addItem("- Role -")
         self.role.addItems(ROLES)
+        self.hero = QComboBox(); make_combo_searchable(self.hero); self.refresh_heroes()
+        self.hero.currentTextChanged.connect(self._on_hero_changed)
         row.addWidget(self.label)
         row.addWidget(self.name, 2)
         row.addWidget(self.hero, 2)
         row.addWidget(self.role, 1)
+
+    def _on_hero_changed(self, hero_name: str):
+        hero_name = hero_name.strip()
+        # The hero's own role (settable in Manage Heroes) wins if set, since
+        # it covers custom heroes the hardcoded default map doesn't know
+        # about and lets it be corrected without a code change.
+        role = (self.get_hero_role(hero_name) if self.get_hero_role else "") or HERO_ROLES.get(hero_name)
+        if role:
+            self.role.setCurrentText(role)
 
     def refresh_heroes(self):
         current = self.hero.currentText() if hasattr(self, 'hero') else ""
@@ -1033,9 +1188,10 @@ class PlayerRow(QWidget):
                 self.hero.setCurrentIndex(ix)
 
 class TeamPanel(QGroupBox):
-    def __init__(self, title: str, get_hero_names, default_color: str = "#FFFFFF"):
+    def __init__(self, title: str, get_hero_names, get_hero_role=None, default_color: str = "#FFFFFF"):
         super().__init__(title)
         self.get_hero_names = get_hero_names
+        self.get_hero_role = get_hero_role
         lay = QVBoxLayout(self)
 
         top = QHBoxLayout()
@@ -1073,7 +1229,7 @@ class TeamPanel(QGroupBox):
         grid = QVBoxLayout()
         self.player_rows: List[PlayerRow] = []
         for i in range(1, 9):
-            pr = PlayerRow(i, self.get_hero_names)
+            pr = PlayerRow(i, self.get_hero_names, self.get_hero_role)
             self.player_rows.append(pr)
             grid.addWidget(pr)
         lay.addLayout(grid)
@@ -1157,8 +1313,12 @@ class TeamPanel(QGroupBox):
             if pdata.role:
                 ixr = pr.role.findText(pdata.role)
                 pr.role.setCurrentIndex(ixr if ixr >= 0 else 0)
-            else:
+            elif not pdata.hero:
+                # No saved role and no hero either - reset instead of leaving
+                # a stale role from whatever team previously occupied this row.
                 pr.role.setCurrentIndex(0)
+            # else: hero was just set above with no saved role - keep whatever
+            # _on_hero_changed auto-filled from it instead of blanking it out.
 
     def refresh_hero_lists(self):
         for pr in self.player_rows:
@@ -2404,6 +2564,8 @@ class StandingsTab(QWidget):
 
 class BracketTab(QWidget):
     updated = pyqtSignal()
+    link_requested = pyqtSignal(str)
+    unlink_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -2414,6 +2576,39 @@ class BracketTab(QWidget):
         self._qualified_provider: Optional[Callable[[], List[TeamRef]]] = None
 
         root = QVBoxLayout(self)
+
+        # ── SOWDraft tournament live link (teams, standings, bracket) ──
+        # Mirrors StandingsTab's link box - kept outside _editable_container
+        # so Link/Unlink stay clickable even while a live link has locked the
+        # rest of this tab read-only. Both tabs drive the same underlying
+        # TournamentLinkClient in SOWBroadcast, so linking/unlinking from
+        # either tab affects both.
+        tlink_box = QGroupBox("SOWDraft Tournament Live Link")
+        tlink_root = QVBoxLayout(tlink_box)
+        tlink_row = QHBoxLayout()
+        self.tournament_link_url_edit = QLineEdit()
+        self.tournament_link_url_edit.setPlaceholderText("Liitä SOWDraftin turnauslinkki (esim. https://.../tournament/<id>)")
+        self.tournament_link_btn = QPushButton("Link")
+        self.tournament_link_btn.clicked.connect(self._on_link_clicked)
+        self.tournament_unlink_btn = QPushButton("Unlink")
+        self.tournament_unlink_btn.setEnabled(False)
+        self.tournament_unlink_btn.clicked.connect(self.unlink_requested)
+        self.tournament_link_status_label = QLabel("Ei linkitetty")
+        tlink_row.addWidget(self.tournament_link_url_edit, 1)
+        tlink_row.addWidget(self.tournament_link_btn)
+        tlink_row.addWidget(self.tournament_unlink_btn)
+        tlink_row.addWidget(self.tournament_link_status_label)
+        tlink_root.addLayout(tlink_row)
+        root.addWidget(tlink_box)
+
+        # Everything below is disabled as a block while a tournament is
+        # linked (see set_editable_locked), since it becomes a read-only
+        # mirror of the live data instead of a manual editor.
+        self._editable_container = QWidget()
+        root_orig = root
+        root = QVBoxLayout(self._editable_container)
+        root.setContentsMargins(0, 0, 0, 0)
+        root_orig.addWidget(self._editable_container, 1)
 
         header = QGroupBox("Bracket Title")
         header_form = QFormLayout(header)
@@ -2521,6 +2716,14 @@ class BracketTab(QWidget):
 
     def set_qualified_provider(self, provider: Callable[[], List[TeamRef]]):
         self._qualified_provider = provider
+
+    def _on_link_clicked(self):
+        self.link_requested.emit(self.tournament_link_url_edit.text().strip())
+
+    def set_editable_locked(self, locked: bool):
+        """Greys out everything except the live-link controls themselves,
+        so Unlink always stays reachable while a tournament link is active."""
+        self._editable_container.setEnabled(not locked)
 
     def _new_match_id(self) -> str:
         stamp = int(time.time())
@@ -2814,6 +3017,7 @@ class BracketTab(QWidget):
                     team2=TeamRef(name=match.team2.name, abbr=match.team2.abbr, logo_path=match.team2.logo_path),
                     score1=match.score1,
                     score2=match.score2,
+                    scheduled_at=match.scheduled_at,
                 ))
             self._rounds.append(BracketRound(
                 name=rnd.name,
@@ -2971,8 +3175,8 @@ class TournamentApp(QMainWindow):
         match_root.addLayout(fmt_bar)
 
         splitter = QSplitter()
-        self.team1_panel = TeamPanel("Team 1", self._hero_names, default_color="#55aaff")
-        self.team2_panel = TeamPanel("Team 2", self._hero_names, default_color="#ff557f")
+        self.team1_panel = TeamPanel("Team 1", self._hero_names, self._hero_role, default_color="#55aaff")
+        self.team2_panel = TeamPanel("Team 2", self._hero_names, self._hero_role, default_color="#ff557f")
         splitter.addWidget(self.team1_panel)
         splitter.addWidget(self.team2_panel)
         splitter.setSizes([700, 700])
@@ -3071,6 +3275,8 @@ class TournamentApp(QMainWindow):
         self.bracket_tab = BracketTab()
         self.bracket_tab.updated.connect(self._update)
         self.bracket_tab.set_qualified_provider(self._teams_from_standings)
+        self.bracket_tab.link_requested.connect(self._on_link_tournament)
+        self.bracket_tab.unlink_requested.connect(self._on_unlink_tournament)
         tabs.addTab(self.bracket_tab, "Bracket")
         
         self._ensure_default_assets_installed()
@@ -3136,7 +3342,8 @@ class TournamentApp(QMainWindow):
                 self.heroes[name] = Asset(
                     name=name,
                     image_path=os.path.join("Scoreboard", "Heroes", f"{self._slugify(name)}.png"),
-                    source_path=p
+                    source_path=p,
+                    role=HERO_ROLES.get(name),
                 )
 
         if not loaded_maps:
@@ -3355,6 +3562,7 @@ class TournamentApp(QMainWindow):
                     "score1": int(m.score1 or 0),
                     "score2": int(m.score2 or 0),
                     "status": m.status or "",
+                    "scheduled_at": int(m.scheduled_at or 0),
                 })
             rounds.append({
                 "name": r.name,
@@ -3448,7 +3656,8 @@ class TournamentApp(QMainWindow):
                 self.heroes[name] = Asset(
                     name=name,
                     image_path=os.path.join("Scoreboard", "Heroes", f"{self._slugify(name)}.png"),
-                    source_path=r["file_path"]
+                    source_path=r["file_path"],
+                    role=HERO_ROLES.get(name),
                 )
                 added_h += 1
             else:
@@ -3562,6 +3771,10 @@ class TournamentApp(QMainWindow):
 
     def _hero_names(self) -> List[str]:
         return sorted(self.heroes.keys())
+
+    def _hero_role(self, name: str) -> str:
+        asset = self.heroes.get(name)
+        return (asset.role if asset and asset.role else "") or HERO_ROLES.get(name, "")
 
     def _map_names(self) -> List[str]:
         return sorted(self.maps.keys())
@@ -3994,6 +4207,13 @@ class TournamentApp(QMainWindow):
                         if os.path.isfile(fallback_abs):
                             body_image_path, body_source_path = fallback_rel, fallback_abs
 
+                role = (it.get("role") or "").strip() or None if category == "Heroes" else None
+                if category == "Heroes" and not role:
+                    # No saved role yet (entry predates this feature) - fall
+                    # back to the well-known default instead of leaving it
+                    # blank until someone happens to reopen it in Manage Heroes.
+                    role = HERO_ROLES.get(name)
+
                 target_dict[name] = Asset(
                     name=name,
                     image_path=img_rel if img_rel else None,
@@ -4001,6 +4221,7 @@ class TournamentApp(QMainWindow):
                     source_path=img_abs if (img_abs and os.path.isfile(img_abs)) else None,
                     body_image_path=body_image_path,
                     body_source_path=body_source_path,
+                    role=role,
                 )
             return True
         except Exception:
@@ -4160,10 +4381,12 @@ class TournamentApp(QMainWindow):
                 item = {"name": name, "slug": slug, "image": img_rel}
                 if category_name == "Maps":
                     item["mode"] = (asset.mode or "")
-                if category_name == "Heroes" and body_dir:
-                    out_body_png = os.path.join(body_dir, f"{_hero_body_filename(name)}.png")
-                    if os.path.isfile(out_body_png):
-                        item["body_image"] = _norm_rel(out_body_png, root)
+                if category_name == "Heroes":
+                    item["role"] = (asset.role or "")
+                    if body_dir:
+                        out_body_png = os.path.join(body_dir, f"{_hero_body_filename(name)}.png")
+                        if os.path.isfile(out_body_png):
+                            item["body_image"] = _norm_rel(out_body_png, root)
                 items.append(item)
 
             index_json_path = os.path.join(cat_dir, "index.json")
@@ -4382,6 +4605,13 @@ class TournamentApp(QMainWindow):
             # REST-haku on oikeasti onnistunut.
             self._tournament_link_has_data = False
             self._tournament_link.connect(url)
+            # Standings ja Bracket -tabit jakavat saman linkityksen - pidä
+            # molempien linkkikentät samassa tekstissä riippumatta kummasta
+            # tabista Link-nappia painettiin.
+            if hasattr(self, "standings_tab"):
+                self.standings_tab.tournament_link_url_edit.setText(url)
+            if hasattr(self, "bracket_tab"):
+                self.bracket_tab.tournament_link_url_edit.setText(url)
         except ValueError as e:
             QMessageBox.warning(self, "Link Tournament", str(e))
 
@@ -4391,7 +4621,7 @@ class TournamentApp(QMainWindow):
         if hasattr(self, "standings_tab"):
             self.standings_tab.set_editable_locked(False)
         if hasattr(self, "bracket_tab"):
-            self.bracket_tab.setEnabled(True)
+            self.bracket_tab.set_editable_locked(False)
 
     def _on_tournament_link_status(self, status: str):
         if status.startswith("error:"):
@@ -4407,12 +4637,15 @@ class TournamentApp(QMainWindow):
             text = "Ei linkitetty"
         else:
             text = status
-        self.standings_tab.tournament_link_status_label.setText(text)
 
         is_linked_or_pending = self._tournament_link.tournament_id is not None
-        self.standings_tab.tournament_link_btn.setEnabled(not is_linked_or_pending)
-        self.standings_tab.tournament_unlink_btn.setEnabled(is_linked_or_pending)
-        self.standings_tab.tournament_link_url_edit.setEnabled(not is_linked_or_pending)
+        for tab in (getattr(self, "standings_tab", None), getattr(self, "bracket_tab", None)):
+            if tab is None:
+                continue
+            tab.tournament_link_status_label.setText(text)
+            tab.tournament_link_btn.setEnabled(not is_linked_or_pending)
+            tab.tournament_unlink_btn.setEnabled(is_linked_or_pending)
+            tab.tournament_link_url_edit.setEnabled(not is_linked_or_pending)
 
     def _cache_tournament_logo(self, url: Optional[str]) -> Optional[str]:
         """Downloads a sowdraft team logo into Scoreboard/TournamentLogos and
@@ -4453,7 +4686,8 @@ class TournamentApp(QMainWindow):
             self.standings_tab.tournament_link_status_label.setText("Linkitetty")
         if hasattr(self, "bracket_tab"):
             self.bracket_tab.from_settings(b_settings)
-            self.bracket_tab.setEnabled(False)
+            self.bracket_tab.set_editable_locked(True)
+            self.bracket_tab.tournament_link_status_label.setText("Linkitetty")
         self._update()
 
     @staticmethod
@@ -4648,8 +4882,11 @@ class TournamentApp(QMainWindow):
 
     def _apply_state(self, state: dict):
         self.link_url_edit.setText(state.get("draft_link_url", "") or "")
+        tournament_link_url = state.get("tournament_link_url", "") or ""
         if hasattr(self, "standings_tab"):
-            self.standings_tab.tournament_link_url_edit.setText(state.get("tournament_link_url", "") or "")
+            self.standings_tab.tournament_link_url_edit.setText(tournament_link_url)
+        if hasattr(self, "bracket_tab"):
+            self.bracket_tab.tournament_link_url_edit.setText(tournament_link_url)
         # Heroes/Maps/Game Modes are NOT restored from here - Scoreboard/<Category>/
         # index.json (loaded by _auto_discover_assets() at startup, before this
         # ever runs) is the single source of truth for that catalogue. This state
@@ -4751,6 +4988,7 @@ class TournamentApp(QMainWindow):
                     score1=int(m.get("score1", 0) or 0),
                     score2=int(m.get("score2", 0) or 0),
                     status=m.get("status", ""),
+                    scheduled_at=int(m.get("scheduled_at", 0) or 0),
                 ))
             rounds.append(BracketRound(
                 name=r.get("name", ""),
@@ -4816,6 +5054,7 @@ class TournamentApp(QMainWindow):
                         score1=int(m.get("score1", 0) or 0),
                         score2=int(m.get("score2", 0) or 0),
                         status=m.get("status", ""),
+                        scheduled_at=int(m.get("scheduled_at", 0) or 0),
                     ))
                 rounds.append(BracketRound(
                     name=r.get("name", ""),

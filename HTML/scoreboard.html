@@ -204,6 +204,27 @@ body.leaving      .ban { opacity:0; transform: translateY(-50%) scale(.9); }
   const slug = s=>(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"item";
   const setBg = (el,url)=>el.style.backgroundImage=`url('${url}?_=${Date.now()}')`;
 
+  // Shrinks a single-line, no-wrap team name's font size until it fits its
+  // reserved space instead of getting clipped by the ellipsis. Must run
+  // after the text is set, since it measures the real laid-out width.
+  async function fitTeamName(el, maxSize=32, minSize=16){
+    if (document.fonts) {
+      try {
+        await Promise.all([
+          document.fonts.load(`800 ${maxSize}px Rajdhani`),
+          document.fonts.load(`400 ${maxSize}px Rajdhani`),
+        ]);
+        await document.fonts.ready;
+      } catch {}
+    }
+    el.style.fontSize = maxSize + "px";
+    let size = maxSize;
+    while(el.scrollWidth > el.clientWidth && size > minSize){
+      size -= 1;
+      el.style.fontSize = size + "px";
+    }
+  }
+
   let T1_LOGO = MATCH+"/T1Logo.png";
   let T2_LOGO = MATCH+"/T2Logo.png";
   
@@ -240,7 +261,7 @@ async function applyColors(){
   document.documentElement.style.setProperty("--quaternary", hex(kv.quaternary,"#3A3A90"));
 }
 
-  async function upT1Name(){ document.getElementById("t1name").textContent=(await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1"; }
+  async function upT1Name(){ const el=document.getElementById("t1name"); el.textContent=(await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1"; await fitTeamName(el); }
   async function upT1Score(){ document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0"; }
   async function upT1Color(){ const c=hex((await read(MATCH+"/T1Color.txt")).trim(),"#27AAE1"); document.documentElement.style.setProperty("--t1", c); document.getElementById("t1card").style.borderRightColor=c; }
   async function upT1Logo(){
@@ -267,7 +288,7 @@ async function applyColors(){
 	  el.classList.toggle("has-ban", shown);
 	}
 
-  async function upT2Name(){ document.getElementById("t2name").textContent=(await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2"; }
+  async function upT2Name(){ const el=document.getElementById("t2name"); el.textContent=(await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2"; await fitTeamName(el); }
   async function upT2Score(){ document.getElementById("t2score").textContent=(await read(MATCH+"/T2Score.txt")).trim()||"0"; }
   async function upT2Color(){ const c=hex((await read(MATCH+"/T2Color.txt")).trim(),"#C80013"); document.documentElement.style.setProperty("--t2", c); document.getElementById("t2card").style.borderLeftColor=c; }
   async function upT2Logo(){

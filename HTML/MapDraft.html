@@ -59,14 +59,13 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     color:var(--secondary); text-align:center;
   }
-  /* Same reasoning as .mappick-wrap: stay in the flex flow, hidden via
-     visibility, so the team name doesn't jump when scores first appear. */
+  /* Always shown, even at 0-0 - hiding it at 0-0 left the MAP PICK badge
+     looking oddly far from the center VS box with nothing to anchor it to
+     on that side. */
   .scorebox{
     flex:0 0 105px; height:100%; display:flex; align-items:center; justify-content:center;
     background:var(--quaternary);
-    visibility:hidden;
   }
-  .scorebox.shown{ visibility:visible; }
   .teamscore{ font-size:68px; font-weight:900; line-height:1; color:#fff; }
 
   /* MAP PICK badge — kept in the flex flow at all times (hidden via
@@ -282,9 +281,33 @@ async function applyColors(){
   document.documentElement.style.setProperty("--quaternary",q);
 }
 
+// Shrinks a single-line, no-wrap team name's font size until it fits its
+// reserved space instead of getting clipped by the ellipsis - mirrors
+// fitCaptionText() in maps.html. Must run after the text is set and the
+// element is laid out, since it measures the real column width.
+async function fitTeamName(el, maxSize=64, minSize=28){
+  if (document.fonts) {
+    try {
+      await Promise.all([
+        document.fonts.load(`900 ${maxSize}px Rajdhani`),
+        document.fonts.load(`700 ${maxSize}px Rajdhani`),
+      ]);
+      await document.fonts.ready;
+    } catch {}
+  }
+  el.style.fontSize = maxSize + "px";
+  let size = maxSize;
+  while(el.scrollWidth > el.clientWidth && size > minSize){
+    size -= 2;
+    el.style.fontSize = size + "px";
+  }
+}
+
 /* Teams */
 async function upT1(){
-  document.getElementById("t1name").textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
+  const t1name=document.getElementById("t1name");
+  t1name.textContent=((await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1").toUpperCase();
+  await fitTeamName(t1name);
   document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0";
   const c=hex((await read(MATCH+"/T1Color.txt")).trim())||"#27AAE1";
   document.documentElement.style.setProperty("--t1",c);
@@ -294,7 +317,9 @@ async function upT1(){
   else document.getElementById("t1logo").style.backgroundImage="none";
 }
 async function upT2(){
-  document.getElementById("t2name").textContent=((await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2").toUpperCase();
+  const t2name=document.getElementById("t2name");
+  t2name.textContent=((await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2").toUpperCase();
+  await fitTeamName(t2name);
   document.getElementById("t2score").textContent=(await read(MATCH+"/T2Score.txt")).trim()||"0";
   const c=hex((await read(MATCH+"/T2Color.txt")).trim())||"#C80013";
   document.documentElement.style.setProperty("--t2",c);
@@ -302,13 +327,6 @@ async function upT2(){
   document.documentElement.style.setProperty("--t2-rgb",rgb.join(","));
   if(await ok(MATCH+"/T2Logo.png")) setBg(document.getElementById("t2logo"),MATCH+"/T2Logo.png");
   else document.getElementById("t2logo").style.backgroundImage="none";
-}
-function toggleScoreBoxes(){
-  const a=parseInt(document.getElementById("t1score").textContent,10)||0;
-  const b=parseInt(document.getElementById("t2score").textContent,10)||0;
-  const show=a!==0||b!==0;
-  document.getElementById("t1scorebox").classList.toggle("shown",show);
-  document.getElementById("t2scorebox").classList.toggle("shown",show);
 }
 
 /* Main scene */
@@ -397,7 +415,6 @@ async function tick(){
       _prevSig=sig;
       await applyColors();
       await Promise.all([upT1(),upT2()]);
-      toggleScoreBoxes();
       await renderScene(state);
     }
   }finally{
