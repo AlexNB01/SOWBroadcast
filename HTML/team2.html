@@ -10,81 +10,136 @@
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
 
-  html,body{
-    margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);
-    overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif
-  }
+  html,body{margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden;
+            font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
 
   :root{
     --primary:#0f1114;
     --text:#ffffff;
     --muted:#00000;
     --tcolor:#C80013;
+    --card:#141a20;
+    --radius:12px;
   }
 
-  .wrap{position:relative;width:1920px;height:1080px;color:var(--text)}
+  .wrap{position:relative; width:1920px; height:1080px; color:var(--text)}
 
   .header{
-    position:absolute;top:24px;left:64px;right:64px;height:110px;
-    display:flex;align-items:center;gap:18px;
-    background:var(--primary);border-left:10px solid var(--tcolor);
-    border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.28);padding:0 22px
+    position:absolute; top:24px; left:64px; right:64px; height:110px;
+    display:flex; align-items:center; gap:18px;
+    background:var(--primary); border-left:10px solid var(--tcolor);
+    border-radius:var(--radius); box-shadow:0 10px 26px rgba(0,0,0,.28); padding:0 22px;
   }
-  .hdr-logo{
-    width:92px;height:92px;border-radius:10px;
-    background-size:contain;background-position:center;background-repeat:no-repeat
+  .hdr-logo{width:92px; height:92px; border-radius:10px;
+            background-size:contain; background-position:center; background-repeat:no-repeat}
+  .hdr-name{font-size:56px; font-weight:900; text-transform:uppercase; letter-spacing:.5px;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+
+  /* ==== Lineup: vertical player cards, full-body hero art ==== */
+  .lineup{
+    position:absolute; left:64px; right:64px; top:160px; bottom:150px;
+    display:flex; align-items:stretch; gap:16px;
   }
-  .hdr-name{
-    font-size:56px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+  .player-card{
+    flex:1 1 0; min-width:0;
+    display:flex; flex-direction:column;
+    background:var(--card);
+    border-radius:var(--radius);
+    overflow:hidden;
+    box-shadow:0 8px 22px rgba(0,0,0,.25);
   }
-  .starters{
-    position:absolute;left:64px;right:64px;top:160px;
-    display:grid;grid-template-columns:repeat(3,1fr);gap:22px
+
+  .photo-wrap{
+    flex:1 1 auto; min-height:0; position:relative; overflow:hidden;
+    background:linear-gradient(160deg, var(--tcolor) 0%, rgba(10,11,14,.5) 55%, var(--card) 100%);
   }
-  .card{
-    display:flex;align-items:center;gap:16px;min-height:210px;
-    background:var(--primary);border-left:8px solid var(--tcolor);
-    border-radius:12px;padding:16px;box-shadow:0 8px 22px rgba(0,0,0,.25)
+  .photo-wrap img{
+    position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+    height:100%; width:auto; max-width:none;
+    object-fit:contain; object-position:bottom;
+    filter:drop-shadow(0 10px 18px rgba(0,0,0,.5));
   }
-  .hero{
-    width:300px;height:178px;border-radius:10px;overflow:hidden;background:#ffffff;
-    display:flex;align-items:center;justify-content:center
+  .photo-wrap.no-hero{ display:flex; align-items:center; justify-content:center; }
+  .photo-wrap.no-hero::after{
+    content:"?"; font-size:110px; font-weight:900; color:rgba(255,255,255,.15);
   }
-  .hero img{width:100%;height:100%;object-fit:cover;display:block}
-  .meta{display:flex;flex-direction:column;gap:8px;min-width:0}
+
+  .accent-line{
+    position:absolute; left:0; right:0; bottom:0; height:4px; z-index:2;
+    background:var(--tcolor);
+  }
+
+  /* Lives on the name-plate (not the photo) since .photo-wrap needs
+     overflow:hidden to crop the hero image, which would clip the badge
+     too if it were positioned there instead. */
+  .role-badge{
+    position:absolute; left:50%; top:-24px; transform:translateX(-50%);
+    width:50px; height:44px; z-index:3;
+    clip-path:polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0% 50%);
+    background:var(--tcolor);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 14px rgba(0,0,0,.4);
+  }
+  .role-badge img{
+    width:24px; height:24px; object-fit:contain;
+    filter:brightness(0) invert(1);
+  }
+
+  .name-plate{
+    flex:0 0 auto; position:relative;
+    background:var(--primary); color:var(--text);
+    padding:32px 8px 24px; text-align:center;
+  }
   .p-name{
-    font-size:40px;font-weight:900;text-transform:uppercase;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    font-size:30px; font-weight:900; text-transform:uppercase; letter-spacing:.3px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .p-row{display:flex;align-items:center;gap:10px}
-  .muted{color:var(--muted); font-weight:700; font-size:28px;letter-spacing:.3px}
 
-	.roleimg{
-	  width:28px; height:28px;
-	  object-fit:contain; display:block;
-	  filter: brightness(0) saturate(100%) drop-shadow(0 1px 1px rgba(0,0,0,.35));
-	  border-radius:4px;
-	}
-
+  /* ==== Subs: compact pill + name list ==== */
   .subs{
-    position:absolute;left:64px;right:64px;bottom:64px;display:none;
-    gap:22px;align-items:stretch
+    position:absolute; left:0; right:0; bottom:56px; display:none;
+    align-items:center; justify-content:center;
   }
-  .sub{
-    flex:1 1 0;display:flex;gap:14px;align-items:center;min-height:150px;
-    background:var(--primary);border-left:6px solid var(--tcolor);
-    border-radius:12px;padding:12px 14px;max-width:450px;box-shadow:0 6px 18px rgba(0,0,0,.2)
+  /* One continuous pill in two tones (accent label + dark name list),
+     not a smaller pill nested inside a separate outer box - overflow:hidden
+     lets the box's own border-radius clip both segments into one shape. */
+  .subs-box{
+    display:flex; align-items:stretch;
+    background:var(--primary);
+    border-radius:var(--radius);
+    overflow:hidden;
+    box-shadow:0 10px 24px rgba(0,0,0,.35);
   }
-  .sub .hero{width:170px;height:126px;border-radius:10px}
-  .sub .p-name{font-size:32px}
-  .sub .roleimg{width:24px;height:24px}
-  
+  .subs-pill{
+    background:var(--tcolor); color:var(--primary);
+    font-size:22px; font-weight:900; letter-spacing:2px;
+    display:flex; align-items:center;
+    padding:14px 26px;
+  }
+  .subs-names{
+    font-size:24px; font-weight:800; letter-spacing:.5px; color:var(--text);
+    display:flex; align-items:center; gap:14px;
+    padding:14px 28px 14px 22px;
+  }
+  .subs-sep{ opacity:.4; }
+  /* Tinted via mask (not a hardcoded white filter) so it stays legible
+     against --primary regardless of whether the active color config makes
+     that light or dark - var(--text) is already chosen by the operator to
+     contrast with it, same as the plain text sitting in this same box. */
+  .subs-role{
+    display:inline-block; width:20px; height:20px;
+    margin-left:8px; vertical-align:middle;
+    background-color:var(--text); opacity:.75;
+    -webkit-mask-size:contain; mask-size:contain;
+    -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+    -webkit-mask-position:center; mask-position:center;
+  }
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-.card, .sub { opacity: 0; }
+.player-card, .subs { opacity: 0; }
 
 </style>
 </head>
@@ -95,52 +150,90 @@
     <div class="hdr-name" id="tname">TEAM 2</div>
   </div>
 
-  <div class="starters" id="starters"></div>
+  <div class="lineup" id="starters"></div>
   <div class="subs" id="subs"></div>
 </div>
 
 <script>
+  /* ---------- Helpers & paths ---------- */
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
+  const HEROES_BODY = SB + "/HeroesBody";
   const ROLES = SB + "/Roles";
   const TEAM="T2";
 
   async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
   async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
   const hex=(s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
-  const slug=s=>(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"item";
-  function setBg(el,url){ el.style.backgroundImage=`url('${url}?_=${Date.now()}')`; }
+
+  // Mirrors MapDraft.html's heroBodyFile()/SOWBroadcast.py's _hero_body_filename() -
+  // HeroesBody files are named Title_Case_With_Underscores, not the simple
+  // lowercase-hyphen slug used for the small Heroes/ icons.
+  const heroBodyOverrides={
+    "d.va":"Dva","dva":"Dva",
+    "lúcio":"Lucio","lucio":"Lucio",
+    "soldier: 76":"Soldier_76","soldier 76":"Soldier_76","soldier:76":"Soldier_76",
+    "wrecking ball":"Wrecking_Ball",
+    "junker queen":"Junker_Queen",
+    "jetpack cat":"Jetpack_Cat",
+    "torbjörn":"Torbjörn","torbjorn":"Torbjörn",
+  };
+  function heroBodyFile(name){
+    if(!name) return null;
+    const lo=(name||"").toLowerCase().trim();
+    if(heroBodyOverrides[lo]) return heroBodyOverrides[lo];
+    return name.trim().split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join("_");
+  }
 
   function parseRole(raw){
-    const r=(raw||"").trim().toLowerCase();
-    if(r.startsWith("tank"))                             return {label:"TANK",    file:"Tank"};
-    if(r.startsWith("dps") || r.startsWith("damage"))    return {label:"DAMAGE",  file:"Damage"};
-    if(r.startsWith("supp") || r.startsWith("support") ||
-       r.startsWith("heal"))                             return {label:"SUPPORT", file:"Support"};
-    if(r.startsWith("flex"))                             return {label:"FLEX",    file:"Flex"};
-    return {label:"ROLE", file:""};
-  }
-  async function setRoleIcon(imgEl, raw){
-    const info=parseRole(raw);
-    imgEl.alt = info.label;
-    if(info.file){
-      const p = `${ROLES}/${info.file}.png`;
-      if(await ok(p)){ imgEl.src = p + "?_=" + Date.now(); return; }
-    }
-    imgEl.removeAttribute("src");
-  }
+	  const r=(raw||"").trim().toLowerCase();
+	  if(r.startsWith("tank"))                              return {label:"TANK",    file:"Tank"};
+	  if(r.startsWith("dps") || r.startsWith("damage"))     return {label:"DAMAGE",  file:"Damage"};
+	  if(r.startsWith("supp")|| r.startsWith("support") ||
+		 r.startsWith("heal"))                               return {label:"SUPPORT", file:"Support"};
+	  if(r.startsWith("flex"))                               return {label:"FLEX",    file:"Flex"};
+	  return {label:"ROLE", file:""};
+	}
+	async function setRoleIcon(imgEl, raw){
+	  const info=parseRole(raw);
+	  imgEl.alt = info.label;
+	  if(info.file){
+		const p = `${ROLES}/${info.file}.png`;
+		if(await ok(p)){ imgEl.src = p + "?_=" + Date.now(); return; }
+	  }
+	  imgEl.removeAttribute("src");
+	}
+
+	// Same role icon as setRoleIcon(), but applied as a CSS mask on a plain
+	// div (tinted via background-color) instead of an <img src>, so it can
+	// be colored with var(--text) rather than baked-in pixel colors.
+	async function setRoleMaskIcon(el, raw){
+	  const info=parseRole(raw);
+	  el.title = info.label;
+	  if(info.file){
+		const p = `${ROLES}/${info.file}.png`;
+		if(await ok(p)){
+		  const url = `url('${p}?_=${Date.now()}')`;
+		  el.style.webkitMaskImage = url;
+		  el.style.maskImage = url;
+		  return;
+		}
+	  }
+	  el.style.webkitMaskImage = "none";
+	  el.style.maskImage = "none";
+	}
 
   async function applyColors(){
-    const kv={}; (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
-      const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim()]=m[2].trim();
-    });
+    const kv={}; (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{ const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim()]=m[2].trim();});
     document.documentElement.style.setProperty("--primary", hex(kv.primary,"#0f1114"));
     document.documentElement.style.setProperty("--text",    hex(kv.secondary,"#ffffff"));
     const tcol=hex(await read(MATCH+"/"+TEAM+"Color.txt"), "#C80013");
     document.documentElement.style.setProperty("--tcolor", tcol);
   }
 
+  function setBg(el,url){ el.style.backgroundImage=`url('${url}?_=${Date.now()}')`; }
+
   async function upTeamHead(){
-    const name=(await read(MATCH+"/"+TEAM+"Name.txt")).trim() || "TEAM 2";
+    const name=(await read(MATCH+"/"+TEAM+"Name.txt")).trim() || (TEAM==="T1"?"TEAM 1":"TEAM 2");
     document.getElementById("tname").textContent = name.toUpperCase();
     const logo=MATCH+"/"+TEAM+"Logo.png";
     if(await ok(logo)) setBg(document.getElementById("tlogo"), logo);
@@ -159,81 +252,72 @@
     return arr;
   }
 
-  function createStarter(p){
-    const card=document.createElement("div"); card.className="card";
+  async function createPlayerCard(p){
+    const card = document.createElement("div");
+    card.className = "player-card";
 
-    const heroBox=document.createElement("div"); heroBox.className="hero";
-    const img=document.createElement("img"); img.alt="";
-    heroBox.appendChild(img);
+    const photo = document.createElement("div");
+    photo.className = "photo-wrap";
+
+    let hasHero = false;
     if(p.hero){
-      const path=`${HEROES}/${slug(p.hero)}.png`;
-      ok(path).then(exists=>{ if(exists) img.src=path+"?_="+Date.now(); });
+      const bodyFile = heroBodyFile(p.hero);
+      const path = `${HEROES_BODY}/${bodyFile}.png`;
+      if(await ok(path)){
+        const img = document.createElement("img");
+        img.alt = p.hero;
+        img.src = path + "?_=" + Date.now();
+        photo.appendChild(img);
+        hasHero = true;
+      }
     }
+    if(!hasHero) photo.classList.add("no-hero");
 
-    const meta=document.createElement("div"); meta.className="meta";
-    const name=document.createElement("div"); name.className="p-name"; name.textContent=p.name.toUpperCase();
+    const accentLine = document.createElement("div");
+    accentLine.className = "accent-line";
+    photo.appendChild(accentLine);
 
-    const row=document.createElement("div"); row.className="p-row";
-    const rIcon=document.createElement("img"); rIcon.className="roleimg";
+    const plate = document.createElement("div");
+    plate.className = "name-plate";
+
+    const badge = document.createElement("div");
+    badge.className = "role-badge";
+    const rIcon = document.createElement("img");
     setRoleIcon(rIcon, p.role);
-    const rLabel=document.createElement("div"); rLabel.className="muted";
-    rLabel.textContent=parseRole(p.role).label;
+    badge.appendChild(rIcon);
+    plate.appendChild(badge);
 
-    row.append(rIcon, rLabel);
-    meta.append(name, row);
-    card.append(heroBox, meta);
+    const name = document.createElement("div");
+    name.className = "p-name";
+    name.textContent = p.name.toUpperCase();
+    plate.append(name);
+
+    card.append(photo, plate);
     return card;
   }
 
-  function createSub(p){
-    const card=document.createElement("div"); card.className="sub";
-
-    const heroBox=document.createElement("div"); heroBox.className="hero";
-    const img=document.createElement("img"); img.alt="";
-    heroBox.appendChild(img);
-    if(p.hero){
-      const path=`${HEROES}/${slug(p.hero)}.png`;
-      ok(path).then(exists=>{ if(exists) img.src=path+"?_="+Date.now(); });
-    }
-
-    const meta=document.createElement("div"); meta.className="meta";
-    const name=document.createElement("div"); name.className="p-name"; name.textContent=p.name.toUpperCase();
-
-    const row=document.createElement("div"); row.className="p-row";
-    const rIcon=document.createElement("img"); rIcon.className="roleimg";
-    setRoleIcon(rIcon, p.role);
-    const rLabel=document.createElement("div"); rLabel.className="muted";
-    rLabel.textContent=parseRole(p.role).label;
-
-    row.append(rIcon, rLabel);
-    meta.append(name, row);
-    card.append(heroBox, meta);
-    return card;
+  function getStingerStartMs(){
+    const qs = new URLSearchParams(location.search);
+    const q = parseInt(qs.get("stinger") || qs.get("delay") || "", 10);
+    if (!isNaN(q) && q >= 0) return q;
+    return 1800;
   }
 
-
-function getStingerStartMs(){
-  const qs = new URLSearchParams(location.search);
-  const q = parseInt(qs.get("stinger") || qs.get("delay") || "", 10);
-  if (!isNaN(q) && q >= 0) return q;
-  return 1800;
-}
-
-function applyStagger(){
-  const base = getStingerStartMs();
-  const step = 150;
-  const nodes = [
-    ...document.querySelectorAll("#starters .card"),
-    ...document.querySelectorAll("#subs .sub"),
-  ];
-  nodes.forEach((el, i) => {
-    const delay = base + i * step;
-    el.style.animation = "none";
-    void el.offsetWidth;
-    el.style.animation = `fadeIn 680ms ease-out ${delay}ms both`;
-  });
-}
-
+  function applyStagger(){
+    const base = getStingerStartMs();
+    const step = 150;
+    const nodes = [
+      ...document.querySelectorAll("#starters .player-card"),
+      document.getElementById("subs"),
+    ];
+    nodes.forEach((el, i) => {
+      if(!el) return;
+      const delay = base + i * step;
+      el.style.animation = "none";
+      void el.offsetWidth;
+      el.style.animation = `fadeIn 680ms ease-out ${delay}ms both`;
+    });
+  }
 
   async function render(){
     await applyColors();
@@ -244,27 +328,52 @@ function applyStagger(){
     const subs     = players.slice(5);
 
     const startersEl=document.getElementById("starters");
-    startersEl.innerHTML=""; starters.forEach(p=>startersEl.appendChild(createStarter(p)));
+    startersEl.innerHTML="";
+    for(const p of starters){ startersEl.appendChild(await createPlayerCard(p)); }
 
     const subsEl=document.getElementById("subs");
     subsEl.innerHTML="";
     if(subs.length){
       subsEl.style.display="flex";
-      subs.forEach(p=>subsEl.appendChild(createSub(p)));
+      const box = document.createElement("div");
+      box.className = "subs-box";
+
+      const pill = document.createElement("div");
+      pill.className = "subs-pill";
+      pill.textContent = "SUBS";
+      box.appendChild(pill);
+
+      const names = document.createElement("div");
+      names.className = "subs-names";
+      subs.forEach((p, idx)=>{
+        if(idx > 0){
+          const sep = document.createElement("span");
+          sep.className = "subs-sep";
+          sep.textContent = "|";
+          names.appendChild(sep);
+        }
+        const n = document.createElement("span");
+        n.textContent = p.name.toUpperCase();
+        const role = document.createElement("div");
+        role.className = "subs-role";
+        setRoleMaskIcon(role, p.role);
+        n.appendChild(role);
+        names.appendChild(n);
+      });
+      box.appendChild(names);
+      subsEl.appendChild(box);
     }else{
       subsEl.style.display="none";
     }
-	applyStagger();
+    applyStagger();
   }
-
 
   function startSSE(){
     try{
       const es=new EventSource("/events");
       es.onmessage=async ev=>{
         try{
-          const d=JSON.parse(ev.data||"{}");
-          const ch=Array.isArray(d.changed)?d.changed:[];
+          const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
           if(ch.some(k=>k.startsWith("t2.") || k==="general.colors")) await render();
         }catch{}
       };

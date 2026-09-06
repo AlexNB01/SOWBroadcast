@@ -9,7 +9,7 @@
 ; ============================================================
 
 #define AppName      "SOWBroadcast"
-#define AppVersion   "2.0.0"
+#define AppVersion   "2.2.0"
 #define AppPublisher "Suomi OW"
 #define AppExeName   "SOWBroadcast.exe"
 #define ServerExe    "SOWServer.exe"
