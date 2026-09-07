@@ -3786,6 +3786,7 @@ class TournamentApp(QMainWindow):
             "version": 1,
             "name": t.name,
             "abbr": t.abbr,
+            "color_hex": t.color_hex,
             "logo_png": logo_name if t.logo_path else None,
             "players": [
                 {"name": p.name, "hero": p.hero, "role": p.role}
@@ -3830,6 +3831,7 @@ class TournamentApp(QMainWindow):
             abbr=data.get("abbr",""),
             logo_path=None,
             score=keep_score,
+            color_hex=data.get("color_hex") or getattr(panel, "default_color", "#FFFFFF"),
             players=players,
             banned_hero=""
         )
@@ -3854,9 +3856,8 @@ class TournamentApp(QMainWindow):
 
         if cand:
             t.logo_path = cand
-            t.color_hex = getattr(panel, "default_color", "#FFFFFF")
-            panel.from_team(t)
-            self._autosave()
+        panel.from_team(t)
+        self._autosave()
 
     def _export_status_text(self, state: dict):
         """Kirjoita käyttäjän asettama status-teksti Scoreboard/Match/status.txt"""
