@@ -6,199 +6,197 @@
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
 <title>SOW Scoreboard</title>
+<!--
+  Dark, gold-accented broadcast bar modeled on an Overwatch World Cup
+  scorebar reference: angled flag/logo chip, glowing team-color wash on
+  each card, a merged "First to N" + pick badge, a hero-ban portrait per
+  side, and map-list / tournament-name strips above each team's card.
+  This is a fixed dark skin - it intentionally does NOT read the app's
+  General-tab primary/secondary theme colors, so it keeps this look
+  regardless of the user's configured light/dark overlay theme. Team
+  colors (t1/t2) still come from live match data, since those are
+  per-match, not theme. Team identity is always the full team name
+  (never an abbreviation), and there is no W-L "record" segment.
+  Reads Scoreboard/Match + Scoreboard/General and reacts to the app's
+  SSE feed, same as before.
+-->
 <style>
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
   html,body{margin:0;padding:0;width:1920px;height:1080px;background:rgba(0,0,0,0);overflow:hidden;font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
 
-	:root{
-	  --primary:#0f1114;
-	  --secondary:#000000;
-	  --text:#ffffff;
-	  --t1:#27AAE1;
-	  --t2:#C80013;
-	  --quaternary:#3A3A90;
-	}
-	
-.maptop{
-  position:fixed; top:0px; left:50%; transform:translateX(-50%);
-  height:28px;
-  display:inline-flex;
-  align-items:stretch;
-  background:var(--primary);
-  border:1px solid rgba(0,0,0,.25);
-  border-radius:6px;
-  overflow:hidden;
-  box-shadow:0 6px 18px rgba(0,0,0,.25);
-  pointer-events:none;
-}
+  :root{
+    --bar:#101114;
+    --bar-2:#1b1e24;
+    --line:rgba(255,255,255,.14);
+    --muted:#8b93a0;
+    --t1:#27AAE1;
+    --t2:#C80013;
+    --gold-1:#eecb8d;
+    --gold-2:#9c7327;
+  }
 
-.mapbar{ height:30px; display:flex; align-items:stretch; }
+  /* Three independent boxes - .card.left/.card.right plus a separate
+     center pill - not one continuous bar. */
+  .card{
+    position:fixed; top:50px; width:526px; height:66px; min-width:0;
+    display:flex; align-items:stretch;
+    background:var(--bar); color:#fff;
+    border-radius:6px;
+    box-shadow:0 10px 26px rgba(0,0,0,.45);
+    overflow:hidden;
+  }
+  .card.left{ left:42px; }
+  .card.right{ right:42px; }
 
-.pickbox{
-  height:30px; width:136px; padding:0 12px;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  background:var(--primary);
-  color:var(--text);
-  font:800 26px/1 Rajdhani;
-  letter-spacing:.5px;
-  text-transform:uppercase;
-  border-left:1px solid rgba(0,0,0,.25);
-}
-.pickbox .ico{ width:26px; height:26px; background-size:contain; background-repeat:no-repeat; background-position:center; }
+  /* glow bleeding in from the logo side toward the center */
+  .card.left::before, .card.right::before{
+    content:""; position:absolute; inset:0; z-index:0; opacity:.5; pointer-events:none;
+  }
+  .card.left::before{ background:radial-gradient(180% 220% at -15% 50%, var(--t1), transparent 70%); }
+  .card.right::before{ background:radial-gradient(180% 220% at 115% 50%, var(--t2), transparent 70%); }
 
-.seg{
-  height:30px; width:136px; padding:0 12px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  background:var(--primary);
-  color:var(--text);
-  font:800 26px/1 Rajdhani;
-  letter-spacing:.5px;
-  text-align:center;
-}
-.seg.empty{ background:transparent; color:var(--text); align-items:center;}
-.seg.current{ background:transparent; color:var(--text); align-items:center;}
-.seg.done{ background:transparent; color:var(--text); align-items:center;}
-.seg .ico{ width:26px; height:26px; background-size:contain; background-repeat:no-repeat; background-position:center;}
+  /* No team-color fill or clip-path behind the logo - it sits uncropped
+     on the card's own dark background; the glow above carries the team
+     color instead. */
+  .flag{
+    flex:0 0 56px; width:56px; height:100%; z-index:1;
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+  }
+  /* breathing room between the logo and the card's outer edge */
+  .card.left .flag{ margin-left:10px; }
+  .card.right .flag{ margin-right:10px; }
 
-.card{
-  position:fixed; top:10px; width:446px; height:55px;
-  background:var(--primary); color:var(--text);
-  border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,.28);
-  display:block;
-}
-.card.left  { left:43px; padding-left:78px;  }
-.card.right { right:43px; padding-right:78px; }
+  .name{
+    flex:1 1 auto; min-width:0; z-index:1; padding:0 14px;
+    display:flex; align-items:center;
+    font-size:26px; font-weight:700; text-transform:uppercase; letter-spacing:-.2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* text hugs the inner edge (toward ban/score/center) - a short name
+     leaves its slack next to the logo, not as a gap before the score. */
+  .card.left .name{ justify-content:flex-end; text-align:right; }
+  .card.right .name{ justify-content:flex-start; text-align:left; }
 
-.card .inner{
-  position:relative;
-  height:100%;
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-.card .inner.left  { justify-content:flex-start; text-align:right; }
-.card .inner.left .name { text-align:right; }
+  .ban{
+    flex:0 0 auto; z-index:1; display:none;
+    flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    padding:0 10px; border-left:1px solid var(--line); border-right:1px solid var(--line);
+  }
+  .ban.has-ban{ display:flex; }
+  .ban .tag{
+    font:700 9px/1 'Rajdhani',sans-serif; letter-spacing:1.2px;
+    color:#fff; text-transform:uppercase;
+  }
+  .ban .portrait{
+    width:30px; height:30px; border-radius:4px; background:var(--bar-2);
+    background-size:cover; background-position:center; background-repeat:no-repeat;
+  }
 
-.card .inner.right { justify-content:flex-end; }
+  .score{
+    flex:0 0 auto; z-index:1; align-self:center;
+    min-width:36px; margin:0 10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px; font-weight:700; font-variant-numeric:tabular-nums;
+  }
 
-.card .name{
-  flex:1 1 0%;
-  min-width:0;
-  font-size:32px;
-  font-weight:800;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  text-transform:uppercase;
-  letter-spacing: -1px;
-}
-.card .logo{
-  flex:0 0 56px;
-  flex-shrink:0;
-  width:56px;
-  height:100%;
-  background-size:contain;
-  background-repeat:no-repeat;
-  background-position:center;
-}
-.card.left  .logo{  background-color: var(--t1); }
-.card.right .logo{  background-color: var(--t2); }
+  /* "First to N" + pick, merged into one badge - same shape/fill/shadow
+     family as .mapsrow/.statusrow. The pick half is plain white text; the
+     word "pick" and the team name share the same color so it stays
+     legible regardless of how dark the team's own color is. */
+  .ftpick{
+    position:fixed; top:24px; left:50%; transform:translateX(-50%);
+    height:36px; display:flex; align-items:center;
+    background:var(--bar); border-radius:6px;
+    box-shadow:0 6px 14px rgba(0,0,0,.35);
+    padding:0 22px; white-space:nowrap;
+    font:700 16px/1 'Rajdhani',sans-serif; letter-spacing:1px; text-transform:uppercase; color:#fff;
+  }
+  .ftpick .sep{
+    display:none; width:1px; height:18px; background:var(--line); margin:0 16px;
+  }
+  .ftpick .sep.show{ display:inline-block; }
+  .ftpick .pickpart{ display:none; }
+  .ftpick .pickpart.show{ display:inline; }
 
-.card .score{
-  flex:0 0 27px;
-  flex-shrink:0;
-  height:100%;
-  padding:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:32px;
-  font-weight:900;
-  background:transparent;
-  text-align:center;
-}
+  /* Map-list strip, sitting above the right team's card and overlapping
+     its top edge - a thin bar the taller card tucks under. Each map shows
+     its mode icon + name once picked, or "TBD" (plain text, no icon)
+     while that slot's map hasn't been chosen yet in the GUI. */
+  .mapsrow{
+    position:fixed; top:10px; right:43px; width:525px; height:28px; z-index:2;
+    display:flex; align-items:center; justify-content:space-evenly;
+    background:var(--bar); border-radius:0 0 6px 6px;
+    box-shadow:0 6px 14px rgba(0,0,0,.35);
+    padding:0 0px;
+  }
+  .mapsrow .mitem{
+    display:flex; align-items:center; gap:6px; min-width:0;
+    font:700 12px/1 'Rajdhani',sans-serif; letter-spacing:.4px; text-transform:uppercase; color:#fff;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mapsrow .mitem.tbd{ color:var(--muted); font-weight:600; }
+  /* Already-completed maps fade to the same gray as TBD - only the map
+     that's still ahead (named but not yet played) stays white. */
+  .mapsrow .mitem.played{ color:var(--muted); }
+  .mapsrow .mitem.played .micon{ opacity:.6; }
+  .mapsrow .micon{
+    flex:0 0 14px; width:14px; height:14px;
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+  }
+  .mapsrow .msep{ flex:0 0 auto; width:1px; height:14px; background:var(--line); }
 
-.card.left  .inner{ padding-right:12px; }
-.card.right .inner{ padding-left:12px;  }
+  /* Tournament-name strip, mirroring .mapsrow but above the left team's
+     card. Hidden entirely (not just empty) when Status text is blank in
+     the GUI, so no empty gray bar floats above the card. */
+  .statusrow{
+    display:none; position:fixed; top:10px; left:43px; width:max-content; max-width:525px; height:28px; z-index:2;
+    align-items:center; justify-content:center;
+    background:var(--bar); border-radius:0 0 6px 6px;
+    box-shadow:0 6px 14px rgba(0,0,0,.35);
+    font:700 12px/1 'Rajdhani',sans-serif; letter-spacing:1px; text-transform:uppercase; color:#fff;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 16px;
+  }
+  .statusrow.show{ display:flex; }
 
-.ban{
-  position:absolute; top:50%; transform:translateY(-50%);
-  width:56px; height:100%;
-  background-size:cover; background-position:center; background-repeat:no-repeat;
-  display:none;
-  box-shadow:none; outline:none; border:none;
-}
-.card.left  .ban{ left:4px;}
-.card.right .ban{ right:4px;}
-
-.ban.has-ban::after{
-  content:"BAN";
-  position:absolute;
-  top:4px; bottom:4px;
-  display:flex; align-items:center; justify-content:center;
-  writing-mode:vertical-rl; text-orientation:upright;
-  font:900 17px/1 'Rajdhani', sans-serif;
-  letter-spacing:-5px;
-}
-
-.card.left  .ban.has-ban::after{  right:-18px; color:var(--t1); }
-.card.right .ban.has-ban::after{  left:-18px;  color:var(--t2); }
-
-.card, .maptop { 
-  will-change: transform, opacity; 
-  transition: transform 2080ms cubic-bezier(.2,.8,.2,1), opacity 2000ms ease;
-}
-
-body:not(.visible) .maptop,
-body.leaving      .maptop { transform: translate(-50%,-24px); opacity:0; }
-
-body:not(.visible) #t1card, body:not(.visible) .card.left,
-body.leaving      #t1card, body.leaving      .card.left { transform: translateX(-40px); opacity:0; }
-
-body:not(.visible) #t2card, body:not(.visible) .card.right,
-body.leaving      #t2card, body.leaving      .card.right{ transform: translateX(40px);  opacity:0; }
-
-.ban{ transition: transform 2000ms ease, opacity 2000ms ease; }
-body:not(.visible) .ban,
-body.leaving      .ban { opacity:0; transform: translateY(-50%) scale(.9); }
+  .card, .ftpick, .mapsrow, .statusrow{ will-change:transform, opacity; transition:transform 2080ms cubic-bezier(.2,.8,.2,1), opacity 2000ms ease; }
+  body:not(.visible) .ftpick,  body.leaving .ftpick { transform:translate(-50%,-24px); opacity:0; }
+  body:not(.visible) .card.left,  body.leaving .card.left { transform:translateX(-40px); opacity:0; }
+  body:not(.visible) .card.right, body.leaving .card.right{ transform:translateX(40px);  opacity:0; }
+  body:not(.visible) .mapsrow,    body.leaving .mapsrow    { transform:translateY(-24px); opacity:0; }
+  body:not(.visible) .statusrow,  body.leaving .statusrow  { transform:translateY(-24px); opacity:0; }
 </style>
 </head>
 <body>
-  <div class="maptop" id="maptop">
-    <div class="mapbar" id="mapbar"></div>
-    <div class="pickbox" id="pickbox">
-      <div class="ico" id="pickico"></div>
-      <span id="pickabbr"></span>
-      <span>PICK</span>
-    </div>
+  <div class="card left" id="t1card">
+    <div class="flag" id="t1logo"></div>
+    <div class="name" id="t1name">TEAM 1</div>
+    <div class="ban" id="t1ban"><span class="tag">Ban</span><div class="portrait" id="t1banimg"></div></div>
+    <div class="score" id="t1score">0</div>
   </div>
-	<div class="card left" id="t1card">
-	  <div class="ban" id="t1ban"></div>
-	  <div class="inner left">
-		<div class="name"  id="t1name">TEAM 1</div>
-		<div class="logo"  id="t1logo"></div>
-		<div class="score" id="t1score">0</div>
-	  </div>
-	</div>
-	<div class="card right" id="t2card">
-	  <div class="ban" id="t2ban"></div>
-	  <div class="inner right">
-		<div class="score" id="t2score">0</div>
-		<div class="logo"  id="t2logo"></div>
-		<div class="name"  id="t2name">TEAM 2</div>
-	  </div>
-	</div>
+
+  <div class="statusrow" id="statusrow"></div>
+
+  <div class="ftpick" id="ftpick">
+    <span id="ftbadge">First to 3</span>
+    <span class="sep" id="ftsep"></span>
+    <span class="pickpart" id="pickpill"><span id="pickteam"></span> pick</span>
+  </div>
+
+  <div class="mapsrow" id="mapsrow"></div>
+
+  <div class="card right" id="t2card">
+    <div class="score" id="t2score">0</div>
+    <div class="ban" id="t2ban"><span class="tag">Ban</span><div class="portrait" id="t2banimg"></div></div>
+    <div class="name" id="t2name">TEAM 2</div>
+    <div class="flag" id="t2logo"></div>
+  </div>
+
 <script>
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
 
   async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
+  async function readJSON(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.json():{}; }catch{ return {}; } }
   async function headOK(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
   const hex = (s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
   const slug = s=>(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"item";
@@ -207,7 +205,7 @@ body.leaving      .ban { opacity:0; transform: translateY(-50%) scale(.9); }
   // Shrinks a single-line, no-wrap team name's font size until it fits its
   // reserved space instead of getting clipped by the ellipsis. Must run
   // after the text is set, since it measures the real laid-out width.
-  async function fitTeamName(el, maxSize=32, minSize=16){
+  async function fitTeamName(el, maxSize=30, minSize=16){
     if (document.fonts) {
       try {
         await Promise.all([
@@ -225,155 +223,143 @@ body.leaving      .ban { opacity:0; transform: translateY(-50%) scale(.9); }
     }
   }
 
-  let T1_LOGO = MATCH+"/T1Logo.png";
-  let T2_LOGO = MATCH+"/T2Logo.png";
-  
-  let T1_ABBR = "", T2_ABBR = "";
+  let T1_NAME = "TEAM 1", T2_NAME = "TEAM 2";
 
-async function upT1Abbr(){
-  T1_ABBR = (await read(MATCH + "/T1Abbr.txt")).trim();
-}
-async function upT2Abbr(){
-  T2_ABBR = (await read(MATCH + "/T2Abbr.txt")).trim();
-}
+  async function readCurrentMapKV(){
+    const cur = parseInt((await read(MATCH + "/CurrentMap.txt")).trim(), 10) || 0;
+    if (!cur) return null;
+    const path = `${MATCH}/Map${cur}.txt`;
+    if (!(await headOK(path))) return null;
 
-async function readCurrentMapKV(){
-  const cur = parseInt((await read(MATCH + "/CurrentMap.txt")).trim(), 10) || 0;
-  if (!cur) return null;
-  const path = `${MATCH}/Map${cur}.txt`;
-  if (!(await headOK(path))) return null;
+    const kv = {};
+    (await read(path)).split(/\r?\n/).forEach(line=>{
+      const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+      if(m) kv[m[1].trim()] = m[2].trim();
+    });
+    return kv;
+  }
 
-  const kv = {};
-  (await read(path)).split(/\r?\n/).forEach(line=>{
-    const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
-    if(m) kv[m[1].trim()] = m[2].trim();
-  });
-  return kv;
-}
-
-async function applyColors(){
-  const kv={}; (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{
-    const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim()]=m[2].trim();
-  });
-  document.documentElement.style.setProperty("--primary",    hex(kv.primary,"#0f1114"));
-  document.documentElement.style.setProperty("--tertiary",    hex(kv.tertiary,"#55aaff"));
-  document.documentElement.style.setProperty("--text",       hex(kv.secondary,"#ffffff"));
-  document.documentElement.style.setProperty("--quaternary", hex(kv.quaternary,"#3A3A90"));
-}
-
-  async function upT1Name(){ const el=document.getElementById("t1name"); el.textContent=(await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1"; await fitTeamName(el); }
+  async function upT1Name(){ const el=document.getElementById("t1name"); T1_NAME=(await read(MATCH+"/T1Name.txt")).trim()||"TEAM 1"; el.textContent=T1_NAME; await fitTeamName(el); }
+  async function upT2Name(){ const el=document.getElementById("t2name"); T2_NAME=(await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2"; el.textContent=T2_NAME; await fitTeamName(el); }
   async function upT1Score(){ document.getElementById("t1score").textContent=(await read(MATCH+"/T1Score.txt")).trim()||"0"; }
-  async function upT1Color(){ const c=hex((await read(MATCH+"/T1Color.txt")).trim(),"#27AAE1"); document.documentElement.style.setProperty("--t1", c); document.getElementById("t1card").style.borderRightColor=c; }
-  async function upT1Logo(){
-    T1_LOGO = MATCH+"/T1Logo.png";
-    if(await headOK(T1_LOGO)){ setBg(document.getElementById("t1logo"), T1_LOGO); }
-    else{ document.getElementById("t1logo").style.backgroundImage="none"; }
-  }
-  
-	async function upT1Ban(){
-	  const el  = document.getElementById("t1ban");
-	  let shown = false;
-
-	  const kv = await readCurrentMapKV();
-	  const hero = (kv?.T1Ban || "").trim();
-
-	  if (hero){
-		const p = HEROES + "/" + slug(hero) + ".png";
-		if (await headOK(p)){ setBg(el, p); el.style.display = "block"; shown = true; }
-	  }
-	  if (!shown){
-		el.style.display = "none";
-		el.style.backgroundImage = "none";
-	  }
-	  el.classList.toggle("has-ban", shown);
-	}
-
-  async function upT2Name(){ const el=document.getElementById("t2name"); el.textContent=(await read(MATCH+"/T2Name.txt")).trim()||"TEAM 2"; await fitTeamName(el); }
   async function upT2Score(){ document.getElementById("t2score").textContent=(await read(MATCH+"/T2Score.txt")).trim()||"0"; }
-  async function upT2Color(){ const c=hex((await read(MATCH+"/T2Color.txt")).trim(),"#C80013"); document.documentElement.style.setProperty("--t2", c); document.getElementById("t2card").style.borderLeftColor=c; }
-  async function upT2Logo(){
-    T2_LOGO = MATCH+"/T2Logo.png";
-    if(await headOK(T2_LOGO)){ setBg(document.getElementById("t2logo"), T2_LOGO); }
-    else{ document.getElementById("t2logo").style.backgroundImage="none"; }
-  }
-	async function upT2Ban(){
-	  const el  = document.getElementById("t2ban");
-	  let shown = false;
+  async function upT1Color(){ document.documentElement.style.setProperty("--t1", hex((await read(MATCH+"/T1Color.txt")).trim(),"#27AAE1")); }
+  async function upT2Color(){ document.documentElement.style.setProperty("--t2", hex((await read(MATCH+"/T2Color.txt")).trim(),"#C80013")); }
+  async function upT1Logo(){ const p=MATCH+"/T1Logo.png"; const el=document.getElementById("t1logo"); if(await headOK(p)) setBg(el,p); else el.style.backgroundImage="none"; }
+  async function upT2Logo(){ const p=MATCH+"/T2Logo.png"; const el=document.getElementById("t2logo"); if(await headOK(p)) setBg(el,p); else el.style.backgroundImage="none"; }
 
-	  const kv = await readCurrentMapKV();
-	  const hero = (kv?.T2Ban || "").trim();
-
-	  if (hero){
-		const p = HEROES + "/" + slug(hero) + ".png";
-		if (await headOK(p)){ setBg(el, p); el.style.display = "block"; shown = true; }
-	  }
-	  if (!shown){
-		el.style.display = "none";
-		el.style.backgroundImage = "none";
-	  }
-	  el.classList.toggle("has-ban", shown);
-	}
-
-async function upMaps(){
-  const bar = document.getElementById("mapbar");
-  const n = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 3;
-  const count = Math.max(1, Math.min(7, n));
-  let current = parseInt((await read(MATCH + "/CurrentMap.txt")).trim(), 10) || 1;
-
-  // Clamp to a sensible range
-  if (current < 1) current = 1;
-  if (current > count) current = count;
-
-  bar.innerHTML = "";
-
-  const seg = document.createElement("div");
-  seg.className = "seg current";
-
-  const txt = document.createElement("span");
-  txt.textContent = `MAP ${current}/${count}`;
-
-  seg.append(txt);
-  bar.appendChild(seg);
-}
-
-async function upPickBox(){
-  const box = document.getElementById("pickbox");
-  const ico = document.getElementById("pickico");
-  const ab  = document.getElementById("pickabbr");
-
-  const kv = await readCurrentMapKV();
-  const pickRaw = (kv?.Pick || "").trim().toUpperCase();
-  const pick = (pickRaw === "T1" || pickRaw === "TEAM 1") ? "T1"
-             : (pickRaw === "T2" || pickRaw === "TEAM 2") ? "T2" : "";
-
-  if (!pick){
-    box.style.display = "none";
-ico.style.backgroundImage = "none";
-    ab.textContent = "";
-    return;
+  async function upBan(side, elId, imgId){
+    const el = document.getElementById(elId);
+    const img = document.getElementById(imgId);
+    const kv = await readCurrentMapKV();
+    const hero = (kv?.[side === "t1" ? "T1Ban" : "T2Ban"] || "").trim();
+    let shown = false;
+    if (hero){
+      const p = HEROES + "/" + slug(hero) + ".png";
+      if (await headOK(p)){ setBg(img, p); shown = true; }
+    }
+    el.classList.toggle("has-ban", shown);
+    if (!shown) img.style.backgroundImage = "none";
   }
 
-  const logo = (pick === "T1") ? T1_LOGO : T2_LOGO;
-  const abbr = (pick === "T1") ? (T1_ABBR || "T1") : (T2_ABBR || "T2");
+  async function upMaps(){
+    const n = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 3;
+    const count = Math.max(1, Math.min(7, n));
+    // count is the total map pool (1/3/5/7) - the series is won at a simple
+    // majority, so "first to" is always ceil(count/2): 1->1, 3->2, 5->3, 7->4.
+    const winsNeeded = Math.ceil(count / 2);
+    document.getElementById("ftbadge").textContent = `First to ${winsNeeded}`;
+  }
 
-  ico.style.backgroundImage = `url('${logo}?_=${Date.now()}')`;
-  ab.textContent = abbr.toUpperCase();
-box.style.display = "flex";
-}
+  async function upMapsRow(){
+    const n = parseInt((await read(GENERAL + "/first_to.txt")).trim(), 10) || 3;
+    const count = Math.max(1, Math.min(7, n));
 
-async function initial(){
-  await applyColors();
-	await Promise.all([
-	  upT1Name(), upT1Score(), upT1Color(), upT1Logo(),
-	  upT2Name(), upT2Score(), upT2Color(), upT2Logo(),
-	  upT1Abbr(), upT2Abbr()
-	]);
-	await upMaps();
-	await upPickBox();
-	await upT1Ban();
-	await upT2Ban();			   
-}
+    const slots = [];
+    for (let i = 1; i <= count; i++){
+      const path = `${MATCH}/Map${i}.txt`;
+      let name = "", completed = false;
+      if (await headOK(path)){
+        (await read(path)).split(/\r?\n/).forEach(line=>{
+          const m = line.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/);
+          if (!m) return;
+          const key = m[1].trim();
+          if (key === "Name") name = m[2].trim();
+          else if (key === "Completed") completed = m[2].trim() === "1";
+        });
+      }
+      slots.push({ name, completed });
+    }
 
+    const mapsManifest = await readJSON(SB + "/Maps/index.json");
+    const modesManifest = await readJSON(SB + "/Gametypes/index.json");
+    const mapsByName = Object.fromEntries((mapsManifest.maps || []).map(m => [(m.name || "").toLowerCase(), m]));
+    const modeSlugByName = Object.fromEntries((modesManifest.modes || []).map(m => [(m.name || "").toLowerCase(), (m.slug || "").toLowerCase()]));
+
+    const row = document.getElementById("mapsrow");
+    row.innerHTML = "";
+    slots.forEach(({ name, completed }, i) => {
+      if (i > 0){
+        const sep = document.createElement("div");
+        sep.className = "msep";
+        row.appendChild(sep);
+      }
+      const item = document.createElement("div");
+      if (name){
+        item.className = completed ? "mitem played" : "mitem";
+        const meta = mapsByName[name.toLowerCase()];
+        const modeSlug = meta ? modeSlugByName[(meta.mode || "").toLowerCase()] : "";
+        if (modeSlug){
+          const icon = document.createElement("div");
+          icon.className = "micon";
+          icon.style.backgroundImage = `url('${SB}/Gametypes/${modeSlug}.png?_=${Date.now()}')`;
+          item.appendChild(icon);
+        }
+        const txt = document.createElement("span");
+        txt.textContent = name;
+        item.appendChild(txt);
+      } else {
+        item.className = "mitem tbd";
+        item.textContent = "TBD";
+      }
+      row.appendChild(item);
+    });
+  }
+
+  async function upStatusRow(){
+    const el = document.getElementById("statusrow");
+    const txt = (await read(MATCH + "/status.txt")).trim();
+    el.textContent = txt;
+    el.classList.toggle("show", !!txt);
+  }
+
+  async function upPickPill(){
+    const el = document.getElementById("pickpill");
+    const teamEl = document.getElementById("pickteam");
+    const sep = document.getElementById("ftsep");
+    const kv = await readCurrentMapKV();
+    const pickRaw = (kv?.Pick || "").trim().toUpperCase();
+    const pick = (pickRaw === "T1" || pickRaw === "TEAM 1") ? "T1"
+               : (pickRaw === "T2" || pickRaw === "TEAM 2") ? "T2" : "";
+    if (!pick){ el.classList.remove("show"); teamEl.textContent = ""; sep.classList.remove("show"); return; }
+    const name = pick === "T1" ? T1_NAME : T2_NAME;
+    teamEl.textContent = name;
+    el.classList.add("show");
+    sep.classList.add("show");
+  }
+
+  async function initial(){
+    await Promise.all([
+      upT1Name(), upT1Score(), upT1Color(), upT1Logo(),
+      upT2Name(), upT2Score(), upT2Color(), upT2Logo(),
+    ]);
+    await upMaps();
+    await upMapsRow();
+    await upStatusRow();
+    await upPickPill();
+    await upBan("t1", "t1ban", "t1banimg");
+    await upBan("t2", "t2ban", "t2banimg");
+  }
 
   function startSSE(){
     const es=new EventSource("/events");
@@ -381,51 +367,46 @@ async function initial(){
       try{
         const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
         for(const k of ch){
-          if(k==="general.colors") await applyColors();
-			else if(k==="general.first_to"){ await upMaps(); await upPickBox(); await upT1Ban(); await upT2Ban(); }
-			else if(k==="maps"){ await upMaps(); await upPickBox(); await upT1Ban(); await upT2Ban(); }
-          else if(k==="t1.name") await upT1Name();
+          if(k==="general.first_to"){ await upMaps(); await upMapsRow(); await upPickPill(); await upBan("t1","t1ban","t1banimg"); await upBan("t2","t2ban","t2banimg"); }
+          else if(k==="general.status") await upStatusRow();
+          else if(k==="maps"){ await upMaps(); await upMapsRow(); await upPickPill(); await upBan("t1","t1ban","t1banimg"); await upBan("t2","t2ban","t2banimg"); }
+          else if(k==="t1.name"){ await upT1Name(); await upPickPill(); }
           else if(k==="t1.score") await upT1Score();
           else if(k==="t1.color") await upT1Color();
-			else if(k==="t1.logo"){ await upT1Logo(); await upPickBox(); }
-          else if(k==="t2.name") await upT2Name();
+          else if(k==="t1.logo") await upT1Logo();
+          else if(k==="t2.name"){ await upT2Name(); await upPickPill(); }
           else if(k==="t2.score") await upT2Score();
           else if(k==="t2.color") await upT2Color();
-			else if(k==="t2.logo"){ await upT2Logo(); await upPickBox(); }
-			else if(k==="t1.abbr"){ await upT1Abbr(); await upPickBox(); }
-			else if(k==="t2.abbr"){ await upT2Abbr(); await upPickBox(); }
-		  else handleOverlayKey(k);
+          else if(k==="t2.logo") await upT2Logo();
+          else handleOverlayKey(k);
         }
       }catch{}
     };
   }
 
   (async()=>{ await initial(); startSSE(); })();
-function setOverlayVisible(v){
-  document.body.classList.toggle('visible', !!v);
-  document.body.classList.toggle('leaving', !v);
-}
 
-function getStingerStartMs(){
-  const qs = new URLSearchParams(location.search);
-  const q  = parseInt(qs.get("stinger") || qs.get("delay") || "", 10);
-  if(!isNaN(q) && q >= 0) return q;
-  return 1800;
-}
-
-document.addEventListener("DOMContentLoaded", ()=>{
-  const delay = getStingerStartMs();
-  setTimeout(()=> setOverlayVisible(true), delay);
-});
-
-document.addEventListener("visibilitychange", ()=>{
-  setOverlayVisible(!document.hidden);
-});
-
-function handleOverlayKey(k){
-  if(k==="overlay.scoreboard.show") setOverlayVisible(true);
-  if(k==="overlay.scoreboard.hide") setOverlayVisible(false);
-}
+  function setOverlayVisible(v){
+    document.body.classList.toggle('visible', !!v);
+    document.body.classList.toggle('leaving', !v);
+  }
+  function getStingerStartMs(){
+    const qs = new URLSearchParams(location.search);
+    const q  = parseInt(qs.get("stinger") || qs.get("delay") || "", 10);
+    if(!isNaN(q) && q >= 0) return q;
+    return 1800;
+  }
+  document.addEventListener("DOMContentLoaded", ()=>{
+    const delay = getStingerStartMs();
+    setTimeout(()=> setOverlayVisible(true), delay);
+  });
+  document.addEventListener("visibilitychange", ()=>{
+    setOverlayVisible(!document.hidden);
+  });
+  function handleOverlayKey(k){
+    if(k==="overlay.scoreboard.show") setOverlayVisible(true);
+    if(k==="overlay.scoreboard.hide") setOverlayVisible(false);
+  }
 </script>
 </body>
 </html>
