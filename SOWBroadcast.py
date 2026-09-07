@@ -1339,8 +1339,8 @@ class TeamPanel(QGroupBox):
 class MapCard(QWidget):
     """Card-style map widget shown in a grid on the Match tab."""
 
-    CARD_IMAGE_W = 220
-    CARD_IMAGE_H = 124
+    CARD_IMAGE_W = 176
+    CARD_IMAGE_H = 99
 
     def __init__(self, index: int, get_map_names, get_hero_names, get_map_asset=None):
         super().__init__()
@@ -1361,7 +1361,7 @@ class MapCard(QWidget):
         root.setContentsMargins(6, 6, 6, 6)
         root.setSpacing(4)
 
-        # ── Top row: M{n} label | pick combo | map name combo ──
+        # ── Top row: M{n} label | pick combo ──
         top = QHBoxLayout()
         top.setSpacing(4)
         self.label = QLabel(f"M{index}")
@@ -1369,17 +1369,16 @@ class MapCard(QWidget):
         self.pick = QComboBox()
         make_combo_searchable(self.pick)
         self.pick.addItems(["TBA", "T1", "T2"])
-        self.pick.setFixedWidth(55)
-        self.map_combo = QComboBox()
-        make_combo_searchable(self.map_combo)
-        self.refresh_maps()
-        self.map_combo.currentTextChanged.connect(self._update_image)
+        self.pick.setMinimumWidth(90)
         top.addWidget(self.label)
         top.addWidget(self.pick)
-        top.addWidget(self.map_combo, 1)
+        top.addStretch(1)
         root.addLayout(top)
 
-        # ── Map image ──
+        # ── Body row: map image | side panel (map name, score, completed, bans) ──
+        body = QHBoxLayout()
+        body.setSpacing(8)
+
         self.image_label = QLabel()
         self.image_label.setFixedSize(self.CARD_IMAGE_W, self.CARD_IMAGE_H)
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -1387,41 +1386,58 @@ class MapCard(QWidget):
             "background:#333; border-radius:4px; color:#888;"
         )
         self.image_label.setText("TBA")
-        root.addWidget(self.image_label, alignment=Qt.AlignHCenter)
+        body.addWidget(self.image_label, 0, alignment=Qt.AlignTop)
+
+        side = QVBoxLayout()
+        side.setSpacing(4)
+
+        self.map_combo = QComboBox()
+        make_combo_searchable(self.map_combo)
+        self.refresh_maps()
+        self.map_combo.currentTextChanged.connect(self._update_image)
+        side.addWidget(self.map_combo)
 
         # ── Score row ──
         score_row = QHBoxLayout()
         score_row.setSpacing(4)
         self.t1score = QSpinBox(); self.t1score.setRange(0, 200)
         self.t2score = QSpinBox(); self.t2score.setRange(0, 200)
-        score_row.addStretch(1)
         score_row.addWidget(self.t1score)
         score_row.addWidget(QLabel("-"))
         score_row.addWidget(self.t2score)
         score_row.addStretch(1)
-        root.addLayout(score_row)
+        side.addLayout(score_row)
 
         # ── Not Played / Completed toggle ──
         self.completed = QCheckBox("Completed")
-        root.addWidget(self.completed, alignment=Qt.AlignHCenter)
+        side.addWidget(self.completed)
 
         # ── Hero bans (compact) ──
-        bans_row = QHBoxLayout()
-        bans_row.setSpacing(4)
+        t1ban_row = QHBoxLayout()
+        t1ban_row.setSpacing(4)
         self.t1ban = QComboBox(); make_combo_searchable(self.t1ban); self.refresh_hero_list(self.t1ban)
+        t1ban_row.addWidget(QLabel("T1 Ban:"))
+        t1ban_row.addWidget(self.t1ban, 1)
+        side.addLayout(t1ban_row)
+
+        t2ban_row = QHBoxLayout()
+        t2ban_row.setSpacing(4)
         self.t2ban = QComboBox(); make_combo_searchable(self.t2ban); self.refresh_hero_list(self.t2ban)
-        bans_row.addWidget(QLabel("T1 Ban:"))
-        bans_row.addWidget(self.t1ban, 1)
-        bans_row.addWidget(QLabel("T2 Ban:"))
-        bans_row.addWidget(self.t2ban, 1)
-        root.addLayout(bans_row)
+        t2ban_row.addWidget(QLabel("T2 Ban:"))
+        t2ban_row.addWidget(self.t2ban, 1)
+        side.addLayout(t2ban_row)
+
+        side.addStretch(1)
+        body.addLayout(side, 1)
+        root.addLayout(body)
 
     # ── pick combo stores "—" / "T1" / "T2" internally ──
     # but displays "TBA" / "T1" / "T2" to the user.
     # We keep the internal values consistent with the old MapRow by mapping on read/write.
+    # The combo's displayed text is the team name (set via set_team_names), so the
+    # index - not the text - is what identifies TBA/T1/T2 here.
 
-    def _pick_text_to_data(self, text: str) -> str:
-        return "—" if text == "TBA" else text
+    _PICK_INDEX_TO_DATA = {0: "—", 1: "T1", 2: "T2"}
 
     def _pick_data_to_index(self, data: str) -> int:
         mapping = {"—": 0, "TBA": 0, "T1": 1, "T2": 2}
@@ -1429,10 +1445,15 @@ class MapCard(QWidget):
 
     def get_pick_data(self) -> str:
         """Return pick value in legacy format ('—', 'T1', 'T2')."""
-        return self._pick_text_to_data(self.pick.currentText())
+        return self._PICK_INDEX_TO_DATA.get(self.pick.currentIndex(), "—")
 
     def set_pick_data(self, data: str):
         self.pick.setCurrentIndex(self._pick_data_to_index(data))
+
+    def set_team_names(self, team1_name: str, team2_name: str):
+        """Show the actual team names in the pick combo instead of 'T1'/'T2'."""
+        self.pick.setItemText(1, team1_name.strip() if team1_name and team1_name.strip() else "T1")
+        self.pick.setItemText(2, team2_name.strip() if team2_name and team2_name.strip() else "T2")
 
     def _update_image(self, name: str):
         if not name or not self.get_map_asset:
@@ -3213,18 +3234,23 @@ class TournamentApp(QMainWindow):
         self._maps_grid = QGridLayout(maps_grid_widget)
         self._maps_grid.setSpacing(8)
 
+        MAPS_PER_ROW = 4
         self.map_rows: List[MapCard] = []
         for i in range(1, 8):
             mc = MapCard(i, self._map_names, self._hero_names, self._get_map_asset)
             self.map_rows.append(mc)
-            row_pos = (i - 1) // 3
-            col_pos = (i - 1) % 3
+            row_pos = (i - 1) // MAPS_PER_ROW
+            col_pos = (i - 1) % MAPS_PER_ROW
             self._maps_grid.addWidget(mc, row_pos, col_pos)
 
         maps_box_layout.addWidget(maps_grid_widget)
 
 
         match_root.addWidget(maps_box, 4)
+
+        self.team1_panel.team_name.textChanged.connect(self._update_map_pick_team_names)
+        self.team2_panel.team_name.textChanged.connect(self._update_map_pick_team_names)
+        self._update_map_pick_team_names()
 
         bottom = QHBoxLayout()
         self.reset_btn = QPushButton("Reset")
@@ -3782,6 +3808,12 @@ class TournamentApp(QMainWindow):
     def _update_map_cards_visibility(self, count: int):
         for i, mc in enumerate(self.map_rows):
             mc.setVisible(i < count)
+
+    def _update_map_pick_team_names(self, *_args):
+        t1_name = self.team1_panel.team_name.text()
+        t2_name = self.team2_panel.team_name.text()
+        for mc in self.map_rows:
+            mc.set_team_names(t1_name, t2_name)
 
     def _update_player_rows_visibility(self, count: int):
         for panel in (self.team1_panel, self.team2_panel):
