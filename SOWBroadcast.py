@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QComboBox, QSpinBox, QCheckBox,
     QAction, QFileDialog, QRadioButton, QGroupBox, QGridLayout, QDialog,
     QFormLayout, QListWidget, QListWidgetItem, QMessageBox, QSplitter,
-    QSizePolicy, QColorDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
+    QSizePolicy, QColorDialog, QTabWidget, QScrollArea,
     QTableWidget, QHeaderView, QDialogButtonBox, QFrame, QShortcut
 )
 
@@ -2020,100 +2020,6 @@ class WaitingTab(QWidget):
 
 
 
-class DraftTab(QWidget):
-    updated = pyqtSignal()
-
-    def __init__(self, get_maps_by_mode):
-        super().__init__()
-        self.get_maps_by_mode = get_maps_by_mode
-        root = QVBoxLayout(self)
-
-        row = QHBoxLayout()
-        self.btn_all = QPushButton("Select All")
-        self.btn_none = QPushButton("Select None")
-        row.addWidget(self.btn_all)
-        row.addWidget(self.btn_none)
-        row.addStretch(1)
-        root.addLayout(row)
-
-        self.tree = QTreeWidget()
-        self.tree.setHeaderHidden(True)
-        self.tree.setSelectionMode(QTreeWidget.NoSelection)
-        root.addWidget(self.tree, 1)
-
-        self.btn_all.clicked.connect(self.select_all)
-        self.btn_none.clicked.connect(self.select_none)
-        self.tree.itemChanged.connect(lambda *_: self.updated.emit())
-
-        self.update_btn = QPushButton("Update")
-        self.update_btn.clicked.connect(lambda *_: self.updated.emit())
-        root.addWidget(self.update_btn)
-
-        self.reload()
-
-    def _iter_map_items(self):
-        """Iteroi vain kartta-childit (ei moodiotsikoita)."""
-        top_count = self.tree.topLevelItemCount()
-        for i in range(top_count):
-            parent = self.tree.topLevelItem(i)
-            for j in range(parent.childCount()):
-                yield parent.child(j)
-
-    def reload(self):
-        """Lataa kartat ryhmiteltynä pelimuodoittain. Säilyttää aiemmat valinnat."""
-        old_selected = set(self.get_pool())
-        self.tree.blockSignals(True)
-        self.tree.clear()
-
-        data = self.get_maps_by_mode() or {}
-        for mode_name, maps in data.items():
-            if not maps:
-                continue
-            mode_item = QTreeWidgetItem([mode_name or "Unspecified"])
-            mode_item.setFlags(mode_item.flags() & ~Qt.ItemIsUserCheckable)
-            self.tree.addTopLevelItem(mode_item)
-            for name in sorted(maps):
-                it = QTreeWidgetItem([name])
-                it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
-                checked = (name in old_selected) or (not old_selected)
-                it.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
-                mode_item.addChild(it)
-
-        self.tree.expandAll()
-        self.tree.blockSignals(False)
-
-    def get_pool(self) -> list:
-        """Palauttaa valitun map poolin nimilistan."""
-        pool = []
-        for it in self._iter_map_items():
-            if it.checkState(0) == Qt.Checked:
-                pool.append(it.text(0))
-        return pool
-
-    def set_pool(self, names: list):
-        """Aseta valinnat annetun nimilistan mukaan."""
-        wanted = set(names or [])
-        self.tree.blockSignals(True)
-        for it in self._iter_map_items():
-            it.setCheckState(0, Qt.Checked if it.text(0) in wanted else Qt.Unchecked)
-        self.tree.blockSignals(False)
-        self.updated.emit()
-
-    def select_all(self):
-        self.tree.blockSignals(True)
-        for it in self._iter_map_items():
-            it.setCheckState(0, Qt.Checked)
-        self.tree.blockSignals(False)
-        self.updated.emit()
-
-    def select_none(self):
-        self.tree.blockSignals(True)
-        for it in self._iter_map_items():
-            it.setCheckState(0, Qt.Unchecked)
-        self.tree.blockSignals(False)
-        self.updated.emit()
-
-
 class StandingsTab(QWidget):
     updated = pyqtSignal()
     link_requested = pyqtSignal(str)
@@ -3280,11 +3186,6 @@ class TournamentApp(QMainWindow):
         tabs.addTab(self.waiting_tab, "Waiting Screen")
 
         
-        # --- DRAFT TAB (map pool) ---
-        self.draft_tab = DraftTab(self._maps_by_mode)
-        self.draft_tab.updated.connect(self._update)
-        tabs.addTab(self.draft_tab, "Draft")
-
         # --- STANDINGS TAB ---
         self.standings_tab = StandingsTab()
         self.standings_tab.updated.connect(self._update)
@@ -3761,25 +3662,6 @@ class TournamentApp(QMainWindow):
         dlg.exec_()
         on_close()
 
-    def _maps_by_mode(self) -> dict:
-        """
-        Palauta OrderedDict/dict: mode -> [map-names].
-        Jos kartalla ei ole asetettua modea, laitetaan 'Unspecified' alle.
-        Moodien järjestys otetaan self.modes-assetlistasta, lopuksi lisätään Unspecified jos tarpeen.
-        """
-        from collections import OrderedDict
-        by_mode = OrderedDict()
-        for m in self.modes.keys():
-            by_mode[m] = []
-        by_mode.setdefault("Unspecified", [])
-        for name, asset in self.maps.items():
-            mode = (asset.mode or "").strip() or "Unspecified"
-            by_mode.setdefault(mode, [])
-            by_mode[mode].append(name)
-        cleaned = OrderedDict((k, v) for k, v in by_mode.items() if v)
-        return cleaned
-
-
     def _on_assets_changed(self):
         self.team1_panel.refresh_hero_lists()
         self.team2_panel.refresh_hero_lists()
@@ -3789,8 +3671,6 @@ class TournamentApp(QMainWindow):
             mr.refresh_hero_list(mr.t2ban)
             # Refresh map image for currently selected map
             mr._update_image(mr.map_combo.currentText())
-        if hasattr(self, "draft_tab"):
-            self.draft_tab.reload()
 
     def _get_map_asset(self, name: str):
         return self.maps.get(name)
@@ -4881,7 +4761,7 @@ class TournamentApp(QMainWindow):
             "team2": asdict(t2),
             "maps": maps,
             "current_map": current_ix,
-            "map_pool": self.draft_tab.get_pool() if hasattr(self, "draft_tab") else [],
+            "map_pool": [],
             # Kept here (not for restoring - see _apply_state) purely so
             # _diff_for_scoreboard() can detect edits made through the Asset
             # Manager dialog (which mutates self.heroes/maps/modes directly)
@@ -5036,10 +4916,6 @@ class TournamentApp(QMainWindow):
         )
         if hasattr(self, "bracket_tab"):
             self.bracket_tab.from_settings(b_settings)
-            
-        pool = state.get("map_pool") or []
-        if hasattr(self, "draft_tab"):
-            self.draft_tab.set_pool(pool)
 
     def _update(self):
         state = self._collect_state()
