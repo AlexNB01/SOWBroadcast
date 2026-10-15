@@ -1,0 +1,994 @@
+# SOW Broadcast – uudelleenrakennusspesifikaatio
+
+> Tämä tiedosto on tarkoitettu uuden projektin juureen (`CLAUDE.md`), jotta Claude (tai ihminen) voi rakentaa
+> SOW Broadcast -sovelluksen uudelleen valitulla kielellä/työkalulla. Se kuvaa **mitä** nykyinen sovellus tekee,
+> **missä muodossa** se puhuu ympäristönsä (OBS, overlayt, SOWDraft) kanssa, **miltä** uuden version pitää näyttää
+> (Suomi OW ry:n graafinen ohjeistus) ja **mitä kannattaa tehdä toisin**.
+>
+> Lähde: nykyinen Python/PyQt5-toteutus (`SOWBroadcast.py`, `server.py`, `draft_link.py`, `tournament_link.py`,
+> `HTML/*.html`, `Scoreboard/**`). Rivinumerot viittaavat tilaan 2026-10-15. Merkintä **[EHD-n]** = ehdotus, joka
+> odottaa omistajan hyväksyntää (ks. luku 14). Merkintä **[KYS-n]** = avoin kysymys omistajalle (luku 15).
+
+---
+
+## 0. Työskentelyohjeet Claudelle
+
+1. **Päätetty (omistaja, 2026-10-15): C# + Avalonia UI, vain Windows, koko käyttöliittymä englanniksi.**
+   Kontrolliohjelma on natiivi työpöytäsovellus. **Ei web-pohjaista käyttöliittymää** (ei Electron, ei Tauri,
+   ei WebView-shelliä). Tekninen pino: luku 2b. Kaikki päätökset: luku 15.
+2. **Overlayt pysyvät HTML/CSS/JS:nä.** Ne ovat OBS Browser Source -lähteitä, eikä OBS osaa muuta. Ne eivät ole
+   "sovelluksen UI", vaan sovelluksen tuottama tuote. Sovelluksen sisälle ei rakenneta web-käyttöliittymää.
+   **Overlayjen visuaalista ilmettä ei päivitetä brändiohjeistuksen mukaiseksi** (KYS-4); vain niiden *datankäsittely* siirretään
+   uuteen kontraktiin (KYS-6, ks. luku 9).
+3. **Siirrytään uuteen kontraktiin (KYS-6).** Ei pysyvää taaksepäin yhteensopivuutta: uusi sovellus, uusi tilarajapinta (EHD-2),
+   päivitetyt OBS-scenet ja päivitetyt overlayt (datan haku uudesta rajapinnasta, ulkoasu ennallaan) julkaistaan **yhtenä pakettina**.
+   Silti **vaiheessa M1 uusi sovellus tuottaa vielä vanhan tiedostokontraktin** (luku 6–7), jotta vanhat overlayt toimivat oraakkelina ja
+   golden-testit (luku 13) ovat mahdollisia. Vanha kontrakti poistetaan vasta kun uudet overlayt on otettu käyttöön.
+4. **UI-kieli on yksinomaan englanti** (KYS-5): kaikki tekstit, virheilmoitukset ja tilarivit. Luvun 8 suomenkieliset merkkijonot
+   korvataan englanninkielisillä (ks. 8.0). Lokalisointirunkoa ei tarvita (resurssitiedosto kuitenkin suositeltava, jotta tekstit ovat yhdessä paikassa).
+4. **Vanha sovellus on testioraakkeli.** Aja sama tila molemmilla ja vertaa `Scoreboard/`-puun sisältöä
+   (ks. luku 13, hyväksyntätestit).
+5. **Älä toista bugeja.** Luku 12 listaa vanhan sovelluksen virheet ja oudot kohdat. Ne on tarkoituksella
+   *ei*-kopioitava lista.
+6. **Ulkoasu = yhdistyksen graafinen ohjeistus** (luku 11). Lähde: `suomiow nettisivut/docs/brand/graafinen-ohjeistus.pdf`
+   (v1.0, lokakuu 2026). PDF on totuus; tämän tiedoston luku 11 on tiivistelmä.
+7. Käyttäjäkieli omistajalle: suomi. Koodi, tunnisteet ja commit-viestit: englanti (ellei toisin sovita).
+8. Älä kovakoodaa polkuja (`C:\SOWBroadcast`, `C:\Suomi OW koodiprojektit\...`), porttia (8324) tai versionumeroa
+   useaan paikkaan. Konfiguraatio yhteen paikkaan.
+9. Henkilötietoa (pelaajanimet, joukkueet) on `autosave.json`/`match.json` -tiedostoissa. Älä kopioi oikeaa dataa
+   testeihin tai committeihin; käytä synteettistä.
+
+---
+
+## 1. Mikä järjestelmä on
+
+**SOW Broadcast** on Suomi OW ry:n (suomalainen Overwatch-yhteisö) Overwatch 2 -esportslähetysten ohjausohjelmisto.
+Tuottaja syöttää ottelutiedot (joukkueet, pelaajat, mapit, pisteet, bannit, tulostaulukot, pudotuspelikaavio,
+odotusruudun tekstit ja ajastin) työpöytäsovellukseen. Sovellus kirjoittaa tilan levylle ja ilmoittaa paikalliselle
+palvelimelle, joka työntää muutosviestin OBS:n Browser Source -overlayille. Overlayt hakevat päivittyneet tiedostot ja
+animoivat muutokset ruudulle.
+
+### Komponentit
+
+| # | Komponentti | Nykyinen toteutus | Rooli |
+|---|---|---|---|
+| 1 | **Kontrollisovellus** | `SOWBroadcast.py` (PyQt5, ~5460 riviä) | Kaikki muokkaus, tilan omistus, vienti levylle |
+| 2 | **Paikallinen HTTP-palvelin** | `server.py` (stdlib `ThreadingHTTPServer`), portti 8324 | Staattiset tiedostot + SSE `/events` + `POST /notify` |
+| 3 | **Overlayt** | `HTML/*.html` (17 tiedostoa) | OBS Browser Source, 1920×1080, lukevat `Scoreboard/**` |
+| 4 | **SOWDraft-linkki** | `draft_link.py` (Socket.IO-asiakas) | Täyttää mapit, pickit, bannit, voittajat live-draftista |
+| 5 | **Turnauslinkki** | `tournament_link.py` (REST + Socket.IO-trigger) | Täyttää standings- ja bracket-datan SOWDraftin turnausjärjestelmästä |
+| 6 | **OBS-scenekokoelmat** | `sowbroadcastscenes.json`, `SOWBROADCAST.json` | Tuotavat OBS-scenet (18 kpl) |
+| 7 | **Käynnistin & asennin** | `launch.bat`, PyInstaller-specit, Inno Setup (`setup.iss`) | Jakelu Windowsille |
+
+### Tietovirta
+
+```
+ Käyttäjä muokkaa UI:ta ──► Update-painike / linkkitapahtuma
+        │
+        ▼
+  _collect_state()  ──►  _diff_for_scoreboard(vanha, uusi) ──► changed[] -avaimet
+        │                                                         │
+        ├─► kirjoita Scoreboard/** (txt/json/png)                 │
+        ├─► match.json, assets.json, autosave.json (juuri)        │
+        └─► POST http://127.0.0.1:8324/notify {"changed":[...]} ◄─┘
+                                   │
+                      server.py: SSE /events  ──►  overlay (EventSource)
+                                                      │
+                                       fetch(tiedosto?_=Date.now()) → renderöi + animoi
+```
+
+Ulkoiset palvelut: ainoastaan **sowdraft.fi** (Socket.IO + REST + logokuvat). OBS tarjoaa selaimen, tekstilähteet,
+NDI:n, VLC-musiikin, pelikaappauksen. Sovellus ei puhu OBS:lle suoraan (ks. **[EHD-6]**).
+
+---
+
+## 2. Suositeltu uusi arkkitehtuuri
+
+Pidä rajapinnat (luvut 6–7) ennallaan, mutta siisti sisus:
+
+```
+┌──────────────────────────── yksi prosessi ────────────────────────────┐
+│  UI (natiivi)  ◄──►  Tila (yksi totuus, versioitu)  ◄──►  Palvelut     │
+│                              │                          · DraftLink     │
+│                              ▼                          · TournamentLink│
+│                       Exporter (txt/json/png)           · ReplayWatcher │
+│                              │                          · Timer         │
+│                              ▼                                          │
+│                  HTTP-palvelin + SSE-hub (sisäänrakennettu)             │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Yksi prosessi, yksi palvelin.** Nykyinen sovellus käynnistää palvelimen kahdesti samaan porttiin (`SOWServer.exe`
+  + säie GUI:ssa), ja SSE-tila on moduulikohtainen, joten käyttäytyminen on epädeterminististä (luku 12, #1).
+  Sisäänrakennettu palvelin riittää; erillinen `SOWServer.exe` ja `launch.bat`-koreografia poistuvat. **[EHD-1]**
+- **Tila = yksi puhdas, serialisoitava objekti** (luku 3) + `schemaVersion`. UI on tilan näkymä; palvelut
+  (draft/tournament/timer) muokkaavat tilaa saman rajapinnan kautta kuin UI.
+- **Exporter on puhdas funktio** `exportState(prev, next) → (tiedostomuutokset, changedKeys)`. Helppo testata
+  golden-tiedostoilla.
+- **UI-säie ei tee verkkoa eikä levy-I/O:ta raskaasti.** Vanha sovellus lataa turnauslogot synkronisesti UI-säikeessä
+  (jäädyttää ikkunan) ja POSTaa `/notify`:n UI-säikeestä. Uudessa: taustatehtävät + viestijono UI:lle.
+- **Atomiset kirjoitukset** (kirjoita temp-tiedostoon, vaihda nimeksi) kaikkeen JSON-tilaan. Vanha voi jättää
+  autosaven rikkinäiseksi kesken kirjoituksen.
+- **Ei sivuvaikutuksia latauksessa.** Vanha `_apply_state` laukaisee `updated`-signaaleja kesken latauksen, mikä
+  kirjoittaa puolivalmiin tilan autosaveen yli (luku 12, #9). Lataus = "aseta tila kerralla", sitten yksi päivitys.
+
+---
+
+## 2b. Tekninen pino: C# + Avalonia (vain Windows)
+
+Suositukset (omistaja on päättänyt vain C# + Avalonia + Windows; alla olevat kirjastovalinnat ovat ehdotuksia ja ne saa korvata perustellusti):
+
+| Alue | Suositus | Huom |
+|---|---|---|
+| Runtime | **.NET 8 LTS** (tai uudempi LTS) | `PublishSingleFile` + self-contained → ei erillistä runtime-asennusta |
+| UI | **Avalonia 11** + oma teema `SowTheme.axaml` (ei Fluent sellaisenaan) | design-tokenit luvusta 11.5 `ResourceDictionary`ssä; `ControlTheme`/`Styles` per komponentti – **ei globaalia tyylikaskadia ja ylikirjoituksia vanhemmilla** (ks. 11.6) |
+| Malli | **MVVM** (CommunityToolkit.Mvvm tai ReactiveUI) | tila = `AppState` (immutable record tai `INotifyPropertyChanged`-puu) + `ViewModel`it; UI ei kosketa levyä/verkkoa |
+| HTTP + SSE | **ASP.NET Core Kestrel** (minimal API) prosessin sisällä | `/events` SSE (`Results.Stream`/`IAsyncEnumerable`), `/api/state`, `/notify`; staattiset kansiot erikseen `UseStaticFiles` sallituilla `PhysicalFileProvider`eilla |
+| JSON | **System.Text.Json** (source generators) | `JsonUnmappedMemberHandling.Skip`, `schemaVersion`-migraatiot |
+| Socket.IO | **SocketIOClient** (NuGet, Socket.IO v4) | tarkista yhteensopivuus sowdraft.fi:n palvelinversioon (v3/v4) ennen sitoutumista |
+| REST | `HttpClient` (+ `User-Agent: Mozilla/5.0 (compatible; SOWBroadcast)`) | |
+| Kuvat | **SkiaSharp** / `Avalonia.Media.Imaging` | logo → PNG-uudelleenkoodaus; vältä `System.Drawing` |
+| Fontit | upotettu `AvaloniaResource` (Saira, Inter, Russo One TTF:t) | `FontFamily="avares://…#Saira Semi Condensed"` |
+| Tiedostovahti | `FileSystemWatcher` replay-vahtijalle (+ vakautusviive) | korvaa 0,5 s pollauksen |
+| Ajastin | `PeriodicTimer` + `Stopwatch`/`endsAt` (EHD-9) | |
+| Asennus & päivitys | **Velopack** tai Inno Setup | per-user, `%LOCALAPPDATA%`; päivitystarkistus (EHD-15/16) |
+| Testit | **xUnit** + golden-tiedostot; Avalonia.Headless UI-savutesteihin | |
+| Lokitus | Serilog (tiedosto) | |
+
+Projektirakenne (ehdotus): `SowBroadcast.Core` (tila, säännöt, exporter – ei UI-riippuvuuksia; 100 % testattavissa) ·
+`SowBroadcast.Server` (Kestrel+SSE) · `SowBroadcast.Integrations` (DraftLink, TournamentLink, ReplayWatcher) ·
+`SowBroadcast.App` (Avalonia UI, teema, ViewModelit) · `SowBroadcast.Tests`.
+
+Avalonia-erityishuomiot (opittu PyQt-kokeilusta, luku 11.6):
+- Pitkät välilehdet `ScrollViewer`in sisään. Vähimmäisikkuna 1200×750.
+- Haettava combo: `AutoCompleteBox` ei riitä (vaatimus: substring-haku popupissa, nuolinäppäimet, Esc). Tee oma `SearchableComboBox` (`TemplatedControl`) heti M2:ssa.
+- Värivalitsin: Avalonia `ColorPicker`/`ColorView` teemattuna (EHD-12), ei OS-dialogia. Tiedostovalinnat: `StorageProvider` (OS-natiivi, hyväksytty).
+- Tee `FocusAdorner`/`:focus-visible` -tyyli: 2 px `#23C5D7`.
+- High-DPI toimii oletuksena; tarkista Saira-fontin renderöinti 125/150/200 % skaalauksella.
+
+---
+
+## 3. Tietomalli
+
+Kaikki JSON UTF-8, `ensure_ascii=false`, sisennys 2. Kentät on lueteltu nykyisessä muodossa; uuden toteutuksen on
+osattava **lukea** vanhat tallennukset (`autosave.json`, `*.sowbroadcast.json`) ja **kirjoittaa** `match.json`
+vanhassa muodossa (overlayt lukevat sitä).
+
+### 3.1 Top-level tila (`_collect_state`, SOWBroadcast.py:5044)
+
+```jsonc
+{
+  "team1": Team, "team2": Team,
+  "maps": [ MapEntry x7 ],            // aina 7, myös piilotetut kortit
+  "current_map": 1..7 | null,         // johdettu: ensimmäinen näkyvä, ei-completed kortti
+  "map_pool": [],                     // aina tyhjä (jäänne) – ei toteuteta
+  "assets": { "heroes": {...}, "maps": {...}, "modes": {...} },  // vain autosavessa/diffissä; EI lueta latauksessa
+  "general": General, "waiting": Waiting, "standings": Standings, "bracket": Bracket,
+  "draft_link_url": "", "tournament_link_url": ""
+}
+```
+
+### 3.2 Entiteetit
+
+**Team**: `name`, `abbr` (max 6 merkkiä, ei kirjainkoon pakotusta), `logo_path` (absoluuttinen polku), `score` int 0..200
+(syötetään käsin, **ei** johdeta mapeista), `color_hex` `#rrggbb` (oletus T1 `#55aaff`, T2 `#ff557f`), `players` (8 kpl,
+aina kaikki), `banned_hero` (ei UI:ta, aina `""` – jäänne).
+
+**Player**: `name`, `hero` (`""` = ei valittu), `role` ∈ `Tank|Damage|Support|Flex|""`.
+
+**MapEntry**: `index` 1..7, `map` (nimi tai `""`), `t1`/`t2` int 0..200, `completed` bool,
+`pick` ∈ `"—"` (em dash = TBA) | `"T1"` | `"T2"`, `t1_ban`/`t2_ban` (herojen nimet tai `""`),
+`winner` ∈ `"t1"|"t2"|""` (**johdettu** pelkistä pisteistä, ei `completed`:sta).
+
+**General**: `first_to` (oletus 2; todellisuudessa kopio `maps_count`:sta, ks. luku 12), `maps_count` 1..7 (oletus 7),
+`num_players` 1..8 (oletus 5; Match-välilehden "Players"-spinneri), `format_type` & `division` (käyttämättömiä
+jäänteitä – `division` luetaan MapDraft-overlayssa, mutta UI ei aseta sitä), `host`, `caster1`, `caster2`,
+`status_text`, `overlay_logo_path`, `transition_logo_path`, `colors{primary…octonary}`.
+
+Overlay-värien oletukset: `primary #FFFFFF`, `secondary #000000`, `tertiary #55aaff`, `quaternary #006ea1`,
+`quinary #FFFFFF`, `senary #FFFFFF`, `septenary #FFFFFF`, `octonary #006ea1`. Merkitykset:
+
+| avain | merkitys |
+|---|---|
+| primary | tekstien takana oleva taustaväri |
+| secondary | useimpien tekstien väri |
+| tertiary | aksentit, pisteet, "vs" ei-pelissä-sceneissä |
+| quaternary | pisteiden tausta ei-pelissä-sceneissä |
+| quinary | bracket-matchup-labelit, "Playoffs"-teksti, Away Screen -labelit, somefontti (**ei käytössä** missään overlayssa) |
+| senary | Away Screen / Bracket -viestin fontti (**ei käytössä**) |
+| septenary | stinger-siirtymän ensisijainen tausta |
+| octonary | stinger-siirtymän jälkimmäinen tausta |
+
+**Waiting**: `videos_dir`, `timer_seconds` (= *jäljellä oleva* aika sekunteina), `text_starting` ("STARTING SOON!"),
+`text_brb` ("BE RIGHT BACK!"), `text_end` ("THANK YOU FOR WATCHING"), `timer_running`, `socials{}` (vain ei-tyhjät avaimet;
+mahdolliset: twitch, twitter, youtube, instagram, discord, web), `ticker_override`, `ticker_override_enabled`.
+
+**Standings**: `title`, `subtitle`, `columns{"mode":"map_diff"}` (kiinteä), `rows` (näytetyn/ensimmäisen ryhmän peili),
+`groups[{key,name,rows}]`, `display_group` (`"__all__"` tai ryhmän key).
+**StandingsRow**: `team_name`, `abbr`, `logo_path`, `wins`, `losses`, `map_diff`, `points`, `status` ∈ `""|qualified|eliminated`,
+`rank`, valinnaiset `played`, `draws`, `sf`, `sa` (vain turnauslinkistä).
+
+**Bracket**: `title`, `stage`, `rounds[{name, side:"upper"|"lower"|"grand", matches[]}]`, `double_elim_view` ∈ `""|upper|lower`,
+`teams[16 × TeamRef]`. **BracketMatch**: `id`, `bo_label` ("BO5"), `team1`/`team2` (TeamRef), `score1`, `score2`, `status`,
+`scheduled_at` (epoch ms, 0 = ei). **TeamRef**: `name`, `abbr`, `logo_path`.
+
+**Asset** (hero/map/mode): `name`, `image_path` (suhteellinen), `mode` (vain mapit: Control|Escort|Hybrid|Push|Flashpoint),
+`source_path` (absoluuttinen lähdetiedosto), `body_image_path`/`body_source_path` (vain heroes), `role` (vain heroes: Tank|Damage|Support).
+
+### 3.3 Tallennusmuodot
+
+| Tiedosto | Sisältö | Huomio |
+|---|---|---|
+| `autosave.json` (juuri) | koko tila (+ `assets`) | ladataan automaattisesti käynnistyksessä |
+| `match.json` (juuri) ja `Scoreboard/Match/match.json` | tila ilman `assets` | overlayt (MapDraft, draft) lukevat |
+| `assets.json` (juuri) | `{heroes,maps,modes}` | johdannainen dumppi; totuus on `Scoreboard/<Kat>/index.json` |
+| `*.sowbroadcast.json` | sama kuin autosave | File → Save/Save As/Load |
+| `*.sowteam.json` | `{version:1,name,abbr,color_hex,logo_png,players[8]}` + `<slug>.png` | pisteitä/bannia ei viedä |
+
+Latausvaatimus: tuntemattomat avaimet **ei** saa kaataa latausta (vanha heittää TypeErrorin; luku 12).
+
+---
+
+## 4. Käyttöliittymä – toiminnallinen spesifikaatio
+
+Ikkuna: otsikko "SOW Broadcast", oletuskoko 1400×860, vähimmäiskoko 1200×750. Valikkopalkki + 5 välilehteä:
+**MATCH · GENERAL · WAITING SCREEN · STANDINGS · BRACKET** (isoilla kirjaimilla, Saira; ikonit generisiä).
+Pitkät välilehdet (General, Waiting) **vierityskehykseen** – vanhassa ne leikkautuivat/menivät päällekkäin
+pienemmässä ikkunassa (opittu kantapään kautta).
+
+### 4.1 Valikot
+
+- **File**: Load…, Save, Save As…, —, Quit. (Save: jos `current_save_path` asetettu ja ≠ autosave → kirjoita siihen, muuten Save As.
+  Aina myös autosave. Load ei kutsu Updatea → overlayt päivittyvät vasta seuraavalla Updatella. **[EHD-3]** korjaa.)
+- **Customize**: Manage Heroes…, Manage Maps…, Manage Game Modes…, —, Bulk Import from Folders….
+- **Teams**: Export Home…, Import Home…, —, Export Away…, Import Away…
+
+### 4.2 MATCH-välilehti
+
+- **Format bar**: "Maps" 1..7 (näyttää/piilottaa N ensimmäistä mapkorttia), "Players" 1..8 (näyttää/piilottaa pelaajarivit
+  molemmissa paneeleissa). Piilotettu data säilyy ja viedään.
+- **TeamPanel ×2** (jaettu splitterillä): Name · Abbreviation (max 6) · Score (0..200) · Team Color (värinvalitsin) ·
+  Load Logo… (png/jpg/jpeg/webp/svg; lähtökansio `Scoreboard/Temp/Team Logos`; esikatselu 120×120) · 8 × PlayerRow.
+  - **PlayerRow**: nimi, hero-combo ("— Hero —" + aakkosjärjestys), rooli-combo ("- Role -", Tank/Damage/Support/Flex).
+    Heron valinta asettaa roolin automaattisesti (`asset.role` tai oletuskartta); roolia ei koskaan tyhjennetä
+    eikä Flexiä päätellä. Käyttäjän käsin valitsemaa roolia ei saa ylikirjoittaa listan uudelleenrakennuksessa (vanha tekee niin).
+- **MapCard ×7** (4 sarakkeen ruudukko): `M{n}`, pick-combo (TBA/T1/T2 – T1/T2 näyttävät *joukkueen nimen*, tallennusarvo
+  `—`/`T1`/`T2`, identiteetti indeksillä), mapin kuva 176×99 (cover), map-combo (tyhjä + aakkosjärjestys), kaksi pistespinneriä 0..200,
+  "Completed"-valintaruutu, "T1 Ban:"/"T2 Ban:" hero-comboja.
+- **SOWDraft Live Link** -ryhmä: URL-kenttä, Link, Unlink, tilateksti. Tyhjä URL → varoitus. Linkitettynä: URL ja Link
+  lukittu, Unlink aktiivinen. Unlink katkaisee yhteyden, nollaa **kaikki** mapkortit ja kutsuu Updatea.
+- **Napit**: **Reset** (nollaa molemmat paneelit + värit + mapkortit; ei muuta format baria/general/linkkejä; vain autosave,
+  **ei overlay-pushia – päätetty, KYS-9: vain ja ainoastaan Update päivittää overlayn**; operaattori painaa itse Update. Reset muuttaa vain UI-tilaa ja autosavea;
+  suositus: näytä "unsent changes" -merkki kunnes Update painetaan), **Swap Teams** (vaihtaa paneelien koko sisällön; väri kulkee mukana vain jos poikkeaa slotin oletuksesta;
+  mapeissa vaihtuu t1↔t2, pick T1↔T2, banit; `completed` ei vaihdu; vain autosave), **Update** (→ luku 5.1).
+- Joukkueen nimen muutos päivittää pick-comboiden labelit heti.
+
+### 4.3 GENERAL-välilehti
+
+Casters & Host (host, caster1, caster2) · Logos (overlay-logo ja transition-logo, esikatselu 200×80, lähtökansio
+`Scoreboard/Temp/Broadcast Logos`) · Status text (placeholder "Tournament name here") · Overlay colours (8 riviä, selite + värinvalitsin) ·
+**Reset this tab** (palauttaa oletukset, ei lähetä) · **Update (General)** (kirjoittaa vain general-exportit + status.txt).
+
+### 4.4 WAITING SCREEN -välilehti
+
+- **Videos**: kansiopolku (vain luku) + Browse + "Use default (SOWBroadcast\Highlights)". Oletuskansio:
+  `<base>/SOWBroadcast/Highlights` jos on, muuten `<base>/Highlights`. Valinta tyhjentää polun; selaaminen poistaa valinnan.
+- **Countdown**: näyttö `MM:SS` (minuutit rajaamattomat), napit −30s −1m −3m −5m / +30s +1m +3m +5m, ▶ start, ■ pause, ↺ reset.
+  Semantiikka (säilytä, ks. myös **[EHD-9]**):
+  - `adjust(d)`: remaining = max(0, remaining + d); jos ei käynnissä → preset = remaining.
+  - `start`: jos remaining ≤ 0 → remaining = preset; käynnistä 1 s tick.
+  - `pause`: vain jos käynnissä.
+  - `reset`: pysäytä, remaining = preset.
+  - `tick`: remaining = max(0, remaining − 1); pysäytä nollassa; kirjoita **vain** `timer_seconds.txt` + `timer_running.txt` ja
+    ilmoita `waiting.timer` (kerran sekunnissa). Ei autosavea.
+  - Latauksessa timeria ei käynnistetä; remaining = preset = tallennettu arvo; `timer_running` ohitetaan.
+- **On-screen texts**: Starting Soon / Be Right Back / End screen. Tyhjä → oletusteksti.
+- **Ticker override**: tekstikenttä (aktiivinen vain jos ruksi) + "Overwrite default ticker text".
+- **Socials**: Twitch, Twitter/X, YouTube, Instagram, Discord, Website. Normalisointi `_normalize_handle`
+  (SOWBroadcast.py:2018): poista `https?://`, poista alustan domain-etuliite (twitch, twitter/x.com, youtube/youtu.be,
+  instagram, discord.gg, discord.com/invite), poista alkuun `@` ja `/`, katkaise ensimmäisestä `/ ? #`. Tyhjät pois.
+- **Reset this tab**: oletusvideot päälle, tekstit oletuksiin (lopputeksti "…WATCHING!" huutomerkillä – epäjohdonmukaisuus, yhtenäistä),
+  timer reset, ticker tyhjä; **socials ei tyhjene**. **Update (Waiting)**: vain waiting-exportit + status + autosave.
+
+### 4.5 STANDINGS-välilehti
+
+- Turnauslinkki-ryhmä (jaettu Bracketin kanssa): URL, Link, Unlink, tila. Linkitettynä koko välilehti **vain luku**.
+- **Groups**: Add Group; "Show in standings.html" (`__all__` = kaikki ryhmät, muuten ryhmän key).
+  Ryhmälaatikko: nimi, Remove (ei kun vain yksi), taulukko **Rank · Team · Abbr · W · L · +/- · Points · Status · Logo**
+  (+ Add Row / Remove Selected). Rank 0..99, W/L 0..99, +/- −99..99, Points 0..999, Status ""/qualified/eliminated.
+  Logo = tekstikenttä + Browse (lähtö `Scoreboard/Teams`). Uusi ryhmä: key `group_{n}`, nimi `Group {len+1}`.
+- Title, Subtitle/Group.
+- **Update + sort**: tyhjät rivit pois (ei nimeä/lyhennettä/logoa eikä W/L/diff/points); lajittelu
+  `(−points, −map_diff, lowercase(nimi))`; ranks 1..n uudelleen (vain rank=0-rivit saavat uuden sijan, käsin asetettu >0 säilyy);
+  emit → Update. Lisätilastot (`played/draws/sf/sa`) säilyvät edit-kierroksen yli.
+- **Reset this tab**: yksi tyhjä ryhmä; ei lähetä.
+
+### 4.6 BRACKET-välilehti
+
+- Turnauslinkki-ryhmä kuten yllä (lukitsee välilehden).
+- Title, Stage (jokainen näppäily laukaisee vanhassa koko Updaten – **älä**, käytä debouncea/Update-nappia).
+- **Controls**: Template-combo + Load Template; double-elim view (Upper/Lower; näkyy vain 6- ja 8-tiimin double-elimillä);
+  "Bronze match" (vain single-elim: lisää/poistaa kierroksen "Bronze Match", side `lower`).
+- **Templatet** (match.id = `m{epoch_s}-{counter}`):
+
+| template | upper | lower | muu |
+|---|---|---|---|
+| 4 single | Semifinals(2), Final(1) | – | – |
+| 6 single (top 2 alkaa kierroksella 2) | Round 1(2), Semifinals(2), Final(1) | – | – |
+| 8 single | Quarterfinals(4), Semifinals(2), Final(1) | – | – |
+| 4 double | Upper Semifinals(2), Upper Final(1) | Lower Semifinal(1), Lower Final(1) | Grand Final(1, side `grand`) |
+| 6 double | Upper Round 1(2), Upper Semifinals(2), Upper Final(1) | Lower Round 1(2), Lower Semifinal(1), Lower Final(1) | Grand Final(1) |
+| 8 double | Upper Round 1(4), Upper Semifinals(2), Upper Final(1) | Lower Round 1(2), Lower Round 2(2), Lower Final(1) | Grand Final(1) |
+
+  Template-lataus nollaa double_elim_viewn `upper`ksi ja bronzen pois. Double-view-kontrolli näytetään kierrosmäärien
+  signatuurista (upper [4,2,1]+lower [2,2,1] tai upper [2,2,1]+lower [2,1,1]); 4-double ei saa kontrollia.
+- **Teams-paneeli**: 16 riviä (nimi + logo "…"; abbr aina ""), "Import from Standings" (valintalista, kaikki valittuina;
+  järjestys rank (0→9999) sitten nimi) ja Clear.
+- **BracketMatchWidget**: kaksi haettavaa joukkue-comboa (tyhjä + tiimilistan nimet) + kaksi pistespinneriä 0..99.
+  Joukkueen valinta kopioi TeamRefin (nimi, abbr, logo).
+- **Ei voittajan eteenpäinvientiä** vanhassa – kaikki käsin. **[EHD-4]**
+- Update (Bracket), Reset this tab (tyhjentää, lähettää).
+
+### 4.7 Dialogit
+
+- **AssetManagerDialog** (Heroes 700×560, Maps/Game Modes 700×420): vasemmalla aakkosjärjestetty lista; oikealla Name, Mode (vain Maps),
+  Role (vain Heroes: "- Role -"+ROLES), Logo (Browse, png/jpg/jpeg/webp, esikatselu 180 px), Heroes: myös Full Body Image (140 px).
+  - *Add/Update*: tyhjä nimi → "Missing name". `slug = slugify(name)`; `image_path = Scoreboard/<Heroes|Gametypes|Maps>/<slug>.png`.
+    Heroes: `body_image_path = Scoreboard/HeroesBody/<heroBodyFile(name)>.png`; jos kuvaa ei valittu → käytä olemassa olevaa tiedostoa
+    tai aiempaa `body_source_path`, muuten "Missing body image" ja keskeytä. Ei viennin heti – vienti seuraavalla Updatella diffin kautta
+    (**[EHD-3]**: vie heti).
+  - *Delete*: poistaa assetin ja `Scoreboard/<kat>/<slug>.png`:n (HeroesBody-kuvaa **ei** poisteta), vie heti, tyhjentää lomakkeen.
+- **BulkImportDialog**: skannaa `Scoreboard/Heroes` ja `Scoreboard/Maps` (png/jpg/jpeg/webp), nimiarvaus tiedostonimestä
+  (`-`/`_` → väli, Title Case), rivillä ruksi/nimi/(mapeille Mode). Olemassa olevat nimet ohitetaan. Heroille ei body-kuvaa.
+- **BracketTeamsImportDialog**: valintalista TeamRefeistä (kaikki valittuina), Ok/Cancel.
+- **Haettava combo** (`make_combo_searchable`, SOWBroadcast.py:22): kaikki comboboxit avaavat natiivin dropdownin sijaan oman
+  popupin: suodatuskenttä ("Search…") + lista. Substring-haku kirjainkoosta riippumatta; Up/Down liikkuu näkyvissä riveissä,
+  Enter valitsee, Esc sulkee, klikkaus valitsee; leveys = max(combo, 220), korkeus = clamp(40+22·rivit, 120..320). Hiiren
+  rulla vaihtaa edelleen arvoa. Tämä on sovelluksen tärkein käytettävyysominaisuus (54 heroa, 31 mappia) – toteuta natiivisti.
+
+---
+
+## 5. Liiketoimintalogiikka
+
+### 5.1 Update (`_update`, SOWBroadcast.py:5232)
+
+**Vanha käytös** – laukeaa: Match-Update, Standings/Bracket-muutos, draft-linkin tila, turnauslinkin data, Unlink, käynnistys.
+**Uusi sääntö (KYS-9 + KYS-11): käyttäjän tekemät muokkaukset lähtevät overlayihin vain Update-toiminnoilla** (Match **Update**, **Update (General)**,
+**Update (Waiting)**, **Update + sort**, **Update (Bracket)**). Standings/Bracket-kenttien muokkaus, Reset, Swap, Import, Load eivät vie eivätkä lähetä.
+**Nimetyt poikkeukset (lähettävät itse):**
+1. SOWDraft-/turnauslinkin saapuva data (+ Unlink): koko `_update()` kuten vanhassa (täyttää ja lähettää).
+2. Ajastimen komennot (Start/Pause/Reset/±aika): kirjoita `Waiting/timer_*` ja lähetä `waiting.timer` heti. Ei autosavea per komento ei tarvita; ei sekuntitikkejä (EHD-9).
+3. Replay-vahtija: kopio soittolistaan + `replaypath.txt` + `replay` heti.
+4. Käynnistys: lataa `autosave.json` ja suorita täysi vienti + lähetys (all keys).
+Kaikki muu tilan muutos: vain autosave + "unsent changes" -merkki.
+1. `state = collect()`; `changed = diff(old, state)`.
+2. Vie Heroes/Maps/Gametypes **vain jos** `assets.*` on diffissä.
+3. Vie general, match, waiting, standings, bracket, status.txt (aina).
+4. `notify(changed)`.
+5. Kirjoita juuren `match.json` (tila ilman assets), `assets.json`, autosave.
+6. Tallenna `lastState`.
+`_update_general_only` / `_update_waiting_only` vievät vain oman osansa (+ status). Ne **eivät saa** korvata `lastState`a
+kehyksellä (vanha tekee niin ja aiheuttaa vääriä diffejä).
+
+### 5.2 Diff-avaimet (`_diff_for_scoreboard`, :4262)
+
+Ei vanhaa tilaa → emittoi kaikki. Muuten:
+`assets.heroes|maps|modes` (vertaa vain nimiä, image_path, mode – **ei** roolia/bodya/source_pathia, bugi),
+`general.colors|first_to|logo|status|caster1|caster2|host`, `waiting.texts|timer|videos|socials`,
+`t1.*`/`t2.*` ∈ `name|score|color|logo|ban|abbr|players`, `maps`, `standings`, `bracket`,
+`matchtext` (kun maps/nimi/score/ban/ticker-override muuttuu), `replay` (replay-vahtija).
+`general.first_to` laukeaa `maps_count`in muutoksesta.
+
+### 5.3 Pienet algoritmit
+
+- **slugify** (:4507): NFKD → pienet kirjaimet → poista yhdistävät merkit → `[^a-z0-9]+` → `-` → trimmaa `-` → tyhjä = `"item"`.
+  `Lúcio→lucio`, `D.Va→d-va`. (Ei-latinalaiset nimet törmäävät `"item"`-arvoon – korjaa.)
+- **heroBodyFile** (:260, peilattava MapDraft.html:254-268 JS:ssä): ylikirjoitukset `d.va|dva→Dva`, `lúcio→Lucio`, `soldier: 76→Soldier_76`,
+  `wrecking ball→Wrecking_Ball`, `junker queen→Junker_Queen`, `jetpack cat→Jetpack_Cat`, `torbjörn→Torbjörn`;
+  muuten sanat isolla alkukirjaimella, `_`-liitettynä; tyhjä → `Hero`. **[EHD-10]**: siirrä manifestiin (`body_image`-kenttä on jo index.json:ssa).
+- **hero → rooli**: `asset.role` tai `HERO_ROLES[nimi]` (:170). Hero-roolit löytyvät valmiina `Scoreboard/Heroes/index.json`:sta (54 kpl) – käytä sitä.
+- **matchtext** (:4037): `"{T1} ({s1} - {s2}) {T2}"` + jokaiselle mapille jolla on nimi `"{map} ({m1} - {m2})"`, erotin `"      •      "`
+  (6 väliä, •, 6 väliä), perään **30 välilyöntiä**.
+- **current_map**: ensimmäinen *näkyvä* kortti jossa `completed=false`, muuten null.
+- **Joukkueen väri swapissa**: väri kulkee vain jos eroaa slotin oletuksesta (#55aaff / #ff557f).
+- **Standings-lajittelu** ja **turnauslinkin standings**: pisteet 3/voitto; draw = valmis ottelu ilman `winner_team_id`;
+  lajittelu pisteet → (sf−sa) → sf; `map_diff = sf − sa`.
+- **Logopolun normalisointi** (:3688): Scoreboard-juuren sisällä → suhteellinen, `/`-erottimin; muuten absoluuttinen `/`-erottimin.
+- **Team export** (:4072): oletus `<Scoreboard/Teams>/<slug>.sowteam.json`; logo → `<slug>.png` (ohita jos kohde uudempi). **Import** (:4118):
+  säilyttää nykyisen pistemäärän, ban = ""; väri = tiedoston tai paneelin oletus; logohaku: `logo_png` → `<jsonbasename>.png` → `Logo.png`;
+  pelaajat täytetään 8:aan.
+
+---
+
+## 6. Tiedostokontrakti (`Scoreboard/**`) – **pidä täsmälleen**
+
+Juuri: `base = $SOWB_ROOT || sovelluksen kansio`. Kaikki `.txt` UTF-8; kirjoita vain jos sisältö muuttui. Yksiarvoiset tiedostot ilman
+loppurivinvaihtoa; `key=value`-tiedostot CRLF.
+
+| Polku (`Scoreboard/`) | Muoto / esimerkki | Lukija |
+|---|---|---|
+| `Match/T1Name.txt`, `T2Name.txt` | teksti | lähes kaikki overlayt |
+| `Match/T1Score.txt`, `T2Score.txt` | kokonaisluku | scoreboard, MapDraft, draft, maps, duo/trio/single (piilottavat boxin kun 0–0) |
+| `Match/T1Color.txt`, `T2Color.txt` | `#rrggbb` | scorebar-overlayt, team1/2 |
+| `Match/T1Abbr.txt`, `T2Abbr.txt` | teksti | ei kukaan (draft lukee abbrin match.jsonista) |
+| `Match/T1Logo.png`, `T2Logo.png` | PNG (uudelleenkoodattu valitusta kuvasta, force) | scoreboard, MapDraft, draft, maps, duo/trio/single, team1/2 |
+| `Match/T{n}P{1..8}Name.txt` / `Role.txt` / `Hero.txt` | teksti; aina 8 riviä, tyhjä jos ei pelaajaa | team1.html, team2.html |
+| `Match/T1Players.txt`, `T2Players.txt` | `idx\tname\thero\trole` + CRLF | ei kukaan (OBS-tekstilähde / legacy) |
+| `Match/Map1.txt … Map7.txt` | `Name=`, `T1=`, `T2=`, `Completed=0\|1`, `Pick=—\|T1\|T2`, `T1Ban=`, `T2Ban=` | scoreboard, maps, draft |
+| `Match/CurrentMap.txt` | 1..7 tai tyhjä | scoreboard, maps, draft |
+| `Match/maps.txt` | yksi `slug.png` per rivi (mappipooli) | vain `draft.html` → **poistuu uudesta versiosta (KYS-10)**; ei toteuteta |
+| `Match/map_pool.txt` | mapin nimi per rivi | ei kukaan |
+| `Match/matchtext.txt` | ks. 5.3 | tickerit (startingsoon, berightback, thankyou) |
+| `Match/status.txt` | teksti | scoreboard, draft, duorow, triorow |
+| `Match/match.json` | koko tila ilman assets | MapDraft*, draft |
+| `Match/seriestext.txt` | `ESM 2025` (jäänne) | ei kukaan – **ei toteuteta** |
+| `General/host.txt`, `caster1.txt`, `caster2.txt` | teksti; muoto `Nimi` tai `Nimi @handle` | duorow, triorow, singlecam **ja OBS text_gdiplus -lähteet** |
+| `General/first_to.txt` | **maps_count** (1..7; harhaanjohtava nimi, säilytä) | scoreboard, maps |
+| `General/colors.txt` | `key=#hex` CRLF, 8 avainta | kaikki paitsi scoreboard |
+| `General/OverlayLogo.png`, `TransitionLogo.png` | PNG | maps, waiting, replay, transition |
+| `General/Icons/*.svg` | discord, instagram, twitch, twitter, web, youtube | waiting-overlayt |
+| `Waiting/text_starting.txt`, `text_brb.txt`, `text_end.txt` | teksti | vastaava scene |
+| `Waiting/timer_seconds.txt`, `timer_running.txt` | kokonaisluku; `0\|1` | startingsoon, berightback |
+| `Waiting/ticker_override.txt`, `ticker_use_override.txt` | teksti; `1` vain jos päällä **ja** ei-tyhjä | waiting-overlayt |
+| `Waiting/videos.txt` | tiedostonimet, yksi per rivi, järjestetty | waiting-overlayt |
+| `Waiting/videos_dir.txt` | aina tyhjä (overlayt ohittavat) | – |
+| `Waiting/socials.json` | `{"twitch":"..","twitter":".."}` | waiting-overlayt |
+| `Waiting/Playlist/` | kopio videokansiosta (`.mp4 .mov .webm .mkv`; kopioi jos puuttuu/uudempi; poista muut) | waiting-overlayt |
+| `Replay/replaypath.txt` | yksi tiedostonimi ilman polkua | replay.html |
+| `Replay/Playlist/<n>-Replay-Replay.mp4` | n = suurin etuliite + 1 | replay.html |
+| `Standings/standings.json` | `{title,subtitle,columns,rows,groups[{key,name,rows[{team,abbr,logo,wins,losses,map_diff,points,status,rank,played?,draws?,sf?,sa?}]}],display_group}` | standings.html |
+| `Bracket/bracket.json` | `{title,stage,rounds[{name,side,matches[{id,bo_label,team1{name,abbr,logo},team2,score1,score2,status,scheduled_at}]}],double_elim_view}` (ei `teams`) | bracket.html |
+| `Standings/updated_at.txt`, `Bracket/updated_at.txt` | `YYYY-MM-DD HH:MM:SS`, vain jos sisältö muuttui | – |
+| `Heroes/<slug>.png`, `Heroes/index.json` (+`index.txt`) | `{"heroes":[{name,slug,image:"Heroes/ana.png",role,body_image?}]}` | scoreboard, draft, maps (portretit) |
+| `HeroesBody/<heroBodyFile>.png` | koko vartalo | MapDraft*, team1/2 |
+| `Maps/<slug>.png`, `Maps/index.json` | `{"maps":[{name,slug,image,mode}]}` | scoreboard, MapDraft*, draft, maps |
+| `Gametypes/<slug>.png`, `Gametypes/index.json` | `{"modes":[{name,slug,image}]}` | scoreboard, draft, maps |
+| `Roles/Tank\|Damage\|Support\|Flex.png` | roolikuvakkeet | team1/2 |
+| `TournamentLogos/<sha1(url)[:16]><ext>` | ladatut turnauslogot | standings, bracket |
+| `Teams/`, `Temp/{Team Logos,Broadcast Logos,Maps}/` | käyttäjän työkansiot | – |
+| `__last_gui_touch.txt` | `ok` | ei kukaan (jäänne, älä toteuta) |
+
+Muut tiedostot: `Highlights/` (odotusruudun videot), `Videos/` (tyhjä, ei käytössä), `Music/` (6 mp3, OBS:n VLC-lähde; ei sovelluksen koodissa).
+
+**Assettien käynnistys**: (1) jos `index.json` puuttuu → kopioi puuttuvat kuvat paketoidusta `Scoreboard/<alikansio>`:sta (ei ylikirjoita);
+(2) lataa `index.json`; epäonnistuessa skannaa kuvakansio (nimi = tiedostonimi Title Casena); (3) vie kaikki kolme kategoriaa joka käynnistyksessä.
+Assettivienti = `shutil.copy2` (ei uudelleenkoodausta; ohita jos koko sama ja kohde ei vanhempi), `index.txt` + `index.json`.
+
+---
+
+## 7. HTTP-palvelin ja SSE-protokolla
+
+Nykyinen `server.py` (120 riviä): `GET /events` (SSE), `POST /notify`, kaikki muu staattisena tiedostopalvelimena juuresta.
+Overlayt käyttävät juuri-relatiivisia URL:eja (`/Scoreboard/Match/T1Name.txt`), OBS käyttää `http://127.0.0.1:8324/HTML/<sivu>.html`.
+
+| | Vaatimus (yhteensopivuus) | Parannus |
+|---|---|---|
+| Portti/osoite | `127.0.0.1:8324` oletus | konfiguroitava; vapaa portti jos varattu; **[EHD-1]** |
+| Otsakkeet | `Cache-Control: no-cache, no-store, must-revalidate`, `Pragma: no-cache`, `Expires: 0` joka vastauksessa | – |
+| `GET /events` | `text/event-stream`; ensin `: connected\n\n`; `id: <n>\ndata: {"changed":[...]}\n\n`; keepalive `: keepalive\n\n` 15 s välein | jono + `Last-Event-ID`-uudelleentoisto; ei vanhan viestin toistoa uudelle asiakkaalle |
+| `POST /notify` | runko `{"changed":[string]}` → **204**; virhe → **400** | rajoita rungon koko; tarkista `Content-Length`; vain localhost; tunniste-token **[EHD-1]** |
+| Staattiset | koko juuri | **vain** `HTML/`, `Scoreboard/`, `Music/`, `Videos/`, `Highlights/` (ei `autosave.json`) |
+| CORS | ei | ei tarvita (same-origin) |
+
+**changed-avainten sanasto**: luku 5.2. Overlayt reagoivat vain tunnettuihin avaimiin ja hakevat sitten tiedostot uudelleen
+(`fetch(polku + "?_=" + Date.now())`, olemassaolo `HEAD`-pyynnöllä).
+
+Sovelluksen `notify` on synkroninen 0,5 s timeoutilla, virheet nielty. Uudessa: asynkroninen.
+
+---
+
+## 8. Integraatiot
+
+### 8.0 UI-merkkijonot englanniksi (KYS-5)
+
+Vanhan sovelluksen suomenkieliset tekstit korvataan:
+
+| Vanha | Uusi (EN) |
+|---|---|
+| Ei linkitetty | Not linked |
+| Yhdistetään… | Connecting… |
+| Linkitetty | Linked |
+| Yhdistetty, haetaan dataa… | Connected, fetching data… |
+| Virhe: … | Error: … |
+| Linkki ei ole kelvollinen URL. | The link is not a valid URL. |
+| Linkistä ei löytynyt matchId-parametria. | The link has no matchId parameter. |
+| Turnausta ei löytynyt. | Tournament not found. |
+| Liitä SOWDraftin stream-linkki… (placeholder) | Paste the SOWDraft stream link (e.g. https://…/stream?matchId=…) |
+| Liitä ensin SOWDraftin …-linkki. | Paste a SOWDraft link first. |
+| Valitse tiimin logo / overlay-logo / transition-logo / väri | Select team logo / overlay logo / transition logo / colour |
+
+Muut tekstit (valikot, napit, `Missing name`, `Imported X heroes and Y maps.`) ovat jo englantia – säilytä. Käytä brittiläistä `colour`ia
+siellä missä vanha sovellus käyttää sitä ("Overlay colours", "Select colour"), ja pidä käytös yhtenäisenä. Tekstit yhteen resurssitiedostoon.
+
+> **Huom:** luvut 8.1 ja 8.2 kuvaavat **vanhan sovelluksen** linkitystä. Uusi sovellus toteuttaa luvun **8.4** mallin (turnaus ensin); 8.1/8.2 ovat
+> `LegacySource`-varatien ja siirrettävien sääntöjen (logojen lataus, standings/bracket-kuvaus, hero-/mappihaku) viitekuvauksia.
+
+### 8.1 SOWDraft-linkki (`draft_link.py`, 93 riviä)
+
+- Asiakas: Socket.IO (`websocket` + `polling`, auto-reconnect, `wait_timeout=10`). Palvelin: `https://sowdraft.fi` (origin otetaan liitetystä URL:sta).
+- URL: mikä tahansa absoluuttinen URL jossa kyselyparametri `matchId`. Esim. `https://sowdraft.fi/stream?matchId=<id>&role=stream`.
+  Virheet: "Linkki ei ole kelvollinen URL." / "Linkistä ei löytynyt matchId-parametria."
+- Yhteyden avautuessa (myös jokaisen reconnectin jälkeen): emit `join-match {matchId, role:"stream"}` (julkinen, ei tokenia).
+  Kuuntele `update-state` (payload dict), `error`, `connect_error`, `disconnect`.
+- Tilat UI:lle: `connecting`, `connected`, `disconnected`, `error:<viesti>` → "Yhdistetään…", "Linkitetty", "Ei linkitetty", "Virhe: …".
+- **Payload-kentät**: `team1Name`, `team2Name`, `previousMaps[{map,winner}]`, `selectedMap`, `selectedMapTeam`, `heroBans[{team,hero}]`,
+  `summary[{pickedBy, entries[{type:"result", winner, team1Score, team2Score}]}]`.
+- **Kuvaus tilaan** (`_on_draft_link_state`, :4955):
+  - Joukkueiden nimiä/logoja/värejä **ei** tuoda. Puolet päätellään vertaamalla trimmattuja, kirjainkoosta riippumattomia nimiä
+    GUI:n joukkueisiin (suora tai vaihdettu järjestys → `sides_swapped`). Jos ei täsmää: pick/ban/pisteet jätetään asettamatta
+    (mapit ja completed asetetaan silti). **[EHD-8]**: näytä varoitus tästä.
+  - `ordered_maps = previousMaps[].map + selectedMap`. Korteille `i < len(previousMaps)`: `completed=true`; viimeinen = nykyinen (ei completed).
+  - Mapin nimi etsitään combosta täsmälleen tai välimerkit/kirjainkoko ohittaen (`King's Row` ↔ `King S Row`).
+  - Pick = `summary`-kierroksen `pickedBy` (päätetyt) tai `selectedMapTeam` (nykyinen); tuntematon → TBA.
+  - Pisteet päätetylle mapille: summaryn `team1Score`/`team2Score` (vaihdetaan jos sides_swapped), muuten `winner` → 1–0 / 0–1. Tasapelit eivät ole `previousMaps`issa.
+  - Hero-bannit vain nykyiselle, päättämättömälle mapille (`heroBans[].team` nimellä → `t1_ban`/`t2_ban`); vanhoja ei tyhjennetä.
+  - Lopuksi `_update()`.
+- Linkin URL tallentuu tilaan mutta **ei yhdistä uudelleen käynnistyksessä** – **[EHD-5]**.
+
+### 8.2 Turnauslinkki (`tournament_link.py`, 145 riviä + kuvaus `SOWBroadcast.py:462-715`)
+
+- URL: `/tournament/<id-tai-slug>` tai `?id=`. REST: `GET {origin}/api/tournament-system/{id}`, julkinen, headerit
+  `User-Agent: Mozilla/5.0 (compatible; SOWBroadcast)` (**pakollinen** – CDN palauttaa 403 oletus-UA:lle), `Accept: application/json`, timeout 10 s.
+  Vastauksen on oltava dict jossa `tournament` (tai "Turnausta ei löytynyt."). `tournament` ja `stages` voivat tulla JSON-merkkijonona.
+- Ensimmäisen haun jälkeen slug korvataan oikealla UUID:lla (`tournament-update` lähetetään vain UUID:lla). `data["_origin"]` lisätään logojen resoluutiota varten.
+- Live: Socket.IO samaan originiin, kuuntele `tournament-update` (arg = tournament id); jos täsmää → **koko REST-haku uudelleen** taustasäikeessä.
+  Ei pollausta. Virheessä yksi uudelleenyritys 4 s päästä. Tilat kuten draftissa; "Yhdistetty, haetaan dataa…" kunnes data saapuu, sitten "Linkitetty".
+- Vastauskentät: `tournament{id,name,format,best_of,stages}`, `teams[{id,name,logo_url}]`,
+  `matches[{id,stage_id,bracket,group_name,round,match_number,team1_id,team2_id,score1,score2,winner_team_id,status,scheduled_at}]`,
+  `standings` (vain ei-vaiheistetuissa), stage `{id,name,format,best_of}`.
+- **Logot**: `urljoin(origin, logo_url)` → **ladataan** `Scoreboard/TournamentLogos/<sha1(url)[:16]><ext|.png>` (SOWDraft lähettää
+  `Cross-Origin-Resource-Policy: same-origin`, joten hotlinkkaus OBS:ssä estyy). Välimuisti per sessio, virheet välimuistiin `None`. Lataa **taustasäikeessä**.
+- **Standings**: vain vaiheet joiden `format` ∈ `round_robin, swiss, league, group_stage`. `group_stage` → ryhmä per `group_name`
+  (matchit joissa `bracket=="group"`), key `"{stageId}_{gname}"`, nimi `"{stage} - Group {g}"`. Rivit lasketaan paikallisesti (5.3).
+  Ei-vaiheistettu → palvelimen `standings` (dict ryhmittäin tai lista; kentät `wins,losses,mapDiff,points,name,id`).
+  Tulos: `columns{"mode":"map_diff"}`, `rows` = ensimmäinen ryhmä, `display_group` = ensimmäisen ryhmän key.
+- **Bracket**: vaiheet `single_elimination, double_elimination, group_stage`. `bye`-matchit pudotetaan; säilytä vain `bracket` ∈
+  `main, winners, losers, grand_final, playoff`. Sivu: `winners→upper`, `losers→lower`, `grand_final→grand`, muu→`upper`.
+  Kierrosnimi etäisyydestä viimeiseen: `Final` / `Semifinals` / `Quarterfinals` / `Round N`, etuliite `Upper `/`Lower `; grand → `Grand Final`;
+  useampi vaihe → `"{Stage}: {nimi}"`. `bo_label = "BO{best_of}"`. Tiimilista max 16; `double_elim_view="upper"`; `stage=""`.
+- Linkin jälkeen Standings- ja Bracket-välilehdet lukitaan kunnes Unlink (data jää paikalleen).
+
+### 8.4 Linkityksen uusi malli: turnaus ensin (PÄÄTETTY 2026-10-15, korvaa 8.1:n ja 8.2:n käyttötavan)
+
+Lähtökohta: SOWDraft-koodin lukeminen (`sowdraft/`: `sockets/index.js`, `lib/gameState.js`, `routes/tournamentSystem.js`) osoitti, että turnauksen ottelu tuntee oman draft-huoneensa
+(`tournament_matches.draft_match_id`), ja draft-tilassa on kaikki tarvittava ilman nimivertailua. Nykyinen "liitä draft-huoneen stream-linkki" -tapa on varakeino, ei pääreitti.
+
+**Käyttäjän näkökulmasta**
+1. Käyttäjä liittää **vain turnauksen osoitteen** (`https://sowdraft.fi/tournament/<slug-tai-id>`) ja painaa **Link**. Kenttiä on yksi.
+2. Sovellus hakee turnauksen (REST) ja näyttää **Match**-valitsimen, jossa on ottelut listana ("Team A vs Team B – round / status"; käynnissä olevat draft-ottelut korostettuina ja listan kärjessä).
+   **Ottelun valitsee aina käyttäjä (KYS-13). Automaattista valintaa ei ole**: ei "follow live match" -tilaa, ei tuoreimman oletusvalintaa. Ennen valintaa mitään ei täytetä (tila `No match selected`).
+   Valinta tallennetaan ja palautuu käynnistyksessä (tämä ei ole automaattista valintaa – käyttäjä valitsi sen); kun ottelu päättyy, sovellus **ei** vaihda seuraavaan vaan ilmoittaa `Match complete` ja odottaa uutta valintaa.
+3. Valitun ottelun joukkueet **täytetään** Team 1/Team 2 -paneeleihin (nimi, lyhenne, logo, väri jos SOWDraftissa on, pelaajat) ja draft-huoneen tila täyttää mapit, pickit, bannit ja pisteet. Tieto **lähetetään overlayihin heti** (KYS-11a).
+4. **Sivut**: oletus SOWDraft team1 → Team 1 -paneeli. Käyttäjä voi vaihtaa "Swap sides" -kytkimellä; valinta tallennetaan tilaan (`link.sidesSwapped`), ei johdeta nimistä.
+5. **Käsin tehdyt muutokset**: linkitetty kenttä saa linkki-merkin. Käyttäjä voi muokata sitä; SOWDraftin arvo ylikirjoittaa käsin muokatun **vain jos SOWDraftin arvo itse muuttuu** (verrataan viimeksi vastaanotettuun arvoon). Näin SOWDraft ei taistele operaattorin korjauksia vastaan.
+6. **Käynnistys**: tallennettu linkki (turnaus-id, valittu ottelu, auto/manuaali, swap) yhdistyy uudelleen automaattisesti (EHD-5 ✔ hyväksytty).
+7. **Varakeino**: "Advanced → Link draft room manually" hyväksyy vanhan `…/stream?matchId=…` -linkin (sama käsittely, ilman turnaustietoa; joukkueet täytetään draft-tilan nimistä/logoista, sivut valitaan käsin).
+8. Tilarivi (EN): `Not linked` / `Connecting…` / `Linked – <tournament> – <Team 1> vs <Team 2>` / `No match selected` / `Waiting for draft to start…` (valittu ottelu ilman draft-huonetta) / `Match complete` / `Error: …` + "last update hh:mm:ss"; varoitus jos draft-huoneen joukkue ei vastaa valittua ottelua.
+
+**Tekninen toteutus (SOWBroadcast-puoli)**
+- Abstraktio `IDraftSource` kahdella toteutuksella: **`BroadcastApiSource`** (uusi, ks. 8.5) ja **`LegacySource`** (nykyiset julkiset rajapinnat). Jos `GET …/broadcast` palauttaa 404 → käytä LegacySourcea automaattisesti. Yhteinen sisäinen malli `LinkedState` (alla), josta tilaan kirjoitus on yksi funktio.
+- **Reitti 1 (uusi)**: REST `GET /api/tournament-system/:id/broadcast[?matchId=]` + Socket.IO `join-tournament` → `tournament-event` (liveMatch-payload mukana, ei lisähakua).
+- **Reitti 2 (legacy)**: REST `GET /api/tournament-system/:id` (julkinen) + Socket.IO `join-match {matchId, role:"stream"}` → `update-state` (draft-huone) + `tournament-update` (id-merkkijono, **tulee kaikista turnauksista** → suodata tunnuksella, myös slug→UUID).
+- **Eheyden varmistus** (SOWDraftin tapahtumat eivät kanna järjestysnumeroa legacy-reitillä): haku uudelleen (a) jokaisen Socket.IO-reconnectin jälkeen, (b) 30 s välein hiljaisesti, (c) kun `version` hyppää yli yhden (uusi reitti). Koko tila haetaan kerralla, joten toistot ovat idempotentteja.
+- **WAF/CDN**: sowdraft.fi:n edessä oleva suoja palautti 403 Python-urllibin User-Agentille. Käytä `User-Agent: SOWBroadcast/<versio> (+https://suomiow.fi)` ja pyydä SOWDraftin ylläpitoa sallimaan se (S5 alla). Älä imitoi selainta.
+- Tokenit: tiimitokeneita (`team1`/`team2`-roolit) **ei koskaan** käytetä, tallenneta eikä lokiteta. Vain `stream`-rooli.
+- Logot: kuten 8.2 (lataus taustasäikeessä `Scoreboard/TeamLogos/` – huom. uusi kansio joukkueiden logoille, `TournamentLogos` säilyy standings/bracketille); koko- ja tyyppitarkistus (PNG/JPEG/WebP/SVG, max ~2 Mt).
+
+**`LinkedState` → SOWBroadcast-tila (kuvaus)**
+
+| Lähde (SOWDraft) | Kohde (SOWBroadcast) | Sääntö |
+|---|---|---|
+| `teams[].name` | `team{n}.name` | suoraan |
+| `teams[].abbr` | `team{n}.abbr` | jos puuttuu (KYS-12 ✔): **ehdota automaattisesti** nimen 3 ensimmäistä kirjainta/numeroa isoina (vain kirjaimet/numerot, välit ohitetaan); merkitse "suggested" -merkillä ja anna muokata; SOWDraftin oma arvo voittaa heti kun se ilmestyy |
+| `teams[].color` | `team{n}.color_hex` | jos puuttuu: säilytä paneelin nykyinen väri |
+| `teams[].logoUrl` | `team{n}.logo_path` | lataa paikalliseksi (8.2) |
+| `teams[].players[]` | `team{n}.players[0..7]` | max 8 ensimmäistä SOWDraftin järjestyksessä; `name` = battletagin osa ennen `#` (max 12 merkkiä), muuten `name`, muuten Discord-nimi |
+| pelaajan `role` + `secondaryRoles` | `players[].role` | `Tank→Tank`; `Hitscan`, `Flex DPS→Damage`; `Main Support`, `Flex Support→Support`; jos pää+toissijaiset kattavat kaikki kolme kategoriaa (tank/dps/support) → `Flex` (sama sääntö kuin SOWDraftin `dsPlaysAllRoles`) |
+| `live.score.team1/team2` | `team{n}.score` | **automaattisesti** (EHD-4 ✔ tähän tapaukseen): ottelun kokonaispisteet |
+| `live.maps[i].map` | `maps[i].map` | etsi comboista täsmälleen, sitten välimerkit/kirjainkoko ohittaen (`King's Row`); löytymättömästä varoitus tilariville, ei hiljaista ohitusta |
+| `live.maps[i].pickedBy` (`team1`/`team2`/`null`) | `maps[i].pick` | slotti→T1/T2 (swap huomioiden); `null`/auto → `TBA` (`—`) |
+| `live.maps[i].bans[]` (`team`,`hero`) | `maps[i].t1_ban`/`t2_ban` | **jokaiselle mapille**, ei vain nykyiselle (vanha ei tehnyt näin) |
+| `live.maps[i].result` | `maps[i].t1/t2`, `completed` | `team1Score/team2Score` jos on (Control/Escort/Flashpoint/Hybrid); muuten `winner` → 1–0 / 0–1 (Push); `draw` → annetut pisteet (tai 0–0), `completed=true`; swap vaihtaa t1↔t2 |
+| `live.maps[i].status == "current"` | `completed=false`, `current_map` | viimeinen käynnissä oleva kortti |
+| `live.maps.length` | `general.maps_count` | **ei muuteta** automaattisesti (format-palkki on operaattorin); varoita jos `mapCount`-sarja ei mahdu |
+| `live.phase == "complete"` | tilarivi | näytä "Match complete" |
+
+Mapit täytetään korteille 1..N kronologisessa järjestyksessä (`order`). Tasapelit näkyvät omana korttinaan (vanhassa ne katosivat, koska SOWDraft ei kirjannut niitä `previousMaps`iin).
+
+**Standings ja bracket**: kuten 8.2 (turnauslinkin kuvaus), mutta jos `GET …/broadcast` palauttaa palvelinlaskemat `standings`/`stages`, käytä niitä, älä laske pisteitä paikallisesti uudelleen (poistaa "3 pistettä/voitto" -kovakoodauksen, sillä SOWDraftin stage-asetuksissa `pts_win/pts_draw/pts_loss/tiebreakers` ovat säädettävissä).
+
+**Testit (luku 13:een lisättävät)**: fikstuurit joukkueen nimen kirjoitusasun eroista, vaihdetuista sivuista, tasapelistä, kahdesta samasta mapista, Push-mapista (ei yksityiskohtaisia pisteitä), auto-pickistä (`pickedBy:null`), katkenneesta yhteydestä kesken drafin, kahdesta samanaikaisesta in_progress-ottelusta, slug→UUID-vaihdosta, tuntemattomasta mapista/herosta.
+
+### 8.5 Pyynnöt SOWDraft-puolelle (päätetty: kaikki neljä + yksi; toteutus erillisenä SOWDraft-työnä)
+
+SOWDraft on omistajan oma palvelu (`C:\Suomi OW koodiprojektit\sowdraft`, Node.js 20 + Express 4 + Socket.IO 4 + SQLite). Muutokset ovat **taaksepäin yhteensopivia**: nykyisiä päätepisteitä, tapahtumia ja kenttiä ei muuteta tai poisteta.
+
+**S1 – `GET /api/tournament-system/:id/broadcast[?matchId=<tournament_match_id>]`** (julkinen; `:id` = UUID tai slug, kuten muut reitit)
+Palauttaa yhden dokumentoidun, versioidun JSON:n. Palvelin tekee nimi→slotti-resoluution, joten asiakas ei vertaa nimiä.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "version": 1234,                    // kasvava laskuri per turnaus (muistissa riittää; nollautuu uudelleenkäynnistyksessä → asiakas hakee silloin koko tilan)
+  "updatedAt": 1760000000000,
+  "tournament": { "id", "slug", "name", "format", "status", "bestOf", "logoUrl" },
+  "stages": [ { "id", "name", "format", "bestOf", "ptsWin", "ptsDraw", "ptsLoss", "tiebreakers": [] } ],
+  "teams": [ { "id", "name", "abbr": null|"EE", "color": null|"#rrggbb", "logoUrl": null|"https://…" (absoluuttinen),
+               "players": [ { "name", "battletag", "role", "secondaryRoles": [], "country" } ] } ],   // ei discord_user_id, ei yhteystietoja
+  "matches": [ { "id", "stageId", "bracket", "groupName", "round", "matchNumber", "team1Id", "team2Id",
+                 "score1", "score2", "winnerTeamId", "status", "scheduledAt", "draftMatchId", "bestOf" } ],
+  "standings": { /* kuten nykyinen GET /api/tournament-system/:id */ },
+  "live": null | {                    // VAIN kun ?matchId= annettu ja ottelulla on draft_match_id; muuten null (ei automaattista "uusin in_progress" -valintaa, KYS-13)
+    "tournamentMatchId", "draftMatchId", "team1Id", "team2Id",
+    "phase": "ready-check|map|side-selection|hero-ban|result|complete",
+    "mapCount": 2,                    // voitettavien mappien määrä (first to)
+    "score": { "team1": 0, "team2": 0 },
+    "currentTurn": "team1|team2|null", "countdownEnd": null,
+    "maps": [ { "order": 1, "map": "Lijiang Tower", "gamemode": "control",
+                "pickedBy": "team1|team2|null", "auto": false,
+                "side": null | { "chosenBy": "team2", "side": "Attack|Defense" },
+                "bans": [ { "team": "team1", "hero": "Ana" } ],
+                "status": "current|decided",
+                "result": null | { "winner": "team1|team2|draw", "team1Score": 2, "team2Score": 1 } } ]
+  }
+}
+```
+Johto: `live.maps` rakennetaan draft-tilan `summary`-listasta (`type:"map"` -merkinnät kronologisesti, mukaan lukien tasapelit), bannit `entries[type:"ban"]`:sta + nykyisen kierroksen `heroBans`ista, tulokset `entries[type:"result"]`:sta (`winnerSlot`, `team1Score`, `team2Score`), sivut `sideSelections`:sta. Vastaus välimuistiin 1–2 s muistissa (julkinen, kuormitus). Ei salaisuuksia: ei `roleTokens`ia, ei yhteystietoja.
+
+**S2 – Turnaustapahtuma huoneeseen** (lisäys, ei korvaa)
+- Uusi socket-viesti `join-tournament {tournamentId}` (julkinen; slug→UUID) → `socket.join("tournament:" + uuid)`.
+- Uusi tapahtuma `tournament-event` huoneeseen: `{ tournamentId, version, updatedAt, changed: ["live"|"matches"|"teams"|"standings"], live? }` – `live` mukana kun `changed` sisältää `"live"` (≤ muutama kt), muuten asiakas hakee `/broadcast`in.
+- **Vanha `tournament-update` (merkkijono, `io.emit` kaikille) säilyy ennallaan** nettisivuja varten. Toteutus: yksi apufunktio `notifyTournament(id, changed)` joka emittoi molemmat; korvaa/täydentää ~40 `io.emit('tournament-update', …)` -kutsua ([gameState.js:93](../sowdraft/lib/gameState.js:93), `tournamentSystem.js` useita) – oletus `changed = ["matches","teams","standings"]`, `broadcastState` lisää `"live"`.
+
+**S3 – Joukkueen lyhenne ja väri**
+- `tournament_teams`: uudet sarakkeet `abbr TEXT`, `color TEXT` (migraatio `initDB.js`: `ALTER TABLE … ADD COLUMN` jos puuttuu).
+- Validointi: `abbr` 1–6 merkkiä (trimmattu), `color` `^#[0-9a-fA-F]{6}$` tai tyhjä. Lisää `PATCH /api/tournament-system/:id/teams/:teamId` sallittuihin kenttiin ([tournamentSystem.js:583](../sowdraft/routes/tournamentSystem.js:583)), admin-UI:hin (`tournament-admin.js`) ja valinnaisena ilmoittautumislomakkeelle/kapteenin muokkaukseen.
+- Julkinen joukkuedata palauttaa kentät (ei yksityisiin kuuluvia).
+
+**S4 – Tasapelin kirjaus**
+- `resolveAndApplyMapResult` ([gameState.js:334](../sowdraft/lib/gameState.js:334)) draw-haara: lisää `match.previousMaps.push({ map, winner: 'draw' })` ennen `selectedMap = null`.
+- **Ennen muutosta auditoi `previousMaps`in kuluttajat** (`public/match.js`, `public/stream.html`, `routes/matches.js` admin-muokkaus ~:231–257, `routes/stats.js`, `lib/discord.js`) – `winner: 'draw'` ei saa rikkoa voittolaskentaa tai tilastoja. Jos auditointi paljastaa riskin, jätä S4 pois: uusi `/broadcast` käyttää `summary`a eikä tarvitse `previousMaps`ia; kirjaa päätös tähän.
+
+**S4 – tulos (2026-10-15, SOWDraft-haara `claude/broadcast-api`, commit 4b22831):** auditoinnin perusteella **S4:ää ei sovellettu**. Admin-editori (`public/admin.js`, `PATCH /admin/matches/:matchId`)
+lukee `previousMaps`ia `summary`n kanssa indeksi-linjassa ja tulkitsisi `{winner:'draw'}`-rivin joukkue 1:n voitoksi ja laskisi sarjan uudelleen tallennuksessa. `/broadcast` ei tarvitse sitä, koska `live.maps` rakennetaan
+`summary`sta, jossa tasapelimappi on aina mukana. Päätös dokumentoitu SOWDraftin README:ssä.
+
+**S5 – tulos (testattu 2026-10-15):** sowdraft.fi on **Cloudflaren** takana. `curl` pyynnöllä `GET /api/public-tournaments`: User-Agent `Python-urllib/3.13` → **403**, mutta `SOWBroadcast/3.0 (+https://suomiow.fi)` ja `Mozilla/5.0 (compatible; SOWBroadcast)` → **200**. Eli pelkkä oma, ei-kirjastomainen UA riittää nykyisellään; erillinen sallintasääntö on **valinnainen varmistus** (Cloudflaren Browser Integrity Check voi tiukentua tai haastaa tietyistä IP-osoitteista). Käytä aina `SOWBroadcast/<versio>` -UA:ta, älä HttpClientin/kirjaston oletusta.
+
+**S5 – CDN/WAF-sallinta**: sallita `User-Agent: SOWBroadcast/*` (konfiguraatio sowdraft.fi:n edessä, ei koodimuutos).
+
+**SOWDraft-puolen testit**: tasapelin jälkeinen `/broadcast` (`maps` sisältää tasapelikortin), Push-mappi (ei pisteitä), auto-pick (`pickedBy:null`), kaksi samaa mappia, `join-tournament` slugilla, `tournament-event` vain oikeaan huoneeseen, vanha `tournament-update` toimii ennallaan nettisivuilla, `/broadcast` ei vuoda tokeneita/yhteystietoja, `version` kasvaa jokaisesta muutoksesta.
+
+### 8.6 OBS
+
+Scenekokoelma: 18 scenea (`In Game`, `InstantReplay`, `Bracket`, `Standings`, `MapDraft`, `Maps`, `Duo SingleCam`, `DuoCam Row`, `TrioCam Row`,
+`Team1`, `Team2`, `Starting Soon`, `Be Right Back`, `Thank You for Watching`, kaksi casteria + host NDI-kehykset, erotin).
+Jokaisessa scenessä värilähde + overlay + `transition.html` päällimmäisenä; OBS-siirtymä "BGG Wipe". 29 browser sourcea 1920×1080 (Team 2 Roster 1920×1089),
+3 `text_gdiplus` joka lukee `C:/SOWBroadcast/Scoreboard/General/{caster1,caster2,host}.txt`, 2 NDI-lähdettä, game capture, webcam, 2 VLC (Music), kuvamaski
+`HTML/assets/imagemask/scalecamera.png`. Laitekohtaiset arvot (NDI-koneen nimi, BRIO-polku) on kovakoodattu – uusi tuotanto: tuotettava generoitu/siivottu kokoelma. Kaksi tiedostoa
+eroavat vain MapDraft-lähteessä (`draft.html` vs `mapdraft.html` – jälkimmäinen toimii vain Windowsin kirjainkoko-välinpitämättömyydellä).
+
+---
+
+## 9. Overlayt (HTML) – mitä ne tekevät
+
+Kaikki 1920×1080, läpinäkyvä tausta (paitsi MapDraft: musta), lukevat `ROOT=".."`-suhteellisesti. **Yhteinen "stinger"-koukku**:
+`?stinger=` tai `?delay=` (ms, oletus 1800) viivästää `body.visible`-luokkaa; `visibilitychange` vaihtaa `visible`/`leaving` (OBS "shutdown when not visible"
+käynnistää sisääntuloanimaation uudelleen). Päivitys: SSE-vihje → `fetch`.
+
+| Tiedosto | Scene | Lukee | Päivitys | Huomio |
+|---|---|---|---|---|
+| `scoreboard.html` | In Game | `Match/T{n}Name\|Score\|Color\|Logo`, `Map1..N.txt`, `CurrentMap`, `status.txt`, `General/first_to`, `Maps/index.json`, `Gametypes/index.json` | SSE | uusi tumma/kulta-ulkoasu; **ei** lue `colors.txt`:ää; "First to N" = `ceil(maps_count/2)`; ban-portretti `Heroes/<slug>.png`; kuolleet koukut `overlay.scoreboard.show/hide` |
+| `MapDraft.html` ✔ **säilyy (KYS-10)** | MapDraft (uusi scene osoittaa tähän; kirjainkoko täsmälleen `MapDraft.html`) | `match.json`, `T*`, `colors.txt`, `HeroesBody`, `Maps/<slug>.png` | pollaus 1 s (signatuuri) | nykyisen mapin paljastus + bannattu hero; ei animaatioita |
+| `MapDraft_v2.html` | ei käytössä | kuten yllä + `Maps/<slug>.mp4` jos on | pollaus | testifork: video taustana; mp4:ää ei ole |
+| ~~`draft.html`~~ | (vanha `SOWBROADCAST.json`) | `maps.txt`, `match.json`, `Map<N>.txt`, `T*` | pollaus 1 s | **EI TUODA uuteen versioon (KYS-10)** – ei käytössä; vain historiaa: sarake per pelitila, lukee olematonta `state.current`, voittajat avaimella mapin nimi |
+| `maps.html` | Maps | `Map1..N`, `CurrentMap`, indexit, `OverlayLogo`, `T*Logo` | pollaus 1 s | voittaja päätellään pisteistä; "NEXT MAP" -tabi |
+| `team1.html`, `team2.html` | Team1/Team2 | `T{n}P{1..8}*`, `T{n}Name\|Color\|Logo`, `colors.txt`, `HeroesBody`, `Roles` | SSE | identtiset kuuden rivin eroin → yksi parametrisoitu sivu |
+| `duorow.html`, `triorow.html`, `singlecam.html` | kamerarivit | `T*`, `caster1\|2`, `host`, `status`, `colors` | SSE | 6 px `--tertiary`-kehykset; `Nimi @handle` jäsennetään; singlecamin `upFooter` kuollutta koodia |
+| `bracket.html` | Bracket | `Bracket/bracket.json`, `colors.txt` | SSE | CSS-grid, elbow-liittimet DOM:sta, automaattinen skaalaus 0,65–1,4, flash muuttuneille; värit käänteisesti (primary=kortti, secondary=teksti) |
+| `standings.html` | Standings | `Standings/standings.json`, `colors.txt` | SSE | skaalaa viewportiin; sarakkeet vaihtuvat `played`-kentän mukaan; vyöhykevärit qualified/eliminated |
+| `replay.html` | InstantReplay | `Replay/replaypath.txt` → `Replay/Playlist/<tiedosto>`, logo | pollaus 1 s (SSE-`replay` ohitetaan) | kaksoispuskuri toimii huonosti; video `loop` |
+| `startingsoon.html`, `berightback.html`, `thankyouforwatching.html` | odotusscenet | `Waiting/*`, `matchtext`, `socials.json`, `OverlayLogo`, `Icons/*.svg`, `colors` | SSE + 1 s `upTimer` | ~95 % identtiset → yksi mallipohja; Rajdhani Google Fontsista (vaatii netin) |
+| `transition.html` | stinger | `colors.txt` (septenary/octonary), `TransitionLogo.png` | vain lataus | kaksi vinoa wipe-kerrosta + logo; ajoitus viritetty 1800 ms oletukselle |
+
+**Yhteiset JS-apurit** (kopioitu ~15 tiedostoon): `read/readJSON/ok`, `applyColors` (regex `^\s*([^=#]+)\s*=\s*(.+?)\s*$`), `slug/nameToSlug`, `hex/hexToRgb`,
+`fitTeamName/fitCaptionText/fitBigText` (odottavat `document.fonts.load`), `startSSE`, signatuuri → renderöi vain muutoksesta.
+CSS-muuttujat: `--primary #0f1114`, `--secondary #fff`, `--tertiary #3a3a90`, `--quaternary #006ea1`, `--t1`/`--t2` (oletus `#27AAE1`/`#C80013` – **eri** kuin sovelluksen oletukset).
+
+**Linjaus (päätetty: KYS-4 ja KYS-6)**:
+- **Ulkoasua ei päivitetä.** Overlayjen värit, fontit (Rajdhani), asettelut ja animaatiot pysyvät ennallaan, myös `scoreboard.html`:n kulta/tumma-ilme.
+  Ne eivät ole brändiohjeistuksen alaisia. Älä "korjaa" niitä brändin mukaisiksi.
+- **Datankäsittely siirretään uuteen kontraktiin.** Koska siirrytään uuteen tilarajapintaan (EHD-2) ja scenet päivitetään samalla, overlayjen datankäsittely
+  (kopioidut `read/ok/readJSON`-apurit, SSE-avainsanasto, pollaus) korvataan yhdellä jaetulla moduulilla joka hakee `GET /api/state` ja kuuntelee uutta SSE:tä.
+  Tämä on **sallittu ja odotettu** refaktorointi (EHD-11, rajattuna: ei ulkoasumuutoksia). Samalla yhdistettävät kaksoiskappaleet: waiting ×3 → 1,
+  team1/2 → 1. **Draft-overlay (KYS-10, päätetty): vain `MapDraft.html` säilyy.** `draft.html` on eri tiedosto eikä ole enää käytössä → **ei tuoda uuteen versioon**
+  (ei migraatiota, ei OBS-scenessä; poista myös sen yksinomaan käyttämä `Match/maps.txt` tiedostokontraktista). `MapDraft_v2.html` on käyttämätön testifork: sitä ei tuoda sellaisenaan, mutta sen **video-taustatuki yhdistetään valinnaisena ominaisuutena `MapDraft.html`:ään** (KYS-14, luku 15).
+- Fontit paikallisina (waiting-overlayt hakevat nyt Rajdhanin Google Fontsista → ei toimi ilman nettiä).
+- Visuaalinen regressiotesti: ennen/jälkeen-kuvakaappaus jokaisesta overlaysta (1920×1080) samalla tilalla; ero sallittu vain jos animaatiotiming-poikkeama.
+- Kontrolliohjelma riippuu overlayjen sisäisestä toteutuksesta vain `/api/state`-skeeman ja SSE:n kautta (luku 7).
+
+---
+
+## 10. Taustaprosessit
+
+- **Replay-vahtija** (`_replay_watcher`, :4220): säie, pollaa 0,5 s `Scoreboard/Replay/Replay Replay.mp4` (OBS:n replay buffer tallentaa tähän –
+  OBS-konfiguraatio, ei repossa). Vakaa kun `(mtime,size)` sama 3 kertaa ja eri kuin viimeksi kopioitu → kopioi `Replay/Playlist/{n}-Replay-Replay.mp4`
+  (n = suurin numeroetuliite + 1), kirjoita `replaypath.txt` (vain tiedostonimi), notify `["replay"]`. Käynnistyksessä olemassa oleva tiedosto kopioituu uudelleen
+  (bugi – kopioi vain jos uusi). Playlistia ei koskaan siivota.
+- **Waiting-videoiden synkka** (`_export_waiting`, :3629): ks. luku 6.
+- **Timer**: luku 4.4.
+- **Autosave**: joka Update + sulkeminen (`closeEvent` katkaisee linkit ja tallentaa).
+
+---
+
+## 11. Ulkoasu – Suomi OW ry:n graafinen ohjeistus
+
+Lähde: `suomiow nettisivut/docs/brand/graafinen-ohjeistus.pdf` (25 sivua, v1.0, lokakuu 2026). **Sovellus on sisäinen työkalu**, joten
+ohjeistusta sovelletaan sen hengessä; kohdat joissa tulkinta on omani on merkitty **(tulkinta)**.
+
+### 11.1 Väripaletti (s. 10, 23)
+
+| Token | Hex | Nimi | Rooli |
+|---|---|---|---|
+| `--sow-night` | `#001445` | Yönsininen | tumma pohja (pääväri, tumma) |
+| `--sow-lion` | `#134380` | Leijonansininen | pääväri; rakenne, valinnat, ensisijainen täyttö |
+| `--sow-crown` | `#1E8AB9` | Kruununsininen | tukiväri; hover, gradientin yläpää |
+| `--sow-shadow` | `#0F356B` | Varjonsininen | tukiväri; kortit/paneelit, gradientin alapää |
+| `--sow-blade` | `#23C5D7` | Teräsyaani | **korostus, säästeliäästi** |
+| `--sow-frost` | `#A9B8CC` | Huurre | toissijainen teksti tummalla |
+| `--sow-ice` | `#F2F6FA` | Jäänvalkoinen | vaalea pohja |
+| – | `#FFFFFF` | Valkoinen | ensisijainen teksti tummalla |
+| – | `#5A6B82` | Harmaansininen | toissijainen teksti vaalealla |
+| Liukuväri | `#1E8AB9 → #0F356B` | | **aina ylhäältä alas**, ei vaakaan/säteittäin/käänteisenä |
+
+**Käyttösuhteet (s. 11)**: 55 % pohja (valkoinen/jäänvalkoinen/yönsininen) · 25 % Leijonansininen · 15 % tukivärit · **5 % Teräsyaani**:
+vain viivat, LIVE-merkki, tärkein numero tai linkki. "Se erottuu, koska sitä on vähän." Teräsyaani ei koskaan pohjaväriksi.
+Tarkistuslistan kohta: *"Vain paletin värit"*, *"Teräsyaania alle 5 %"*, *"Enintään kaksi elementtiä"* (s. 25).
+
+**Kontrastit** (WCAG AA; laskettu uudelleen, täsmää ohjeistuksen s. 12 lukuihin):
+
+| teksti → tausta | suhde | käyttö |
+|---|---|---|
+| valkoinen / yönsininen | 17,7:1 | kaikki tekstit |
+| valkoinen / varjonsininen | 12,1:1 | tekstit korteilla |
+| valkoinen / leijonansininen | 9,8:1 | napit |
+| huurre / yönsininen | 8,8:1 | toissijainen |
+| huurre / varjonsininen | 6,0:1 | toissijainen korteilla |
+| teräsyaani / yönsininen | 8,5:1 | linkit, aksentit |
+| teräsyaani / varjonsininen | 5,8:1 | linkit korteilla |
+| yönsininen / teräsyaani | 8,5:1 | **painiketeksti teräsyaanilla** |
+| harmaansininen / valkoinen | 5,4:1 | toissijainen vaalealla |
+| valkoinen / kruununsininen | **3,9:1** | **vain iso teksti (24 px+)** |
+| teräsyaani / valkoinen | **2,1:1** | **kielletty tekstinä** |
+| leijonansininen / yönsininen | **1,8:1** | **kielletty** (ei tekstiä leijonansinisellä tummalla pohjalla) |
+
+Ohjeistuksen oma tumman teeman resepti (s. 13): **pohja `#001445` · kortit `#0F356B` · teksti `#FFFFFF` · toissijainen `#A9B8CC` · painike ja linkki `#23C5D7`**.
+
+### 11.2 Typografia (s. 14–15)
+
+| Rooli | Fontti | Painot | Huom |
+|---|---|---|---|
+| Otsikot | **Saira Semi Condensed** | Bold 700 / ExtraBold 800 | H1 versaalein, yksi per julkaisu |
+| Leipäteksti | **Inter** | Regular 400 / SemiBold 600 | tekstin tasaus vasemmalle, riviväli 1,5 |
+| Tulokset ja nostot | **Russo One** | vain yksi paino | **max 4 sanaa**, esim. `LIVE`, `FINAALI`, `3–1` |
+| Varafontit | Arial Narrow Bold / Arial | | jos fontteja ei ole; "ei muita fontteja" |
+
+Ohjeistuksen kokoasteikko (verkko / some / A3): H1 Saira 800 = 48 / 110 / 100 pt · H2 Saira 700 = 32 / 64 / 48 · H3 Saira 700 = 24 / 44 / 32 ·
+pikkuotsikko 15 / 28 / 18 · leipä Inter 400 = 17 / 32 / 13 · kuvateksti 14 / 24 / 9 · nosto Russo One = 64 / 120 / 120.
+**Sovellusasteikko (tulkinta, tiheä työkalu-UI)**: sivuotsikko Saira 800 versaalein 24–28 px · osio-otsikko Saira 700 versaalein 15–16 px ·
+leipä Inter 400 13–14 px · kenttälabel Inter 600 12–13 px · numerot/ajastin Russo One 36–64 px.
+**Fonttitiedostot**: repossa on nyt vain *latin*-osajoukko WOFF2:sta muunnettuna (`HTML/fonts/{Saira,Inter,RussoOne}/*.ttf`). Uuteen projektiin
+hae **täydet** TTF:t (Google Fonts, OFL) – ä/ö/å tarvitaan, ja `latin-ext` kattaa erikoisnimet (Torbjörn, Lúcio, Esperança). Lisenssit mukaan.
+
+### 11.3 Logo ja ikoni (s. 3–9)
+
+Viisi versiota: **Päälogo** (oletus), **Pitkä nimi** (SM-kisat, kumppanit, media), **CUPS** (vain kuukausiturnaukset), **Tunnus** (pienet tilat, striimin kulma, sovellusikoni), **Maskotti** (vain vaalealla).
+Lähdetiedostot: `suomiow nettisivut/src/assets/brand/suomiow_{paalogo,pitka-nimi,cups,tunnus,maskotti}.png` (3875×3875 RGBA) + `suomiow_profiili_*.png`.
+Säännöt: logo on **aina sininen** (ei tapahtuma-/kumppaniväriä), aina suorassa, ei venytystä (Shift pohjassa), ei varjoa/hehkua/3D:tä/lisäreunuksia,
+ei himmennystä (100 % peittävyys), vain PNG (ei JPG – ei valkoista laatikkoa). **Suoja-alue X = 10 % logon näkyvästä leveydestä**
+(ympyräversiot 5 % halkaisijasta; PNG:ssä on jo 6–10 % läpinäkyvää reunaa). **Minimikoot** (100 % näkymä): päälogo 120 px, pitkä nimi 180 px, CUPS 120 px,
+tunnus 32 px, maskotti 160 px. Ei tilaa → vaihda **tunnukseen**, älä pienennä päälogoa. Oikeat taustat: valkoinen, jäänvalkoinen, yönsininen, liukuväri.
+Väärät: teräsyaani, kirkkaat värit, kirjava kuva, maskotti sinisellä.
+**Sovelluksessa**: ikkuna-/tehtäväpalkki-ikoni = **Tunnus** (ikoni 32 ja 180 px; tee ICO usealla koolla – 16 px sivustoikoni puuttuu ohjeistuksen s. 26 mukaan, tilattava logon tekijältä);
+yläpalkki/About/splash = Päälogo yönsinisellä pohjalla; pieni tila → Tunnus.
+
+### 11.4 Elementit (s. 16–17)
+
+- **Teräviiva** (hammastettu viiva): korkeus 8–26 px 1080 px leveässä kuvassa, hampaan leveys = 2 × viivan korkeus; otsikon alla/erottimena;
+  ei valkoisella pohjalla, ei kehyksenä. → Sovelluksessa: ohut erotinviiva sivun otsikon alla, **säästeliäästi** (se on Teräsyaanin 5 % -budjettia).
+- **Liukuväripinta**: aina ylhäältä alas `#1E8AB9→#0F356B`; isot otsikkopalkit, splash, About; iso teksti ylös, pieni alas.
+- **Tarrareuna** (valkoinen 1 % + yönsininen 1,3 %) ja **harjareuna** (4–7 piikkiä, syvyys 10–20 %) ovat markkinointigrafiikkaa (julisteet, nimilaput).
+  Työkalu-UI:ssa ei käytetä; mahdollisesti splash/About, **enintään yksi** per näkymä. **(tulkinta)**
+
+### 11.5 Design-tokenit sovellukselle **(tulkinta ohjeistuksesta)**
+
+| Käyttö | Arvo |
+|---|---|
+| Ikkunan tausta | `#001445` |
+| Kortti / ryhmälaatikko / paneeli / syötekenttä | `#0F356B` |
+| Teksti | `#FFFFFF`; toissijainen `#A9B8CC` |
+| Reunaviiva | `#A9B8CC` ~22–35 % alfa (sama väri, ei uutta) |
+| Ensisijainen toiminto (yksi per näkymä, esim. *Update*) | täyttö `#23C5D7`, teksti `#001445` (8,5:1) |
+| Toissijainen painike | täyttö `#134380`, teksti `#FFFFFF` (9,8:1), hover `#1E8AB9` + **lihavoitu/iso** teksti tai kirkastettu `#134380` (valk./`#1E8AB9` on vain 3,9:1) |
+| Fokus | **2 px `#23C5D7`** (ohjeistus s. 23: "Kohdistus: 2 px Teräsyaani") |
+| Valittu välilehti / otsikkoliuska | `#134380` |
+| Disabled | teksti `#A9B8CC` ~45 % alfa, tausta `#0F356B` |
+| Ajastin / tärkein numero | Russo One, teräsyaani-täyttö + yönsininen teksti (ainoa isompi teräsyaani-pinta) |
+| Tooltip | tausta `#0F356B`, 1 px reuna `#23C5D7` |
+| Kulmapyöristys | 4–6 px (ohjeistus ei määrää) |
+| Skrollipalkki | raide `#001445`, kahva `#A9B8CC` ~35 %, hover `#1E8AB9` |
+
+**Toiminnalliset poikkeukset (HYVÄKSYTTY, KYS-3)**: ohjeistuksessa ei ole onnistumis-/virheväriä. Kolme operaattorille kriittistä tilaa
+tarvitsevat universaalin värin: **Start = vihreä, Pause = tumma liuskekivi, Reset = neutraali harmaa** (vanhan sovelluksen ratkaisu),
+sekä virheilmoitus (punainen). Standings-overlayn qualified/eliminated-värit (vihreä/punainen) ovat vastaava poikkeus.
+
+### 11.6 Opit PyQt-version teemoituksesta (älä toista)
+
+Vanhaan sovellukseen tehtiin keskeneräinen (committaamaton, `git status`) teema globaalilla QSS:llä. Havainnot, jotka koskevat mitä tahansa toolkitia:
+1. Hajanaiset paikalliset tyylit (18 `setStyleSheet`-kutsua kovakoodatuilla heksoilla) → epäyhtenäinen ulkoasu. Käytä **yhtä token-taulukkoa** ja tyylitä komponenttitasolla.
+2. Pitkät välilehdet **tarvitsevat vierityskehyksen** – ilman sitä rivit puristuvat ja napit menevät päällekkäin (General/Waiting).
+3. Paikallisen tyylin asettaminen *esi-isä*-widgetille rikkoi lapsinappien perityn tyylin (napit muuttuivat läpinäkyviksi). Vältä "tyylin overridea" vanhemmilla; käytä scope-rajattuja resursseja/teemaa (juuri syy suositella XAML/QML-mallia).
+4. Vierityskehyksen viewport maalaa oletuspohjavärin (valkoinen raidan sliveri) – aseta pohja eksplisiittisesti.
+5. Haettava combo ja natiivit tiedosto-/värivalintadialogit eivät perineet teemaa (Windows-OS-dialogit) – hyväksyttävä rajoitus, mutta oma värivalitsin (palettiin sidottu + vapaa heksa) olisi parempi **[EHD-12]**.
+
+---
+
+## 12. Vanhan sovelluksen virheet ja oudot – **älä kopioi**
+
+1. Kaksi palvelinta samaan porttiin (SOWServer.exe + säie GUI:ssa); SSE-hub moduulikohtainen → epädeterministinen. Jos portti varattu, GUI kaatuu käynnistyksessä (ei try/exceptiä).
+2. SSE toimittaa vain **viimeisen** payloadin (ei jonoa) → nopeat päivitykset hukkaavat avaimia; uusi asiakas saa heti vanhan viestin. `Content-Length`-int-parsinta ilman suojaa, rungolla ei kokorajaa.
+3. Koko juurikansio tarjolla (myös `autosave.json` henkilötietoineen); `POST /notify` ilman autentikointia (mikä tahansa selainsivu voi lähettää).
+4. `first_to.txt` sisältää `maps_count`in; `general.first_to` laahaa yhden `collect`in jäljessä; `first_to`/`maps_count`/`format_type` menevät sekaisin; `current_map` johdettu, `winner` johdettu vain pisteistä.
+5. Match-välilehden muutokset eivät ole liveinä; **Reset, Swap Teams, Team import, File→Load** vain autosaavat eivätkä päivitä overlayita.
+   **Päätös (KYS-9, vahvistettu): vain ja ainoastaan Update päivittää overlayn.** Reset, Swap Teams, Team import ja File→Load eivät lähetä – tämä on tarkoituksellinen
+   ominaisuus, ei bugi. Se *koskee myös* Bracketin ja Standingsin jokaista näppäilyä/muutosta, jotka vanhassa laukaisevat koko Updaten (bugi #6): uudessa ne eivät lähetä mitään
+   ennen Update-painiketta. Avoimet poikkeukset (linkit, ajastin, replay) luvussa 15.
+6. Bracketin jokainen näppäily (Title/Stage/tiimin nimi) laukaisee koko Updaten (kaikki viennit + autosave).
+7. `refresh_heroes` laukaisee hero-changed ja **ylikirjoittaa käsin valitun roolin** oletuksella.
+8. `_apply_state` käynnistää signaaleja kesken latauksen → `_update_waiting_only` autosaa puolivalmiin tilan; tuntemattomat avaimet (`Team(**d)`, `WaitingSettings(**d)`) kaatavat latauksen → tallennukset versioherkkiä.
+9. `_update_general_only`/`_update_waiting_only` korvaavat `lastState`n kehyksellä → seuraava täysi Update raportoi vääriä muutoksia.
+10. Asset-muutosten diff ei havaitse roolin/body-kuvan/kuvan korvaamisen muutosta (vain nimi/image_path/mode); vienti vasta seuraavalla Updatella (paitsi Delete).
+11. Vanhentuneet tuotokset: `T1Logo.png`/`T2Logo.png`/General-logot jäävät kun logo tyhjennetään.
+12. Turnauslogojen lataus synkronisesti UI-säikeessä (jäädyttää), ei kokorajaa/sisältötarkistusta, välimuistia ei siivota; yksi uudelleenyritys 4 s; koko turnaus haetaan joka `tournament-update`ssa.
+13. Draft-linkki: puolet vain nimivertailulla – ei täsmää → hiljainen ohitus; `disconnect` vs. auto-reconnect -kilpa; linkki ei yhdistä uudelleen käynnistyksessä.
+14. Replay-vahtija kopioi olemassa olevan tiedoston joka käynnistyksessä; playlist ei siivoudu.
+15. Kovakoodatut Windows-polut: `C:\Suomi OW koodiprojektit\...` (DEV_ASSET_DIRS, :189), `C:\SOWBroadcast` (scene-JSONit, asennin), `Replay\\Playlist` kirjaimellinen backslash, tallennettu absoluuttisia `C:\...` logo/source-polkuja JSONissa; `taskkill /IM SOWServer.exe` tappaa kaikki samannimiset.
+16. `slugify` palauttaa `"item"` ei-latinalaisille nimille; kaksoistiedostot (`antartic-peninsula.png`, `lucio.png`/`l-cio.png`…); `Heroes/d-va.png` puuttuu vaikka indexissä; hero-kuvat Title_Case vs. slug -epäyhtenäisyys.
+17. Ajastin 1 s `QTimer` ilman ajautumiskorjausta; "adjust" pysäytettynä muuttaa presetin; lopputeksti oletuksessa ilman `!`, resetissä `!`:llä; "Reset this tab" ei tyhjennä sosiaalisia.
+18. Kuollut koodi/kentät: `Team.banned_hero`, `GeneralSettings.format_type/division`, `map_pool`, `Scoreboard/Roles` (itse asiassa käytössä overlayissa), `_export_scoreboard`, `seriestext.txt`, `__last_gui_touch.txt`, `videos_dir.txt`, `T*Abbr/Players.txt`, `quinary/senary`.
+19. Suomi/englanti sekaisin UI:ssa ja virheviesteissä; ei lokitusta (`print` + lokit mykistetty), ei testejä, ei CI:tä, ei konfiguraatiotiedostoa.
+20. Asennin: versio vain `setup.iss`:ssä (2.3.0), ei näy sovelluksessa; `install.iss` vanhentunut (2.1, eri AppId, kovakoodatut polut); 266 Mt (kuvat+musiikki; musiikin lisenssi epäselvä); `PrivilegesRequired=lowest` + `C:\SOWBroadcast` voi epäonnistua.
+22. **Draft-linkki katoaa tasapelin kohdalla**: SOWDraft ei kirjaa tasapeliä `previousMaps`iin (`gameState.js:358`), ja vanha koodi rakentaa mapit `previousMaps`ista + `selectedMap`ista → tasapelimappi ja sen bannit puuttuvat. Uusi rakentaa `summary`sta (luku 8.4).
+23. Draft-linkki tuo bannit vain nykyiselle mapille eikä tyhjennä vanhoja; puolet päätellään nimestä (8.4: slotit ID/swap-kytkimellä).
+21. `D.Va` / `Soldier: 76` -tiedostonimet vaativat ylikirjoitustaulun; `Torbjörn.png`-tiedostonimi sisältää ei-ASCII:ta.
+
+---
+
+## 13. Rakennusvaiheet ja hyväksyntätestit
+
+### Vaiheet
+
+| Vaihe | Sisältö | Valmis kun |
+|---|---|---|
+| M0 | Projektirunko, token-teema (luku 11.5), ikkuna, valikot, fontit, ikoni, `schemaVersion`-tila + autosave/load (atomiset) | tyhjä ikkuna näyttää brändin mukaiselta; vanhat `autosave.json` latautuvat |
+| M1 | Palvelin + SSE + notify-jono; Exporter; golden-testit | vanhat overlayt toimivat uudella palvelimella ilman muutoksia |
+| M2 | Assetit: index.json-lataus, haettava combo, AssetManager, BulkImport | kaikki 54 heroa/31 mappia/5 pelitilaa listautuvat, haku toimii |
+| M3 | MATCH-välilehti kokonaan (TeamPanel, MapCard, Swap/Reset/Update, team import/export) | luvun 4.2 käyttäytyminen + `Scoreboard/Match/**` vastaa oraakkelia |
+| M4 | GENERAL + WAITING (timer, socials, playlist-synkka) | exportit vastaavat, ajastin overlayssa oikein |
+| M5 | STANDINGS + BRACKET (templatet, tiimilista, lukitus) | `standings.json`/`bracket.json` vastaavat |
+| M6 | SOWDraft-linkitys luvun **8.4** mukaan (`IDraftSource`: `BroadcastApiSource` + `LegacySource`), turnaus ensin, Match-valitsin, swap-kytkin, ristiriitasääntö | mock-palvelimella ja oikealla `esm26`-turnauksella; toimii sekä uudella `/broadcast`-rajapinnalla että vanhalla SOWDraftilla |
+| M6b | **SOWDraft-muutokset S1–S5** (luku 8.5; erillinen työ `sowdraft`-repossa, tehtävä ennen kuin `BroadcastApiSource` voidaan testata livenä) | SOWDraft-puolen testit vihreinä; vanhat nettisivut toimivat ennallaan |
+| M7 | Replay-vahtija, asennin (per-käyttäjä), versionäyttö, lokitus | puhdas asennus Windows 11:lle toimii OBS:n kanssa |
+| M8 | **Siirtymä uuteen kontraktiin (KYS-6)**: overlayjen datakerros → `/api/state`+SSE (ulkoasu ennallaan, visuaalinen regressiotesti), uudet/siivotut OBS-scenet, vanhan tiedostokontraktin poisto | overlayt näyttävät ennallaan uudella sovelluksella; julkaistaan yhtenä pakettina |
+| M9 | Muut hyväksytyt **[EHD]**-parannukset omistajan järjestyksessä | erikseen sovittu |
+
+### Hyväksyntätestit (golden)
+
+1. **Export-pariteetti**: syötä vanhaan ja uuteen sama synteettinen tila (kaksi joukkuetta, 8 pelaajaa, 7 mappia vaihtelevilla tiloilla,
+   3 ryhmän standings, 8-tiimin double-elim bracket, odotusruudun tekstit/socials). Vertaa `Scoreboard/**` tiedosto tiedostolta (ero sallittu vain `updated_at.txt`).
+2. **Diff-avaimet**: tee sarja muutoksia (pistemuutos, pick, ban, väri, logo, roolimuutos…) ja vertaa `changed`-listoja.
+3. **SSE**: 100 nopeaa notifyä → asiakas saa kaikki avaimet (uusi) / vähintään viimeisen (vanha); keepalive 15 s; reconnect Last-Event-ID:llä.
+4. **Slug/heroBodyFile**: taulukkotesti (`Lúcio, D.Va, Soldier: 76, Torbjörn, Wrecking Ball, Junker Queen, Jetpack Cat, King's Row`).
+5. **Socials-normalisointi**: `https://www.twitch.tv/SuomiOW?x=1`, `@handle`, `//a/b`, `discord.gg/abc`.
+6. **Timer**: adjust/start/pause/reset/tick-sekvenssit (luku 4.4).
+7. **Standings-lajittelu** ja turnauslinkin kuvaus: kiinteä JSON-fikstuuri → odotettu `standings.json`/`bracket.json`.
+8. **Draft-kuvaus**: fikstuurit (suora/vaihdettu puoli, nimi ei täsmää, tasapeli, kaksi samaa mappia).
+9. **Lataus**: vanha `autosave.json` + tuntemattomia avaimia ei kaada; `autosave.json` kirjoitus ei jää rikki kesken (kill -9 -testi).
+10. **UI**: pienin ikkuna 1200×750 – mikään välilehti ei leikkaudu; fokus-rengas 2 px `#23C5D7`; tab-navigointi; kontrastit luvun 11.1 mukaan.
+
+---
+
+## 14. Ehdotetut parannukset ja uudet ominaisuudet (odottavat omistajan hyväksyntää)
+
+Prioriteetti: **A** = korjaa todellisen ongelman, **B** = selvä hyöty, **C** = mukava lisä.
+
+### Päätöstila (omistaja, 2026-10-15)
+
+| Tila | EHD |
+|---|---|
+| ✔ **Hyväksytty** | **1** (yksi prosessi/palvelin, token), **2** (uusi tilarajapinta), **4** (automaatiot), **5** (linkit yhdistyvät uudelleen), **6** (OBS WebSocket), **7** (pikanäppäimet + paikallinen ohjaus), **8** (joukkuekirjasto), **9** (ajastin `endsAt`), **11** (overlayjen datakerros + duplikaatit; ei ulkoasumuutoksia), **12** (oma värivalitsin), **13** (overlay-esikatselu), **14** (UI englanniksi), **15** (perusinfra + päivitystarkistus), **16** (asennin), **17** (undo/redo), **18** (otteluprofiilit) |
+| ✘ **Hylätty** | **19** (saavutettavuuspaketti: ei erillistä työtä; brändin 2 px fokus-rengas ja perus-näppäimistökäyttö kuuluvat silti tavalliseen laatuun) |
+| ◐ **Ehdollinen** | **20** (monialustaisuus: vain jos ei vaadi merkittävästi resursseja → *best effort*: Avalonia/.NET-koodi pidetään siirrettävänä missä se on ilmaista (`Path.Combine`, ei turhia Win32-kutsuja), mutta **vain Windows on tuettu ja testattu**; ei macOS/Linux-buildeja, -asentimia eikä -testejä) |
+| ✔ **Hyväksytty (rajattuna)** | **3** (vain "unsent changes" -merkki, ei Auto-updatea; KYS-9:n mukainen), **10** (asset-manifesti: yksi tiedosto jossa jokaisen sankarin/mapin/pelitilan nimi, slug, rooli/pelitila, kuvatiedostot ja aliakset; poistaa kovakoodatut `HERO_ROLES`, `_HERO_BODY_OVERRIDES` ja nimi-fuzzy-matchit; valinnainen päivitys GitHub Releasesista) |
+
+**Kaikki EHD-ehdotukset on nyt ratkaistu.** Toteutusjärjestys M-vaiheissa (luku 13); M9 kattaa hyväksytyt parannukset omistajan priorisoimassa järjestyksessä.
+
+| # | Ehdotus | Pri | Miksi |
+|---|---|---|---|
+| **EHD-1** ✔ | **Yksi prosessi, yksi sisäänrakennettu palvelin**; konfiguroitava portti + varaportti; vain localhost; `/notify` tokenilla; staattiset vain sallituista kansioista | A | luku 12 #1–3. Poistaa `SOWServer.exe`, `launch.bat`-koreografian ja `taskkill`-kikat |
+| **EHD-2** ✔ | **Yksi tilarajapinta** (**HYVÄKSYTTY, KYS-6**): `GET /api/state` (versioitu) + SSE joka kantaa **tilapäivityksen** (versio + muutosavaimet) ja tukee `Last-Event-ID`; litteät txt-tiedostot jäävät vain OBS-tekstilähteille (caster/host) ja taaksepäin | A/B | nyt sama tila vientinä 4 muodossa; pollaavat overlayt tekevät kymmeniä pyyntöjä/s |
+| **EHD-3** ✔ (uudelleenrajattu KYS-9:llä) | **"Unsent changes" -merkki**: näkyvä merkki (ja muuttuneet kentät korostettuna) kunnes Update painetaan; sääntö "vain Update päivittää overlayn" säilyy. **Ei** Auto-update-kytkintä, ei Reset/Swap/Load/Import-pushia. Asset-muutokset (lisäys/poisto/rooli/kuva) kirjoitetaan levylle heti, mutta overlayihin ne näkyvät vasta Updatella (ei SSE:tä ennen sitä) | A | luku 12 #10; tuottaja ei tiedä mikä on lähetetty |
+| **EHD-4** ✔ | **Automaatiot (valinnaisia kytkimiä)**: joukkueen pistemäärä mapeista; `completed` kun pisteet asetettu; **bracketin voittajan eteenpäinvienti**; "seuraava map" automaattisesti | B | nyt kaikki käsin → virheitä live-tilanteessa |
+| **EHD-5** ✔ (osa luvun 8.4 mallia) | Linkit **yhdistyvät uudelleen käynnistyksessä** (valinnainen); tilarivi + "viimeksi päivitetty" -aikaleima; varoitus jos nimet eivät täsmää | B | nyt hiljainen ohitus |
+| **EHD-6** ✔ | **OBS WebSocket (v5) -integraatio**: scenenvaihto sovelluksesta, replay buffer -tallennus napista, "Go live" -tarkistuslista (palvelin, scenet, lähteet), scenekokoelman generointi ilman laitekohtaisia kovakoodauksia | B | korvaa käsin-konfiguroinnin (replay-polku, NDI/BRIO-nimet) |
+| **EHD-7** ✔ | **Pikanäppäimet + paikallinen HTTP/WebSocket-ohjaus** (Stream Deck / Companion): pisteet ±1, swap, seuraava map, timer start/pause | B | live-tuotannossa hiiri on hidas |
+| **EHD-8** ✔ | **Joukkuekirjasto** tiedostoviennin/-tuonnin tilalle (nimi, abbr, väri, logo, pelaajat; haku; SOWDraftin joukkueiden tuonti) + logot kopioidaan sovelluksen omaan kirjastoon (ei absoluuttisia polkuja, ei vanhentuneita PNG:itä) | B | nyt `*.sowteam.json` + käsin valittu logo joka kerta |
+| **EHD-9** ✔ | **Ajastin loppuaikaleimalla** (`endsAt`, monotoninen kello) ja overlay laskee itse; ei kirjoituksia/notifyja kerran sekunnissa; ei ajautumista | A/B | luku 12 #17; sama tapahtumamäärä pienenee ~60× |
+| **EHD-10** ✔ | **Asset-manifesti** (hero: slug, rooli, vartalokuva, aliakset; map: slug, mode, aliakset kuten `King's Row`; mode): poistaa kovakoodatut `HERO_ROLES`, `_HERO_BODY_OVERRIDES`, nimi-fuzzy-matchit ja kaksoistiedostot; uusien herojen/mappien päivitys yhdellä manifestilla (esim. julkaistu GitHub Releasesissa) | B | uusia heroja tulee jatkuvasti (Doctorine ym.) |
+| **EHD-11** ✔ | **Overlay-refaktorointi**: yksi jaettu JS-moduuli (fetch, värit, fit-text, stinger, SSE + pollausvaraus), parametrisoidut mallipohjat (waiting ×3 → 1, roster ×2 → 1, draft ×3 → 1 `?mode=`), paikalliset fontit (ei Google Fontsia). **Rajaus (KYS-4/6): vain datakerros ja duplikaatit; ulkoasua EI muuteta, ei brändiä** | B (osin päätetty) | ~15 tiedostoa kopioitua koodia |
+| **EHD-12** ✔ | Oma **värivalitsin** (brändipaletti pikavalintoina + vapaa heksa + "viimeksi käytetyt"); joukkuevärin kontrastivaroitus overlayn tekstiä vasten | C | natiivi OS-dialogi ei teemaudu eikä tunne brändiä |
+| **EHD-13** ✔ | **Overlay-esikatselu** sovelluksessa tai yhdellä napilla selaimeen (ei WebView:tä UI:ssa: avaa oletusselaimeen `?preview`) | C | nyt ei näe mitä lähtee ulos ilman OBS:ää |
+| **EHD-14** ✔ | **Kieli**: UI yksinomaan englanniksi, ei sekakieltä; tekstit yhdessä resurssitiedostossa | B | **PÄÄTETTY (KYS-5)**, luku 8.0 |
+| **EHD-15** ✔ | **Perusinfra**: lokitus (tiedosto + näkymä), yksikkötestit, CI, `schemaVersion` + migraatiot, tuntemattomien avainten sietäminen, kaatumisraportti, About-ikkuna (versio), **päivitystarkistus** GitHub Releasesista | A/B | nyt ei testejä, ei lokeja, versio vain asentimessa |
+| **EHD-16** ✔ | **Asennin**: per-käyttäjä asennus + data `%LOCALAPPDATA%`/käyttäjän valitsemaan kansioon (ei `C:\SOWBroadcast` kovakoodattuna), koodiallekirjoitus, musiikki erilliseksi valinnaiseksi paketiksi (lisenssi!), pienempi koko | B | 266 Mt; oikeusongelmat |
+| **EHD-17** ✔ | **Undo/Redo** ja "palauta edellinen ottelu" (autosave-historia) | C | live-virheen korjaus |
+| **EHD-18** ✔ | **Moniottelu-/turnausprofiili**: useita tallennettuja otteluita/turnausasetuksia (nimi, värit, status, logot) ja nopea vaihto | C | nyt yksi autosave + manuaaliset tallennukset |
+| **EHD-19** ✘ | **Saavutettavuus & käytettävyys**: täysi näppäimistönavigointi, fokusjärjestys, korkea kontrasti, skaalaus 100–200 %, high-DPI | B | "moderni sovellus" |
+| EHD-20 ◐ | Monialustaisuus – **vain best effort** (ks. päätöstila) | – | KYS-2: vain Windows tuettu; EHD-20 hyväksytty ehdolla "jos ei vaadi liikaa resursseja" |
+
+---
+
+## 15. Omistajan päätökset ja avoimet kysymykset
+
+### Päätetty (2026-10-15)
+
+| # | Päätös | Seuraus |
+|---|---|---|
+| KYS-1 | **C# + Avalonia UI** | luku 2b; PySide6/QML hylätty |
+| KYS-2 | **Vain Windows** | EHD-20 (monialustaisuus) **pudotettu**; Windows-spesifit (`FileSystemWatcher`, Velopack/Inno, `%LOCALAPPDATA%`) sallittu. Silti ei kovakoodattuja polkuja |
+| KYS-3 | **Toiminnalliset värit hyväksytty** | Start vihreä, Pause liuskekivi, Reset harmaa, virhe punainen, qualified/eliminated: sallitut brändin ulkopuoliset poikkeukset (11.5) |
+| KYS-4 | **Overlayjen ulkoasua ei päivitetä** | kulta/tumma `scoreboard.html` ja muut ennallaan; EHD-11:n brändiosa **hylätty** |
+| KYS-5 | **UI kokonaan englanniksi** | EHD-14 ratkaistu; luku 8.0 |
+| KYS-6 | **Siirrytään uuteen kontraktiin** | EHD-2 **hyväksytty** (uusi `/api/state` + SSE); OBS-scenet ja overlayjen datakerros päivitetään yhtenä pakettina (luku 0 kohta 3, luku 9) |
+| KYS-7 | **`Music/` jaettavissa asentimessa** | EHD-16:n musiikkiosa ei pakollinen; pidä mukana (voi silti olla valinnainen komponentti koon vuoksi) |
+| KYS-9 + KYS-11 | **Käyttäjän muokkaus päivittää overlayn vain Updatella** (vahvistettu 2026-10-15). Neljä nimettyä poikkeusta (KYS-11) | Reset, Swap Teams, joukkueen tuonti, File→Load, kenttien muokkaus, assetti-muutokset: **ei overlay-pushia**. Match **Update**, **Update (General)**, **Update (Waiting)**, **Update + sort**, **Update (Bracket)** kirjoittavat viennit ja lähettävät SSE:n. **Poikkeukset, jotka lähettävät itse**: SOWDraft-/turnauslinkin saapuva data, odotusruudun ajastimen komennot, valmis replay-leike, käynnistys (viimeisin tallennettu tila). Katso luku 5.1 |
+| KYS-11a | **Linkit täyttävät ja lähettävät** | SOWDraft- ja turnauslinkin saapuva data kirjoittuu tilaan ja viedään/lähetetään heti (kuten vanhassa). Unlink: nollaa ja lähettää (kuten vanhassa) |
+| KYS-11b | **Ajastin vaikuttaa heti** | Start/Pause/Reset ja ±aika lähettävät `waiting.timer` heti (EHD-9: `endsAt`, ei sekuntitikkejä) |
+| KYS-11c | **Replay automaattisesti** | valmis leike kopioidaan soittolistaan ja `replay` lähetetään heti |
+| KYS-11d | **Käynnistys lähettää viimeisimmän tilan** | `autosave.json` ladataan ja viedään/lähetetään overlayihin käynnistyksessä (oletettu "Kyllä" – vastaus oli kirjoitettu "Kylä"; vahvistettava) |
+
+> Tulkintoja jotka vaativat vahvistuksen: (a) KYS-4 + KYS-6 yhdessä = overlayjen *datakerros* muuttuu, *ulkoasu* ei. (b) KYS-9 koskee vain Resetiä; Swap/Import/Load jäävät avoimeksi kunnes EHD-3 ratkaistaan.
+
+### Edelleen avoinna
+
+- ~~KYS-8~~ **RATKAISTU 2026-10-15: vaihtoehto (b)** – sovitaan virallinen, dokumentoitu tietomuoto ja muutetaan SOWDraftia (luvut 8.4–8.5; S1–S5 hyväksytty, linkitys "turnaus ensin", pelaajat/roolit täytetään automaattisesti ja lähetetään live). Alkuperäinen kysymys: SOWDraft on toinen sovellus, jonka omistatte itse (`sowdraft`-kansio). SOWBroadcast *arvaa* SOWDraftin lähettämän datan muodon (kentät kuten `team1Name`, `previousMaps`)
+  koodista, eikä muotoa ole kirjattu mihinkään. Tästä seuraa mm. se, että joukkueet tunnistetaan **nimen perusteella** – jos nimi on kirjoitettu eri tavalla, pick/ban/pisteet jäävät hiljaa tuomatta.
+  Kysymys: Haluatteko (a) jatkaa nykyisellä "arvatulla" muodolla, vai (b) sopia SOWDraftin kanssa **virallisen, dokumentoidun tietomuodon** ja tarvittaessa muuttaa myös SOWDraftia
+  (esim. joukkueille tunnisteet/värit/logot mukaan)? Jos (b), tarkistetaan ensin SOWDraftin lähdekoodista mitä se oikeasti lähettää ja kirjataan se tähän tiedostoon.
+- ~~KYS-12~~ **Ratkaistu: kyllä** – puuttuva lyhenne ehdotetaan automaattisesti (3 ensimmäistä kirjainta isoina), muokattavissa, SOWDraftin arvo voittaa kun ilmestyy (luku 8.4).
+- ~~KYS-13~~ **Ratkaistu: ei automaattista valintaa** – käyttäjä valitsee ottelun aina itse; ei Auto-tilaa; S1:n `live` palautuu vain `matchId`-parametrilla (luku 8.4–8.5).
+- ~~KYS-11~~ **Ratkaistu** (a: linkit täyttävät ja lähettävät, b: ajastin heti, c: replay automaattisesti, d: käynnistys lähettää – oletettu "kyllä", vahvistettava; ks. päätöstaulukko).
+- ~~KYS-10~~ **Ratkaistu: `MapDraft.html`** säilyy. `draft.html` ei ole käytössä eikä tule mukaan uuteen versioon.
+- ~~KYS-14~~ **Ratkaistu (tulkinta: säilytetään mahdollisuus – vahvistettava):** `MapDraft_v2.html`:n **video-taustatuki yhdistetään valinnaisena ominaisuutena `MapDraft.html`:ään**: jos `Maps/<slug>.mp4` on olemassa, näytetään se mykistettynä, silmukoituna taustavideona map-kuvan sijaan, muuten `Maps/<slug>.png` (nykyinen käytös). Olemassaolo tarkistetaan kerran per slug ja välimuistitetaan. `MapDraft_v2.html` itsenäisenä tiedostona ei tule mukaan. Videoita ei ole vielä – ominaisuus ei saa vaikuttaa ilman niitä. (Jos tarkoitit "jätetään pois", ominaisuus poistetaan tästä.)
+- **EHD-ehdotukset**: kaikki ratkaistu, päätöstila luvun 14 alussa (EHD-3 ja EHD-10 hyväksytty 2026-10-15).
+
+---
+
+## 16. Viitetiedostot vanhassa repossa
+
+| Aihe | Paikka |
+|---|---|
+| Tietomallit (dataclassit) | `SOWBroadcast.py:228-455`; `HERO_ROLES` :170; `_hero_body_filename` :260 |
+| Haettava combo | `SOWBroadcast.py:22-160` |
+| BracketMatchWidget / TeamRow / dialogit | :718-899; AssetManager :899–1151; BulkImport :3024 |
+| PlayerRow, TeamPanel, MapCard | :1151–1508 |
+| General/Waiting/Standings/Bracket-välilehdet | :1509 / :1735 / :2023 / :2492 |
+| Turnauslinkin kuvaus standings/bracketiksi | :462–715 |
+| Päävaikkuna, `_collect_state`, `_apply_state`, `_update` | `TournamentApp` ~:3361; :5044 / :5107 / :5232 |
+| Viennit (`_export_*`), diff, notify, replay-vahtija | :4014–4700; :4262; :4479; :4220 |
+| Draft-tila → UI | :4955–5039 |
+| Palvelin | `server.py` |
+| Linkit | `draft_link.py`, `tournament_link.py` |
+| Overlayt | `HTML/*.html`; assetit `HTML/assets`, `HTML/fonts` |
+| Asennus | `setup.iss` (ajantasainen), `install.iss` (vanhentunut), `SOWBroadcast.spec`, `SOWServer.spec`, `launch.bat` |
+| Brändi | `suomiow nettisivut/docs/brand/graafinen-ohjeistus.pdf`, `…/src/assets/brand/*.png`, fontit `sowdraft/public/fonts/*.woff2` (+ lisenssit) |
