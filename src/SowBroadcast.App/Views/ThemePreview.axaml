@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="SowBroadcast.App.Views.ThemePreview">
+  <!-- Debug-only gallery to eyeball every themed control against the brand guideline. -->
+  <ScrollViewer>
+    <StackPanel Spacing="16" Margin="0,10,14,10">
+
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <Border Classes="cardTitle"><TextBlock Classes="h2" Text="TYPOGRAPHY" /></Border>
+          <TextBlock Classes="h1" Text="H1 – SAIRA SEMI CONDENSED 800" />
+          <TextBlock Classes="h2" Text="H2 – SAIRA SEMI CONDENSED 700" />
+          <TextBlock Text="Body – Inter 400. Joukkueet ja otteluohjelma, äö ÅÄÖ Torbjörn Lúcio." />
+          <TextBlock FontWeight="SemiBold" Text="Body semibold – Inter 600" />
+          <TextBlock Classes="label" Text="LABEL – INTER 600 / FROST" />
+          <TextBlock Classes="muted" Text="Muted secondary text (Huurre)" />
+          <StackPanel Orientation="Horizontal" Spacing="20">
+            <TextBlock Classes="result" FontSize="48" Text="LIVE" />
+            <TextBlock Classes="result" FontSize="48" Text="3–1" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <Border Classes="cardTitle"><TextBlock Classes="h2" Text="BUTTONS" /></Border>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="Secondary" />
+            <Button Classes="primary" Content="Update" />
+            <Button Content="Disabled" IsEnabled="False" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <Border Classes="cardTitle"><TextBlock Classes="h2" Text="INPUTS" /></Border>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="10">
+            <TextBlock Grid.Row="0" Classes="label" VerticalAlignment="Center" Text="TEXT" />
+            <TextBox x:Name="SampleBox" Grid.Row="0" Grid.Column="1" Watermark="Team name" MaxWidth="420" HorizontalAlignment="Left" Width="420" />
+            <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="DISABLED" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="Read only" IsEnabled="False" Width="420" HorizontalAlignment="Left" />
+            <TextBlock Grid.Row="2" Classes="label" VerticalAlignment="Center" Text="COMBO" />
+            <ComboBox Grid.Row="2" Grid.Column="1" Width="420" SelectedIndex="0">
+              <ComboBoxItem Content="Lijiang Tower" />
+              <ComboBoxItem Content="King's Row" />
+              <ComboBoxItem Content="Watchpoint: Grimsvötn" />
+            </ComboBox>
+            <TextBlock Grid.Row="3" Classes="label" VerticalAlignment="Center" Text="NUMBER" />
+            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="2" Minimum="0" Maximum="200" Width="140" HorizontalAlignment="Left" />
+            <TextBlock Grid.Row="4" Classes="label" VerticalAlignment="Center" Text="CHECK" />
+            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="20">
+              <CheckBox Content="Completed" IsChecked="True" />
+              <CheckBox Content="Unchecked" />
+              <CheckBox Content="Disabled" IsEnabled="False" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

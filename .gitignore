@@ -52,3 +52,10 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+
+# .NET 3.x rebuild
+src/**/bin/
+src/**/obj/
+src/.vs/
+*.user
+TestResults/

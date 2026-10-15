@@ -1,0 +1,114 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Base: night window, white Inter text -->
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource SowNightBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource SowWhiteBrush}" />
+    <Setter Property="FontFamily" Value="{DynamicResource SowBodyFont}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- Typography roles -->
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontFamily" Value="{DynamicResource SowHeadingFont}" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="FontSize" Value="26" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontFamily" Value="{DynamicResource SowHeadingFont}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="FontSize" Value="16" />
+  </Style>
+  <Style Selector="TextBlock.label">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource SowFrostBrush}" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource SowFrostBrush}" />
+  </Style>
+  <Style Selector="TextBlock.result">
+    <Setter Property="FontFamily" Value="{DynamicResource SowDisplayFont}" />
+  </Style>
+
+  <!-- Card: shadow panel with hairline border -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource SowShadowBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SowLineSoftBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+  <Style Selector="Border.header">
+    <Setter Property="Background" Value="{DynamicResource SowGradientBrush}" />
+  </Style>
+  <Style Selector="Border.cardTitle">
+    <Setter Property="Background" Value="{DynamicResource SowLionBrush}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="10,3" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+
+  <!-- Tabs -->
+  <Style Selector="TabControl">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="TabItem">
+    <Setter Property="FontFamily" Value="{DynamicResource SowHeadingFont}" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="Padding" Value="18,10" />
+    <Setter Property="Margin" Value="0,0,4,0" />
+  </Style>
+
+  <!-- Buttons: lion by default; .primary is the single blade call-to-action per view -->
+  <Style Selector="Button">
+    <Setter Property="FontFamily" Value="{DynamicResource SowBodyFont}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="16,7" />
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource SowBladeBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource SowNightBrush}" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowBladeBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource SowNightBrush}" />
+    <Setter Property="Opacity" Value="0.85" />
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowBladeBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource SowNightBrush}" />
+    <Setter Property="Opacity" Value="0.7" />
+  </Style>
+
+  <!-- Inputs -->
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="NumericUpDown">
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+
+  <!-- Status bar -->
+  <Style Selector="Border.statusbar">
+    <Setter Property="Background" Value="{DynamicResource SowNightBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SowLineSoftBrush}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="14,6" />
+  </Style>
+  <Style Selector="Border.pill">
+    <Setter Property="Background" Value="{DynamicResource SowLionBrush}" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="10,3" />
+  </Style>
+</Styles>

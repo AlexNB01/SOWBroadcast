@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="SowBroadcast.App.Views.Placeholder"
+             x:Name="Root">
+  <Border Classes="card" Margin="0,10,0,0">
+    <StackPanel Spacing="8" HorizontalAlignment="Left">
+      <Border Classes="cardTitle">
+        <TextBlock Classes="h2" Text="{Binding Title, ElementName=Root}" />
+      </Border>
+      <TextBlock Classes="muted" Text="{Binding Milestone, ElementName=Root, StringFormat='This tab is built in milestone {0}.'}" />
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -148,6 +148,20 @@ Avalonia-erityishuomiot (opittu PyQt-kokeilusta, luku 11.6):
 
 ---
 
+### 2c. Toteutustila (päivitetään vaiheittain)
+
+**M0 valmis (2026-10-15, haara `v3`)** – `src/SowBroadcast.sln`: `SowBroadcast.Core` (tilamalli + `StateStore`), `SowBroadcast.App` (Avalonia, assembly `SOWBroadcast.exe`, versio **3.0.0**), `SowBroadcast.Tests` (xUnit, 18 testiä).
+Toteutuksessa tehdyt päätökset, jotka poikkeavat luvun 2b ehdotuksista:
+- **Avalonia 11.3.22 (ei 12.x).** Avalonia 12.x:n lähdegeneraattori vaatii Roslyn 4.14:n, mutta asennettu .NET SDK 8.0.426 sisältää 4.11:n (`InitializeComponent` ei generoidu). 12.x:ään voi siirtyä kun SDK päivitetään (.NET 9/10 SDK voi kääntää net8.0-kohteen). Kohde säilyy `net8.0`.
+- **Teema** = `Theme/SowResources.axaml` (palettitokenit + Fluent-resurssien ylikirjoitukset, tumma variantti) + `Theme/SowStyles.axaml` (tyyliluokat: `h1`, `h2`, `label`, `muted`, `result`, `card`, `cardTitle`, `header`, `pill`, `primary`, `statusbar`). Fluent on pohjana mutta kaikki värit tulevat brändipaletista; **yksi `Button.primary` (teräsyaani) per näkymä**, muut napit leijonansinisiä. Fokus = 2 px teräsyaani (varmistettu kuvakaappauksella).
+- **Fontit** upotettuina `Assets/Fonts` (Saira SemiCondensed Bold/ExtraBold, Inter 18pt Regular/SemiBold, Russo One + OFL-lisenssit); fonttiperheet avaimilla `SowHeadingFont`, `SowBodyFont`, `SowDisplayFont`. Täydet fonttisetit omistajan kansiossa `Logos + fonts/` (ei versionhallinnassa).
+- **Logot**: `Logos + fonts/suomiow_rintakuva.png` = **Tunnus** (kruunattu leijonan pää; sovellusikoni ja otsikkopalkki), `suomiow_.png` = Päälogo, `suomiow_suomioverwatch.png` = Pitkä nimi. UI:hin skaalatut PNG:t ja monikokoinen `app.ico` ovat `src/SowBroadcast.App/`.
+- **Tallennus**: `StateStore` (System.Text.Json, `SnakeCaseLower` → vanhat avaimet; tuntemattomat avaimet ohitetaan; `winner` johdetaan pisteistä; pelaajat/mapit täytetään 8/7:ään; atominen kirjoitus + `.bak` + palautus korruptoituneesta). Datan juuri: `%LOCALAPPDATA%\SOWBroadcast` tai `SOWB_ROOT`. Autosave latautuu käynnistyksessä ja tallentuu sulkiessa sekä Save/Load-toimintojen yhteydessä.
+- **Dev-apu (vain Debug)**: `SOWBroadcast.exe --screenshot <tiedosto.png> [--tab <n>] [--size WxH] [--focus]` renderöi ikkunan PNG:ksi ja sulkeutuu – käytetään teeman visuaaliseen tarkistukseen ilman OS-tason kuvakaappausta. THEME-välilehti (kontrollien galleria) näkyy vain Debug-käännöksessä.
+- **Valikot**: File (Load/Save/Save As/Quit) toimii; Customize ja Teams -valikkojen kohdat ovat toistaiseksi pois käytöstä (M2/M3). Välilehdet ovat paikkamerkkejä (M3–M5).
+
+---
+
 ## 3. Tietomalli
 
 Kaikki JSON UTF-8, `ensure_ascii=false`, sisennys 2. Kentät on lueteltu nykyisessä muodossa; uuden toteutuksen on

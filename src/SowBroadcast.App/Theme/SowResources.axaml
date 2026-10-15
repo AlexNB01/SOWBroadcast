@@ -1,0 +1,154 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Suomi OW ry graphic guidelines v1.0 (p.10/23). Only palette colours; alpha variants of Frost for hairlines. -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Dark">
+      <!-- Palette -->
+      <Color x:Key="SowNight">#001445</Color>
+      <Color x:Key="SowLion">#134380</Color>
+      <Color x:Key="SowCrown">#1E8AB9</Color>
+      <Color x:Key="SowShadow">#0F356B</Color>
+      <Color x:Key="SowBlade">#23C5D7</Color>
+      <Color x:Key="SowFrost">#A9B8CC</Color>
+      <Color x:Key="SowWhite">#FFFFFF</Color>
+      <Color x:Key="SowLine">#59A9B8CC</Color>
+      <Color x:Key="SowLineSoft">#38A9B8CC</Color>
+      <Color x:Key="SowFrostDisabled">#73A9B8CC</Color>
+
+      <SolidColorBrush x:Key="SowNightBrush" Color="{StaticResource SowNight}" />
+      <SolidColorBrush x:Key="SowLionBrush" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="SowCrownBrush" Color="{StaticResource SowCrown}" />
+      <SolidColorBrush x:Key="SowShadowBrush" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="SowBladeBrush" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="SowFrostBrush" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="SowWhiteBrush" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="SowLineBrush" Color="{StaticResource SowLine}" />
+      <SolidColorBrush x:Key="SowLineSoftBrush" Color="{StaticResource SowLineSoft}" />
+      <SolidColorBrush x:Key="SowFrostDisabledBrush" Color="{StaticResource SowFrostDisabled}" />
+      <LinearGradientBrush x:Key="SowGradientBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+        <GradientStop Color="#1E8AB9" Offset="0" />
+        <GradientStop Color="#0F356B" Offset="1" />
+      </LinearGradientBrush>
+
+      <!-- Accent colours that Fluent derives selection and checked states from -->
+      <Color x:Key="SystemAccentColor">#134380</Color>
+      <Color x:Key="SystemAccentColorDark1">#0F356B</Color>
+      <Color x:Key="SystemAccentColorDark2">#0F356B</Color>
+      <Color x:Key="SystemAccentColorDark3">#001445</Color>
+      <Color x:Key="SystemAccentColorLight1">#1E8AB9</Color>
+      <Color x:Key="SystemAccentColorLight2">#23C5D7</Color>
+      <Color x:Key="SystemAccentColorLight3">#23C5D7</Color>
+
+      <!-- Button: lion fill, crown on hover -->
+      <SolidColorBrush x:Key="ButtonBackground" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{StaticResource SowCrown}" />
+      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ButtonForeground" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="{StaticResource SowFrostDisabled}" />
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="Transparent" />
+
+      <!-- Text inputs: shadow fill, hairline border, 2px blade focus ring (guideline p.23) -->
+      <SolidColorBrush x:Key="TextControlBackground" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="{StaticResource SowNight}" />
+      <SolidColorBrush x:Key="TextControlForeground" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="TextControlForegroundFocused" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="{StaticResource SowFrostDisabled}" />
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="{StaticResource SowLine}" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="{StaticResource SowLineSoft}" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="{StaticResource SowFrostDisabled}" />
+      <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="{StaticResource SowLion}" />
+
+      <!-- ComboBox -->
+      <SolidColorBrush x:Key="ComboBoxBackground" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="{StaticResource SowNight}" />
+      <SolidColorBrush x:Key="ComboBoxForeground" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="{StaticResource SowFrostDisabled}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="{StaticResource SowLine}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushFocused" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="{StaticResource SowLineSoft}" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="{StaticResource SowLine}" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="{StaticResource SowCrown}" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="{StaticResource SowCrown}" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="{StaticResource SowWhite}" />
+
+      <!-- CheckBox: blade check -->
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="{StaticResource SowBlade}" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="{StaticResource SowNight}" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="{StaticResource SowNight}" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="{StaticResource SowWhite}" />
+
+      <!-- Menus and flyouts -->
+      <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="{StaticResource SowLine}" />
+      <SolidColorBrush x:Key="MenuFlyoutItemBackground" Color="Transparent" />
+      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="{StaticResource SowCrown}" />
+      <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="{StaticResource SowFrostDisabled}" />
+      <SolidColorBrush x:Key="MenuBarBackground" Color="{StaticResource SowNight}" />
+      <SolidColorBrush x:Key="MenuBarItemBackground" Color="Transparent" />
+      <SolidColorBrush x:Key="MenuBarItemBackgroundPointerOver" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="MenuBarItemBackgroundPressed" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="MenuBarItemBackgroundSelected" Color="{StaticResource SowLion}" />
+
+      <!-- Tabs -->
+      <SolidColorBrush x:Key="TabItemHeaderForegroundUnselected" Color="{StaticResource SowFrost}" />
+      <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedPointerOver" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="TabItemHeaderForegroundSelected" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPointerOver" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselected" Color="Transparent" />
+      <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="Transparent" />
+      <SolidColorBrush x:Key="TabItemHeaderBackgroundSelected" Color="Transparent" />
+      <SolidColorBrush x:Key="TabItemHeaderSelectedPipeFill" Color="{StaticResource SowCrown}" />
+
+      <!-- Scrollbars -->
+      <SolidColorBrush x:Key="ScrollBarThumbFill" Color="{StaticResource SowLine}" />
+      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="{StaticResource SowCrown}" />
+      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="{StaticResource SowCrown}" />
+      <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent" />
+      <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="Transparent" />
+
+      <!-- Tooltip -->
+      <SolidColorBrush x:Key="ToolTipBackground" Color="{StaticResource SowShadow}" />
+      <SolidColorBrush x:Key="ToolTipForeground" Color="{StaticResource SowWhite}" />
+      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="{StaticResource SowBlade}" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- Typography (guideline p.14): Saira Semi Condensed for headings, Inter for body, Russo One for results only -->
+  <FontFamily x:Key="SowHeadingFont">avares://SOWBroadcast/Assets/Fonts#Saira SemiCondensed</FontFamily>
+  <FontFamily x:Key="SowBodyFont">avares://SOWBroadcast/Assets/Fonts#Inter 18pt</FontFamily>
+  <FontFamily x:Key="SowDisplayFont">avares://SOWBroadcast/Assets/Fonts#Russo One</FontFamily>
+</ResourceDictionary>
