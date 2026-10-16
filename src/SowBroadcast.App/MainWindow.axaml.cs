@@ -16,19 +16,54 @@ public partial class MainWindow : Window, IFileDialogs, IMessages
     };
 
     private readonly MainWindowViewModel _viewModel;
+    private readonly AppServices _services;
 
     public MainWindow()
     {
         InitializeComponent();
-        _viewModel = new MainWindowViewModel(this, this, AppPaths.AutosavePath);
+        _services = AppServices.Start();
+        _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath);
         DataContext = _viewModel;
 #if DEBUG
         ThemeTab.IsVisible = true;
+        DebugMenu.IsVisible = true;
         WireDevScreenshot();
+        WireDemoLive();
 #endif
-        Opened += async (_, _) => await _viewModel.LoadAutosaveAsync();
-        Closing += (_, _) => _viewModel.Autosave();
+        Opened += async (_, _) =>
+        {
+            await _viewModel.LoadAutosaveAsync();
+            _viewModel.PublishStartup();
+            if (_services.StartupError is { } error)
+                await ShowErrorAsync("Overlay server could not start",
+                    error + "\nOverlay files are still written, but browser overlays will not update.");
+        };
+        Closing += (_, _) =>
+        {
+            _viewModel.Autosave();
+            _services.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
+        };
     }
+
+#if DEBUG
+    // Dev aid: `--demo-live` bumps team 1's score a few seconds after start and publishes it, to watch an open overlay update.
+    private void WireDemoLive()
+    {
+        if (!Environment.GetCommandLineArgs().Contains("--demo-live")) return;
+        Opened += async (_, _) =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(12));
+            _viewModel.State = _viewModel.State with { Team1 = _viewModel.State.Team1 with { Score = _viewModel.State.Team1.Score + 5 } };
+            _viewModel.PublishNowCommand.Execute(null);
+        };
+    }
+
+    private void OnOpenScoreboardOverlay(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel.OverlayBaseUrl is { } url)
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url + "/HTML/scoreboard.html") { UseShellExecute = true });
+    }
+#endif
 
 #if DEBUG
     // Dev aid: `--screenshot <file.png> [--tab <index>] [--size WxH]` renders the window to a PNG and exits.

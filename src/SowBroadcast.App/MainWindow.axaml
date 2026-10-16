@@ -25,6 +25,12 @@
         <Separator />
         <MenuItem Header="_Bulk Import from Folders…" IsEnabled="False" />
       </MenuItem>
+      <MenuItem x:Name="DebugMenu" Header="_Debug" IsVisible="False">
+        <MenuItem Header="_Publish current state (Update)" Command="{Binding PublishNowCommand}" />
+        <MenuItem Header="Load _sample match" Command="{Binding LoadSampleCommand}" />
+        <Separator />
+        <MenuItem Header="Open _scoreboard overlay in browser" Click="OnOpenScoreboardOverlay" />
+      </MenuItem>
       <MenuItem Header="_Teams">
         <MenuItem Header="Export _Home…" IsEnabled="False" />
         <MenuItem Header="Import H_ome…" IsEnabled="False" />
@@ -57,7 +63,10 @@
     <Border DockPanel.Dock="Bottom" Classes="statusbar">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Grid.Column="0" Classes="muted" Text="{Binding StatusText}" VerticalAlignment="Center" />
-        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Version, StringFormat='Version {0}'}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="24">
+          <TextBlock Classes="muted" Text="{Binding ServerStatus}" VerticalAlignment="Center" />
+          <TextBlock Classes="muted" Text="{Binding Version, StringFormat='Version {0}'}" VerticalAlignment="Center" />
+        </StackPanel>
       </Grid>
     </Border>
 

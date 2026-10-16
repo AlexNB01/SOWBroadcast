@@ -25,5 +25,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SowBroadcast.Core\SowBroadcast.Core.csproj" />
+    <ProjectReference Include="..\SowBroadcast.Server\SowBroadcast.Server.csproj" />
   </ItemGroup>
 </Project>

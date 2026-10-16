@@ -11,20 +11,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IFileDialogs _dialogs;
     private readonly IMessages _messages;
+    private readonly IOverlayPublisher _publisher;
     private readonly string _autosavePath;
     private string? _currentSavePath;
 
-    public MainWindowViewModel(IFileDialogs dialogs, IMessages messages, string autosavePath)
+    public MainWindowViewModel(IFileDialogs dialogs, IMessages messages, IOverlayPublisher publisher, string autosavePath)
     {
         _dialogs = dialogs;
         _messages = messages;
+        _publisher = publisher;
         _autosavePath = autosavePath;
+        ServerStatus = publisher.BaseUrl is null ? "Overlay server unavailable" : $"Overlays: {publisher.BaseUrl}";
         State = AppState.CreateDefault();
         Version = typeof(MainWindowViewModel).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "3.0.0";
     }
 
     public string Version { get; }
+    public string ServerStatus { get; }
+    public string? OverlayBaseUrl => _publisher.BaseUrl;
 
     [ObservableProperty] private AppState _state;
     [ObservableProperty] private string _statusText = "Ready";
@@ -51,6 +56,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await _messages.ShowErrorAsync("Autosave could not be read", ex.Message);
         }
     }
+
+    /// <summary>Startup: send the restored state to the overlays (every key, so already-open overlays refresh).</summary>
+    public void PublishStartup() => TryPublish(updateStatus: false);
+
+    [RelayCommand]
+    private void PublishNow() => TryPublish(updateStatus: true);
+
+    private void TryPublish(bool updateStatus)
+    {
+        try
+        {
+            var result = _publisher.Publish(State);
+            HasUnsentChanges = false;
+            if (updateStatus)
+                StatusText = result.ChangedKeys.Count == 0
+                    ? "Overlays are up to date"
+                    : $"Published: {string.Join(", ", result.ChangedKeys.Take(6))}{(result.ChangedKeys.Count > 6 ? "…" : "")}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = $"Could not write overlay files: {ex.Message}";
+        }
+    }
+
+#if DEBUG
+    [RelayCommand]
+    private void LoadSample()
+    {
+        State = SampleState.Create();
+        HasUnsentChanges = true;
+        StatusText = "Loaded the sample match (not published yet)";
+    }
+#endif
 
     public void Autosave()
     {
@@ -83,6 +121,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
         _currentSavePath = path;
+        HasUnsentChanges = true;
         Autosave();
         StatusText = $"Loaded {Path.GetFileName(path)}";
     }
