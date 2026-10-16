@@ -71,6 +71,25 @@ def capture(root: Path, dest: Path):
     (dest / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def capture_assets(root: Path, dest: Path):
+    """Raw copy of the asset folders (index files and the copied images)."""
+    if dest.exists():
+        for old in dest.rglob("*"):
+            if old.is_file():
+                old.unlink()
+    dest.mkdir(parents=True, exist_ok=True)
+    sb_root = root / "Scoreboard"
+    for d in ["Heroes", "HeroesBody", "Maps", "Gametypes"]:
+        base = sb_root / d
+        if not base.exists():
+            continue
+        for path in sorted(base.rglob("*")):
+            if path.is_file():
+                target = dest / d / path.name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(path.read_bytes())
+
+
 def main():
     tmp = Path(tempfile.mkdtemp(prefix="sowb-golden-"))
     os.environ["SOWB_ROOT"] = str(tmp)
@@ -101,6 +120,30 @@ def main():
 
     (GOLDEN / "full").joinpath("state.json").write_text(tokenised(full_state), encoding="utf-8")
     (GOLDEN / "default").joinpath("state.json").write_text(tokenised(default_state), encoding="utf-8")
+
+    # Case "assets": exporter of the hero/map/mode catalogues with a synthetic catalogue.
+    for name in ["Heroes", "HeroesBody", "Maps", "Gametypes"]:
+        shutil.rmtree(tmp / "Scoreboard" / name, ignore_errors=True)
+    fx = FIXTURES / "assets"
+
+    def asset(name, src, **kw):
+        return sb.Asset(name=name, source_path=str(fx / src), **kw)
+
+    win.heroes = {
+        "Ana": asset("Ana", "ana.png", role="Support"),
+        "D.Va": asset("D.Va", "dva.png", role="Tank", body_source_path=str(fx / "dva_body.png")),
+        "Lúcio": asset("Lúcio", "lucio.png", role="Support", body_source_path=str(fx / "lucio_body.png")),
+    }
+    win.maps = {
+        "Busan": asset("Busan", "busan.png", mode="Control"),
+        "King's Row": asset("King's Row", "kingsrow.png", mode="Hybrid"),
+        "Esperança": asset("Esperança", "esperanca.png", mode="Push"),
+    }
+    win.modes = {"Control": asset("Control", "control.png"), "Hybrid": asset("Hybrid", "hybrid.png")}
+    win._export_assets_category("Heroes", win.heroes)
+    win._export_assets_category("Maps", win.maps)
+    win._export_assets_category("Gametypes", win.modes)
+    capture_assets(tmp, GOLDEN / "assets")
 
     # Diff cases: pure function over two collected states.
     def mutate(fn):

@@ -18,12 +18,10 @@ Scoreboard/Bracket/
 Scoreboard/TournamentLogos/
 Scoreboard/__last_gui_touch.txt
 
-# Auto-discovered asset catalogues (the images themselves stay tracked).
-Scoreboard/Maps/index.json
+# Asset catalogues: index.json is the shipped catalogue of heroes/maps/modes (tracked, read by the 3.x app);
+# index.txt is a generated name list.
 Scoreboard/Maps/index.txt
-Scoreboard/Heroes/index.json
 Scoreboard/Heroes/index.txt
-Scoreboard/Gametypes/index.json
 Scoreboard/Gametypes/index.txt
 
 # Scratch staging area for logos/maps the user is about to import.

@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="SowBroadcast.App.Controls.SearchableComboBox"
+             Focusable="False">
+  <!-- A combo whose list is a filter box over the items (54 heroes, 31 maps): type to narrow, arrows to move, Enter to pick. -->
+  <Grid>
+    <Button x:Name="Display" Classes="comboLike"
+            HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+            Click="OnDisplayClick" KeyDown="OnDisplayKeyDown" PointerWheelChanged="OnDisplayWheel">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock x:Name="DisplayText" Grid.Column="0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <Path Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Stroke="{DynamicResource SowFrostBrush}"
+              StrokeThickness="1.5" Data="M 0,0 L 5,5 L 10,0" />
+      </Grid>
+    </Button>
+
+    <Popup x:Name="Dropdown" PlacementTarget="{Binding #Display}" Placement="Bottom"
+           IsLightDismissEnabled="True" Closed="OnPopupClosed">
+      <Border x:Name="PopupBorder" Background="{DynamicResource SowShadowBrush}" BorderBrush="{DynamicResource SowLineBrush}"
+              BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,2,0,0">
+        <DockPanel>
+          <TextBox x:Name="Filter" DockPanel.Dock="Top" Watermark="Search…" Margin="0,0,0,6"
+                   TextChanged="OnFilterChanged" KeyDown="OnFilterKeyDown" />
+          <ListBox x:Name="Rows" Classes="compact" Background="Transparent" BorderThickness="0" Padding="0"
+                   PointerReleased="OnRowsPointerReleased" />
+        </DockPanel>
+      </Border>
+    </Popup>
+  </Grid>
+</UserControl>

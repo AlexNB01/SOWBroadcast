@@ -1,0 +1,24 @@
+{
+  "heroes": [
+    {
+      "name": "Ana",
+      "slug": "ana",
+      "image": "Heroes/ana.png",
+      "role": "Support"
+    },
+    {
+      "name": "D.Va",
+      "slug": "d-va",
+      "image": "Heroes/d-va.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Dva.png"
+    },
+    {
+      "name": "Lúcio",
+      "slug": "lucio",
+      "image": "Heroes/lucio.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Lucio.png"
+    }
+  ]
+}

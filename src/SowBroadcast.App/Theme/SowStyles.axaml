@@ -32,6 +32,10 @@
     <Setter Property="FontFamily" Value="{DynamicResource SowDisplayFont}" />
   </Style>
 
+  <Style Selector="TextBlock.placeholder">
+    <Setter Property="Foreground" Value="{DynamicResource SowFrostBrush}" />
+  </Style>
+
   <!-- Card: shadow panel with hairline border -->
   <Style Selector="Border.card">
     <Setter Property="Background" Value="{DynamicResource SowShadowBrush}" />
@@ -86,6 +90,27 @@
     <Setter Property="Opacity" Value="0.7" />
   </Style>
 
+  <!-- Combo-like button used by SearchableComboBox -->
+  <Style Selector="Button.comboLike">
+    <Setter Property="Background" Value="{DynamicResource SowShadowBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SowLineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="Button.comboLike:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowShadowBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SowFrostBrush}" />
+  </Style>
+  <Style Selector="Button.comboLike:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowShadowBrush}" />
+  </Style>
+  <Style Selector="Button.comboLike:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource SowBladeBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
   <!-- Inputs -->
   <Style Selector="TextBox">
     <Setter Property="CornerRadius" Value="4" />
@@ -97,6 +122,12 @@
   </Style>
   <Style Selector="NumericUpDown">
     <Setter Property="MinHeight" Value="32" />
+  </Style>
+
+  <!-- Compact list rows (searchable combo popup) -->
+  <Style Selector="ListBox.compact ListBoxItem">
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="8,3" />
   </Style>
 
   <!-- Status bar -->

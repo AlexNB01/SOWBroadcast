@@ -1,0 +1,22 @@
+{
+  "maps": [
+    {
+      "name": "Busan",
+      "slug": "busan",
+      "image": "Maps/busan.png",
+      "mode": "Control"
+    },
+    {
+      "name": "King's Row",
+      "slug": "king-s-row",
+      "image": "Maps/king-s-row.png",
+      "mode": "Hybrid"
+    },
+    {
+      "name": "Esperança",
+      "slug": "esperanca",
+      "image": "Maps/esperanca.png",
+      "mode": "Push"
+    }
+  ]
+}

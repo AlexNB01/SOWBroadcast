@@ -12,5 +12,8 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            // Popups (combo lists, menus) are drawn inside the window instead of as separate native windows:
+            // they theme and scale with the rest of the UI and can be captured in screenshots.
+            .With(new Win32PlatformOptions { OverlayPopups = true })
             .LogToTrace();
 }

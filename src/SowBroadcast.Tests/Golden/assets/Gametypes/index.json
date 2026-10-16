@@ -1,0 +1,14 @@
+{
+  "modes": [
+    {
+      "name": "Control",
+      "slug": "control",
+      "image": "Gametypes/control.png"
+    },
+    {
+      "name": "Hybrid",
+      "slug": "hybrid",
+      "image": "Gametypes/hybrid.png"
+    }
+  ]
+}

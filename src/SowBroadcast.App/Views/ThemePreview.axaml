@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:SowBroadcast.App.Controls"
              x:Class="SowBroadcast.App.Views.ThemePreview">
   <!-- Debug-only gallery to eyeball every themed control against the brand guideline. -->
   <ScrollViewer>
@@ -28,6 +29,16 @@
             <Button Content="Secondary" />
             <Button Classes="primary" Content="Update" />
             <Button Content="Disabled" IsEnabled="False" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <Border Classes="cardTitle"><TextBlock Classes="h2" Text="SEARCHABLE COMBO" /></Border>
+          <StackPanel Orientation="Horizontal" Spacing="14">
+            <controls:SearchableComboBox x:Name="SampleCombo" Width="260" NoneText="— Hero —" />
+            <controls:SearchableComboBox x:Name="SampleMapCombo" Width="260" Placeholder="Choose a map" />
           </StackPanel>
         </StackPanel>
       </Border>

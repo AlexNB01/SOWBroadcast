@@ -1,0 +1,382 @@
+{
+  "heroes": [
+    {
+      "name": "Ana",
+      "slug": "ana",
+      "image": "Heroes/ana.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Ana.png"
+    },
+    {
+      "name": "Ashe",
+      "slug": "ashe",
+      "image": "Heroes/ashe.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Ashe.png"
+    },
+    {
+      "name": "Baptiste",
+      "slug": "baptiste",
+      "image": "Heroes/baptiste.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Baptiste.png"
+    },
+    {
+      "name": "Bastion",
+      "slug": "bastion",
+      "image": "Heroes/bastion.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Bastion.png"
+    },
+    {
+      "name": "Brigitte",
+      "slug": "brigitte",
+      "image": "Heroes/brigitte.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Brigitte.png"
+    },
+    {
+      "name": "Cassidy",
+      "slug": "cassidy",
+      "image": "Heroes/cassidy.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Cassidy.png"
+    },
+    {
+      "name": "Doomfist",
+      "slug": "doomfist",
+      "image": "Heroes/doomfist.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Doomfist.png"
+    },
+    {
+      "name": "Echo",
+      "slug": "echo",
+      "image": "Heroes/echo.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Echo.png"
+    },
+    {
+      "name": "Freja",
+      "slug": "freja",
+      "image": "Heroes/freja.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Freja.png"
+    },
+    {
+      "name": "Genji",
+      "slug": "genji",
+      "image": "Heroes/genji.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Genji.png"
+    },
+    {
+      "name": "Hanzo",
+      "slug": "hanzo",
+      "image": "Heroes/hanzo.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Hanzo.png"
+    },
+    {
+      "name": "Hazard",
+      "slug": "hazard",
+      "image": "Heroes/hazard.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Hazard.png"
+    },
+    {
+      "name": "Illari",
+      "slug": "illari",
+      "image": "Heroes/illari.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Illari.png"
+    },
+    {
+      "name": "Junker Queen",
+      "slug": "junker-queen",
+      "image": "Heroes/junker-queen.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Junker_Queen.png"
+    },
+    {
+      "name": "Junkrat",
+      "slug": "junkrat",
+      "image": "Heroes/junkrat.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Junkrat.png"
+    },
+    {
+      "name": "Juno",
+      "slug": "juno",
+      "image": "Heroes/juno.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Juno.png"
+    },
+    {
+      "name": "Kiriko",
+      "slug": "kiriko",
+      "image": "Heroes/kiriko.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Kiriko.png"
+    },
+    {
+      "name": "Lifeweaver",
+      "slug": "lifeweaver",
+      "image": "Heroes/lifeweaver.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Lifeweaver.png"
+    },
+    {
+      "name": "Mauga",
+      "slug": "mauga",
+      "image": "Heroes/mauga.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Mauga.png"
+    },
+    {
+      "name": "Mei",
+      "slug": "mei",
+      "image": "Heroes/mei.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Mei.png"
+    },
+    {
+      "name": "Mercy",
+      "slug": "mercy",
+      "image": "Heroes/mercy.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Mercy.png"
+    },
+    {
+      "name": "Moira",
+      "slug": "moira",
+      "image": "Heroes/moira.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Moira.png"
+    },
+    {
+      "name": "Orisa",
+      "slug": "orisa",
+      "image": "Heroes/orisa.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Orisa.png"
+    },
+    {
+      "name": "Pharah",
+      "slug": "pharah",
+      "image": "Heroes/pharah.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Pharah.png"
+    },
+    {
+      "name": "Ramattra",
+      "slug": "ramattra",
+      "image": "Heroes/ramattra.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Ramattra.png"
+    },
+    {
+      "name": "Reaper",
+      "slug": "reaper",
+      "image": "Heroes/reaper.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Reaper.png"
+    },
+    {
+      "name": "Reinhardt",
+      "slug": "reinhardt",
+      "image": "Heroes/reinhardt.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Reinhardt.png"
+    },
+    {
+      "name": "Roadhog",
+      "slug": "roadhog",
+      "image": "Heroes/roadhog.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Roadhog.png"
+    },
+    {
+      "name": "Sigma",
+      "slug": "sigma",
+      "image": "Heroes/sigma.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Sigma.png"
+    },
+    {
+      "name": "Sojourn",
+      "slug": "sojourn",
+      "image": "Heroes/sojourn.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Sojourn.png"
+    },
+    {
+      "name": "Sombra",
+      "slug": "sombra",
+      "image": "Heroes/sombra.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Sombra.png"
+    },
+    {
+      "name": "Symmetra",
+      "slug": "symmetra",
+      "image": "Heroes/symmetra.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Symmetra.png"
+    },
+    {
+      "name": "Torbjorn",
+      "slug": "torbjorn",
+      "image": "Heroes/torbjorn.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Torbjörn.png"
+    },
+    {
+      "name": "Tracer",
+      "slug": "tracer",
+      "image": "Heroes/tracer.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Tracer.png"
+    },
+    {
+      "name": "Venture",
+      "slug": "venture",
+      "image": "Heroes/venture.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Venture.png"
+    },
+    {
+      "name": "Widowmaker",
+      "slug": "widowmaker",
+      "image": "Heroes/widowmaker.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Widowmaker.png"
+    },
+    {
+      "name": "Winston",
+      "slug": "winston",
+      "image": "Heroes/winston.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Winston.png"
+    },
+    {
+      "name": "Wrecking Ball",
+      "slug": "wrecking-ball",
+      "image": "Heroes/wrecking-ball.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Wrecking_Ball.png"
+    },
+    {
+      "name": "Wuyang",
+      "slug": "wuyang",
+      "image": "Heroes/wuyang.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Wuyang.png"
+    },
+    {
+      "name": "Zarya",
+      "slug": "zarya",
+      "image": "Heroes/zarya.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Zarya.png"
+    },
+    {
+      "name": "Zenyatta",
+      "slug": "zenyatta",
+      "image": "Heroes/zenyatta.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Zenyatta.png"
+    },
+    {
+      "name": "Anran",
+      "slug": "anran",
+      "image": "Heroes/anran.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Anran.png"
+    },
+    {
+      "name": "Domina",
+      "slug": "domina",
+      "image": "Heroes/domina.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Domina.png"
+    },
+    {
+      "name": "Emre",
+      "slug": "emre",
+      "image": "Heroes/emre.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Emre.png"
+    },
+    {
+      "name": "Jetpack Cat",
+      "slug": "jetpack-cat",
+      "image": "Heroes/jetpack-cat.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Jetpack_Cat.png"
+    },
+    {
+      "name": "Mizuki",
+      "slug": "mizuki",
+      "image": "Heroes/mizuki.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Mizuki.png"
+    },
+    {
+      "name": "Shion",
+      "slug": "shion",
+      "image": "Heroes/shion.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Shion.png"
+    },
+    {
+      "name": "Sierra",
+      "slug": "sierra",
+      "image": "Heroes/sierra.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Sierra.png"
+    },
+    {
+      "name": "Vendetta",
+      "slug": "vendetta",
+      "image": "Heroes/vendetta.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Vendetta.png"
+    },
+    {
+      "name": "Lúcio",
+      "slug": "lucio",
+      "image": "Heroes/lucio.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Lucio.png"
+    },
+    {
+      "name": "D.Va",
+      "slug": "d-va",
+      "image": "Heroes/d-va.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/Dva.png"
+    },
+    {
+      "name": "D.Mon",
+      "slug": "d-mon",
+      "image": "Heroes/d-mon.png",
+      "role": "Tank",
+      "body_image": "HeroesBody/D.Mon.png"
+    },
+    {
+      "name": "Soldier: 76",
+      "slug": "soldier-76",
+      "image": "Heroes/soldier-76.png",
+      "role": "Damage",
+      "body_image": "HeroesBody/Soldier_76.png"
+    },
+    {
+      "name": "Doctorine",
+      "slug": "doctorine",
+      "image": "Heroes/doctorine.png",
+      "role": "Support",
+      "body_image": "HeroesBody/Doctorine.png"
+    }
+  ]
+}

@@ -90,7 +90,10 @@ public partial class MainWindow : Window, IFileDialogs, IMessages
         Opened += async (_, _) =>
         {
             if (args.Contains("--focus")) ThemeView.FocusSample();
+            var openCombo = Array.IndexOf(args, "--open-combo");
+            if (openCombo >= 0) ThemeView.OpenSampleCombo(openCombo + 1 < args.Length && !args[openCombo + 1].StartsWith("--") ? args[openCombo + 1] : "");
             await Task.Delay(1200);
+            if (openCombo >= 0) Console.Error.WriteLine($"combo open at capture: {ThemeView.IsSampleComboOpen}");
             var size = new Avalonia.PixelSize((int)Bounds.Width, (int)Bounds.Height);
             using var bitmap = new Avalonia.Media.Imaging.RenderTargetBitmap(size, new Avalonia.Vector(96, 96));
             bitmap.Render(this);
