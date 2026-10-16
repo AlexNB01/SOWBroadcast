@@ -10,6 +10,15 @@ public sealed partial class MainWindowViewModel
 {
     private const int MaxScore = 200;
 
+    /// <summary>Hands the producer's automation switches to the match and the bracket (the same object stays in use when the settings change).</summary>
+    public void UseAutomation(AutomationSettings automation)
+    {
+        Match.Automation = automation;
+        Match.AutomationAllowed = () => !Link.IsLinked;               // linked: SOWDraft fills the scores and the maps
+        Bracket.Automation = automation;
+        Bracket.AutomationAllowed = () => !Link.IsTournamentLinked;   // linked: the tournament fills (and locks) the bracket
+    }
+
     /// <summary>Runs the command <paramref name="id"/> (a <see cref="ControlCatalog"/> id). Must be called on the UI thread.</summary>
     public ControlOutcome RunControl(string id)
     {

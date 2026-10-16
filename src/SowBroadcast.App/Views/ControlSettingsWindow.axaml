@@ -3,7 +3,7 @@
         xmlns:vm="using:SowBroadcast.App.ViewModels"
         x:Class="SowBroadcast.App.Views.ControlSettingsWindow"
         x:DataType="vm:ControlSettingsViewModel"
-        Title="Hotkeys and remote control"
+        Title="Hotkeys, remote control and automation"
         Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
         Width="760" Height="720" MinWidth="640" MinHeight="520"
         WindowStartupLocation="CenterOwner">
@@ -37,6 +37,47 @@
             </Grid>
             <TextBlock Classes="muted" TextWrapping="Wrap"
                        Text="GET or POST /api/control/&lt;command&gt;?token=…  Add &amp;publish=1 to send to the overlays right after the command. Answers 200 done, 409 could not do it, 404 unknown command. GET /api/control lists the commands." />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="AUTOMATION" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Optional helpers, all off until you switch them on. They change what you see here; the overlays still get it with Update. They stand aside while SOWDraft fills the match or the bracket." />
+            <CheckBox IsChecked="{Binding TeamScoreFromMaps}" Content="Team score = maps won (finished maps)" />
+            <CheckBox IsChecked="{Binding CompleteMaps}" Content="Finish a map when a team has the points that win it (the next map becomes current)" />
+            <StackPanel Margin="28,0,0,0" Spacing="6" IsEnabled="{Binding CompleteMaps}">
+              <TextBlock Classes="muted" Text="Points that win a map (0 = not decided by points; finish those maps yourself):" />
+              <WrapPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,18,4">
+                  <TextBlock Text="Control" VerticalAlignment="Center" />
+                  <NumericUpDown MinWidth="90" Minimum="0" Maximum="9" FormatString="0" Value="{Binding ControlPoints}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,18,4">
+                  <TextBlock Text="Flashpoint" VerticalAlignment="Center" />
+                  <NumericUpDown MinWidth="90" Minimum="0" Maximum="9" FormatString="0" Value="{Binding FlashpointPoints}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,18,4">
+                  <TextBlock Text="Push" VerticalAlignment="Center" />
+                  <NumericUpDown MinWidth="90" Minimum="0" Maximum="9" FormatString="0" Value="{Binding PushPoints}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,18,4">
+                  <TextBlock Text="Escort" VerticalAlignment="Center" />
+                  <NumericUpDown MinWidth="90" Minimum="0" Maximum="9" FormatString="0" Value="{Binding EscortPoints}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,18,4">
+                  <TextBlock Text="Hybrid" VerticalAlignment="Center" />
+                  <NumericUpDown MinWidth="90" Minimum="0" Maximum="9" FormatString="0" Value="{Binding HybridPoints}" />
+                </StackPanel>
+              </WrapPanel>
+            </StackPanel>
+            <CheckBox IsChecked="{Binding AdvanceWinners}" Content="Bracket: move the winner of a match to the next round" />
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,0" IsEnabled="{Binding AdvanceWinners}">
+              <TextBlock Text="Matches are best of" VerticalAlignment="Center" />
+              <NumericUpDown MinWidth="90" Minimum="1" Maximum="9" FormatString="0" Value="{Binding BestOf}" />
+              <TextBlock Classes="muted" Text="(a BO label from a tournament link wins over this)" VerticalAlignment="Center" />
+            </StackPanel>
           </StackPanel>
         </Border>
 

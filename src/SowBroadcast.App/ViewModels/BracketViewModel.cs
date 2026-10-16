@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SowBroadcast.App.Services;
 using SowBroadcast.Core.Bracket;
+using SowBroadcast.Core.Control;
 using SowBroadcast.Core.Model;
 
 namespace SowBroadcast.App.ViewModels;
@@ -93,6 +94,19 @@ public sealed partial class BracketMatchViewModel : EditableObject
     private TeamRef Resolve(string? name) =>
         string.IsNullOrEmpty(name) ? new TeamRef() : _lookup(name) ?? new TeamRef { Name = name };
 
+    /// <summary>Puts <paramref name="team"/> in place 1 or 2 (the winner who moved up), keeping its logo and abbreviation.</summary>
+    public void Assign(int slot, TeamRef team)
+    {
+        Loading = true;
+        try
+        {
+            if (slot == 1) { _ref1 = team; Team1 = team.Name; }
+            else { _ref2 = team; Team2 = team.Name; }
+        }
+        finally { Loading = false; }
+        RaiseEdited();
+    }
+
     /// <summary>After the team list changed: teams that are still in it take the list's current logo and name data.</summary>
     public void Resync()
     {
@@ -152,6 +166,13 @@ public sealed partial class BracketViewModel : EditableObject
     private readonly IMessages _messages;
     private readonly MatchIdSource _ids;
     private List<BracketRoundViewModel> _rounds = new();
+    private bool _advancing;
+
+    /// <summary>The automations the producer has switched on (EHD-4); null = none.</summary>
+    public AutomationSettings? Automation { get; set; }
+
+    /// <summary>Whether the winners may be moved up now; false while a tournament link fills (and locks) the bracket.</summary>
+    public Func<bool>? AutomationAllowed { get; set; }
 
     public BracketViewModel(IImagePicker images, string? logoFolder, Func<IReadOnlyList<TeamRef>> standingsTeams,
         ITeamPicker? picker, IMessages messages, MatchIdSource? ids = null)
@@ -252,7 +273,7 @@ public sealed partial class BracketViewModel : EditableObject
                 .Select(m =>
                 {
                     var vm = new BracketMatchViewModel(m, Lookup, names);
-                    vm.Edited += RaiseEdited;
+                    vm.Edited += OnMatchEdited;
                     return vm;
                 })
                 .ToArray();
@@ -267,6 +288,26 @@ public sealed partial class BracketViewModel : EditableObject
         }
         HasRounds = _rounds.Count > 0;
         RaiseEdited();
+    }
+
+    private void OnMatchEdited()
+    {
+        if (!_advancing && !Loading && Automation is { AdvanceBracketWinners: true } automation && AutomationAllowed?.Invoke() != false)
+            AdvanceWinners(automation);
+        RaiseEdited();
+    }
+
+    /// <summary>EHD-4: the winner of every decided match takes its place in the next round (see <see cref="BracketAdvance"/>).</summary>
+    public int AdvanceWinners(AutomationSettings automation)
+    {
+        _advancing = true;
+        try
+        {
+            var plan = BracketAdvance.Plan(CurrentRounds(), automation.DefaultBracketBestOf);
+            foreach (var step in plan) _rounds[step.Round].Matches[step.Match].Assign(step.Slot, step.Team);
+            return plan.Count;
+        }
+        finally { _advancing = false; }
     }
 
     private static string SectionOf(string? side) => side is "lower" or "grand" ? side : "upper";

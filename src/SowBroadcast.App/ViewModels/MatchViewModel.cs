@@ -2,6 +2,8 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using SowBroadcast.App.Services;
 using SowBroadcast.Core.Assets;
+using SowBroadcast.Core.Automation;
+using SowBroadcast.Core.Control;
 using SowBroadcast.Core.Model;
 
 namespace SowBroadcast.App.ViewModels;
@@ -17,6 +19,7 @@ public sealed partial class MatchViewModel : ObservableObject
 
     private readonly AssetService? _assets;
     private bool _loading;
+    private bool _automating;
 
     public MatchViewModel(AssetService? assets, IImagePicker images, string? logoFolder)
     {
@@ -54,14 +57,48 @@ public sealed partial class MatchViewModel : ObservableObject
     /// <summary>Raised when the user changed something (not while a state is being loaded).</summary>
     public event Action? Edited;
 
+    /// <summary>The automations the producer has switched on (EHD-4); null = none.</summary>
+    public AutomationSettings? Automation { get; set; }
+
+    /// <summary>Whether the automations may act now; false while SOWDraft fills the match (its data is the truth then).</summary>
+    public Func<bool>? AutomationAllowed { get; set; }
+
     partial void OnMapsCountChanged(int value) => UpdateVisibility();
 
     partial void OnPlayersCountChanged(int value) => UpdateVisibility();
 
     private void OnChildChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (_loading || e.PropertyName is null || NotEdits.Contains(e.PropertyName)) return;
+        if (_loading || e.PropertyName is null) return;
+        if (!_automating && Automation is { AnyEnabled: true } automation && AutomationAllowed?.Invoke() != false &&
+            (sender is MapCardViewModel || e.PropertyName == nameof(MapsCount)))
+            RunAutomation(automation, sender as MapCardViewModel, e.PropertyName);
+        if (NotEdits.Contains(e.PropertyName)) return;
         Edited?.Invoke();
+    }
+
+    // EHD-4: a map with the winning points is finished, and a team's score follows the maps it has won. This only changes
+    // what is on the screen; the overlays get it with Update.
+    private void RunAutomation(AutomationSettings automation, MapCardViewModel? card, string property)
+    {
+        _automating = true;
+        try
+        {
+            if (automation.CompleteMapsAutomatically && card is { IsShown: true, Completed: false } &&
+                property is nameof(MapCardViewModel.T1) or nameof(MapCardViewModel.T2) or nameof(MapCardViewModel.Map))
+            {
+                var mode = _assets?.Find(AssetCategory.Maps, card.Map)?.Mode;
+                if (MapAutomation.ShouldComplete(automation, mode, card.T1, card.T2)) card.Completed = true;
+            }
+
+            if (automation.TeamScoreFromMaps)
+            {
+                var (one, two) = MapAutomation.Wins(Maps.Where(c => c.IsShown).Select(c => (c.Completed, c.T1, c.T2)));
+                if (Team1.Score != one) Team1.Score = one;
+                if (Team2.Score != two) Team2.Score = two;
+            }
+        }
+        finally { _automating = false; }
     }
 
     private void RefreshLists()

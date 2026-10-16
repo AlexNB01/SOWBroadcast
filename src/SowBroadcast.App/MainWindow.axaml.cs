@@ -40,6 +40,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             standingsLogoFolder: teamsFolder, teamPicker: this,
             linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
         DataContext = _viewModel;
+        _viewModel.UseAutomation(_services.ControlSettings.Automation);
         StartControl();
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
@@ -165,7 +166,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             await ShowErrorAsync("Settings could not be saved", ex.Message);
         }
         ApplyHotkeys();
-        _viewModel.StatusText = "Hotkeys and remote control settings saved";
+        _viewModel.StatusText = "Hotkeys, remote control and automation settings saved";
     }
 
     private void OnOpenScoreboardOverlay(object? sender, RoutedEventArgs e)

@@ -38,12 +38,32 @@ public sealed partial class ControlSettingsViewModel : ObservableObject
         _baseUrl = baseUrl ?? "http://127.0.0.1:8324";
         Rows = ControlCatalog.All.Select(c => new HotkeyRowViewModel(c, settings.GestureFor(c.Id))).ToArray();
         foreach (var row in Rows) row.PropertyChanged += (_, _) => Refresh();
+        var automation = settings.Automation;
+        _teamScoreFromMaps = automation.TeamScoreFromMaps;
+        _completeMaps = automation.CompleteMapsAutomatically;
+        _advanceWinners = automation.AdvanceBracketWinners;
+        _bestOf = automation.DefaultBracketBestOf;
+        _controlPoints = automation.PointsToWin("Control");
+        _flashpointPoints = automation.PointsToWin("Flashpoint");
+        _pushPoints = automation.PointsToWin("Push");
+        _escortPoints = automation.PointsToWin("Escort");
+        _hybridPoints = automation.PointsToWin("Hybrid");
         _globalHotkeys = settings.GlobalHotkeys;
         _token = settings.Token;
         Refresh();
     }
 
     public IReadOnlyList<HotkeyRowViewModel> Rows { get; }
+
+    [ObservableProperty] private bool _teamScoreFromMaps;
+    [ObservableProperty] private bool _completeMaps;
+    [ObservableProperty] private bool _advanceWinners;
+    [ObservableProperty] private int _bestOf;
+    [ObservableProperty] private int _controlPoints;
+    [ObservableProperty] private int _flashpointPoints;
+    [ObservableProperty] private int _pushPoints;
+    [ObservableProperty] private int _escortPoints;
+    [ObservableProperty] private int _hybridPoints;
 
     [ObservableProperty] private bool _globalHotkeys;
     [ObservableProperty] private string _token;
@@ -75,6 +95,21 @@ public sealed partial class ControlSettingsViewModel : ObservableObject
     public ControlSettings ToSettings()
     {
         var settings = new ControlSettings { Token = Token, GlobalHotkeys = GlobalHotkeys };
+        settings.Automation = new AutomationSettings
+        {
+            TeamScoreFromMaps = TeamScoreFromMaps,
+            CompleteMapsAutomatically = CompleteMaps,
+            AdvanceBracketWinners = AdvanceWinners,
+            DefaultBracketBestOf = Math.Clamp(BestOf, 1, 9),
+            MapWinPoints = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Control"] = Math.Max(0, ControlPoints),
+                ["Flashpoint"] = Math.Max(0, FlashpointPoints),
+                ["Push"] = Math.Max(0, PushPoints),
+                ["Escort"] = Math.Max(0, EscortPoints),
+                ["Hybrid"] = Math.Max(0, HybridPoints),
+            },
+        };
         foreach (var row in Rows)
         {
             // Normalised when it reads as a gesture; anything else is kept as typed so Problems can name it.

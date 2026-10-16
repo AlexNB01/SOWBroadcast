@@ -23,6 +23,9 @@ public sealed class ControlSettings
     /// <summary>Hotkeys work in every program (Windows RegisterHotKey), not only while this window has the focus.</summary>
     public bool GlobalHotkeys { get; set; } = true;
 
+    /// <summary>The optional automations (scores from maps, finished maps, bracket advancement).</summary>
+    public AutomationSettings Automation { get; set; } = new();
+
     /// <summary>Command id to gesture text; an empty text means "no hotkey". Commands that are not listed use their default.</summary>
     public Dictionary<string, string> Bindings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -78,6 +81,7 @@ public sealed class ControlSettings
         Token = other.Token;
         GlobalHotkeys = other.GlobalHotkeys;
         Bindings = new Dictionary<string, string>(other.Bindings, StringComparer.OrdinalIgnoreCase);
+        Automation.CopyFrom(other.Automation);   // the same object stays, because the match and the bracket hold on to it
     }
 
     public static ControlSettings Load(string path)
@@ -91,6 +95,9 @@ public sealed class ControlSettings
                 {
                     if (string.IsNullOrWhiteSpace(loaded.Token)) loaded.Token = NewToken();
                     loaded.Bindings = new Dictionary<string, string>(loaded.Bindings ?? new(), StringComparer.OrdinalIgnoreCase);
+                    loaded.Automation ??= new AutomationSettings();
+                    loaded.Automation.MapWinPoints = new Dictionary<string, int>(loaded.Automation.MapWinPoints ?? new(), StringComparer.OrdinalIgnoreCase);
+                    loaded.Automation.DefaultBracketBestOf = Math.Clamp(loaded.Automation.DefaultBracketBestOf, 1, 9);
                     return loaded;
                 }
             }
