@@ -7,13 +7,13 @@ public static class SnapshotParser
 {
     // ---- tolerant JSON access ----------------------------------------------------------------------------
 
-    internal static JsonElement? Prop(JsonElement el, string name) =>
+    public static JsonElement? Prop(JsonElement el, string name) =>
         el.ValueKind == JsonValueKind.Object && el.TryGetProperty(name, out var v) && v.ValueKind != JsonValueKind.Null ? v : null;
 
-    internal static string? Str(JsonElement el, string name) =>
+    public static string? Str(JsonElement el, string name) =>
         Prop(el, name) is { } v ? v.ValueKind == JsonValueKind.String ? v.GetString() : v.ToString() : null;
 
-    internal static int? Int(JsonElement el, string name)
+    public static int? Int(JsonElement el, string name)
     {
         if (Prop(el, name) is not { } v) return null;
         if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i)) return i;
@@ -21,21 +21,21 @@ public static class SnapshotParser
         return v.ValueKind == JsonValueKind.String && int.TryParse(v.GetString(), out var parsed) ? parsed : null;
     }
 
-    internal static long? Long(JsonElement el, string name)
+    public static long? Long(JsonElement el, string name)
     {
         if (Prop(el, name) is not { } v) return null;
         if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var l)) return l;
         return v.ValueKind == JsonValueKind.String && long.TryParse(v.GetString(), out var parsed) ? parsed : null;
     }
 
-    internal static bool Bool(JsonElement el, string name) =>
+    public static bool Bool(JsonElement el, string name) =>
         Prop(el, name) is { } v && (v.ValueKind == JsonValueKind.True || (v.ValueKind == JsonValueKind.Number && v.GetDouble() != 0));
 
-    internal static IEnumerable<JsonElement> Array(JsonElement el, string name) =>
+    public static IEnumerable<JsonElement> Array(JsonElement el, string name) =>
         Prop(el, name) is { ValueKind: JsonValueKind.Array } v ? v.EnumerateArray() : Enumerable.Empty<JsonElement>();
 
     /// <summary>A value that is a JSON array either inline or as a JSON-encoded string (the legacy API does both).</summary>
-    internal static IEnumerable<JsonElement> ArrayOrEncoded(JsonElement el, string name)
+    public static IEnumerable<JsonElement> ArrayOrEncoded(JsonElement el, string name)
     {
         if (Prop(el, name) is not { } v) return Enumerable.Empty<JsonElement>();
         if (v.ValueKind == JsonValueKind.Array) return v.EnumerateArray().ToArray();
@@ -48,7 +48,7 @@ public static class SnapshotParser
         catch (JsonException) { return Enumerable.Empty<JsonElement>(); }
     }
 
-    internal static string Absolute(string origin, string? url)
+    public static string Absolute(string origin, string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return "";
         if (Uri.TryCreate(url, UriKind.Absolute, out var abs) && (abs.Scheme == "http" || abs.Scheme == "https")) return abs.ToString();
@@ -89,14 +89,15 @@ public static class SnapshotParser
             Version = Long(root, "version") ?? 0,
             Origin = origin,
             Stages = stages,
-            Teams = teams.Select(tm => tm with { LogoUrl = tm.LogoUrl }).ToArray(),
+            Teams = teams,
             Matches = matches,
             Standings = ParseStandings(Prop(root, "standings")),
             Live = Prop(root, "live") is { ValueKind: JsonValueKind.Object } live ? ParseLive(live) : null,
         };
     }
 
-    private static LiveState ParseLive(JsonElement live)
+    /// <summary>The <c>live</c> object of the broadcast API (also carried by <c>tournament-event</c>).</summary>
+    public static LiveState ParseLive(JsonElement live)
     {
         var score = Prop(live, "score");
         return new LiveState(

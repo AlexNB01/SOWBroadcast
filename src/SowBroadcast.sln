@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SowBroadcast.Tests", "SowBr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SowBroadcast.Server", "SowBroadcast.Server\SowBroadcast.Server.csproj", "{0F3DBD21-618A-420F-BF46-F5C306028C93}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SowBroadcast.Integrations", "SowBroadcast.Integrations\SowBroadcast.Integrations.csproj", "{FC9E0198-E3A7-46C2-A23E-15376FDA6EC9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{0F3DBD21-618A-420F-BF46-F5C306028C93}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F3DBD21-618A-420F-BF46-F5C306028C93}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0F3DBD21-618A-420F-BF46-F5C306028C93}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC9E0198-E3A7-46C2-A23E-15376FDA6EC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC9E0198-E3A7-46C2-A23E-15376FDA6EC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC9E0198-E3A7-46C2-A23E-15376FDA6EC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC9E0198-E3A7-46C2-A23E-15376FDA6EC9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
