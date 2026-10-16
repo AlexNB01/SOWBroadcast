@@ -11,7 +11,7 @@ using SowBroadcast.Core.Storage;
 
 namespace SowBroadcast.App;
 
-public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
+public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages, ITeamPicker
 {
     private static readonly FilePickerFileType StateFiles = new("SOW Broadcast state")
     {
@@ -32,7 +32,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
         Directory.CreateDirectory(logoFolder);
         Directory.CreateDirectory(broadcastLogoFolder);
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
-            _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir);
+            _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir,
+            standingsLogoFolder: teamsFolder, teamPicker: this);
         DataContext = _viewModel;
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
@@ -173,6 +174,12 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
     {
         var window = new BulkImportWindow(new BulkImportViewModel(_services.Assets, this));
         await window.ShowDialog(this);
+    }
+
+    public async Task<IReadOnlyList<Core.Model.TeamRef>?> PickTeamsAsync(IReadOnlyList<Core.Model.TeamRef> teams)
+    {
+        var window = new TeamImportWindow(new TeamImportViewModel(teams));
+        return await window.ShowDialog<IReadOnlyList<Core.Model.TeamRef>?>(this);
     }
 
     public async Task<string?> PickImageAsync(string title, string? initialDirectory = null)

@@ -81,10 +81,10 @@
         <views:WaitingView />
       </TabItem>
       <TabItem Header="STANDINGS">
-        <views:Placeholder Title="Standings" Milestone="M5" />
+        <views:StandingsView />
       </TabItem>
       <TabItem Header="BRACKET">
-        <views:Placeholder Title="Bracket" Milestone="M5" />
+        <views:BracketView />
       </TabItem>
       <TabItem x:Name="ThemeTab" Header="THEME" IsVisible="False">
         <views:ThemePreview x:Name="ThemeView" />

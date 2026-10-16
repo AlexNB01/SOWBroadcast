@@ -3,6 +3,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SowBroadcast.App.Services;
 using SowBroadcast.Core.Assets;
+using SowBroadcast.Core.Bracket;
+using SowBroadcast.Core.Standings;
 using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Match;
 using SowBroadcast.Core.Model;
@@ -25,7 +27,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public MainWindowViewModel(IFileDialogs dialogs, IMessages messages, IOverlayPublisher publisher, string autosavePath,
         AssetService? assets = null, IImagePicker? images = null, ILogoConverter? logos = null,
         string? teamsFolder = null, string? logoFolder = null, string? broadcastLogoFolder = null,
-        string? defaultVideosDir = null, Func<long>? clock = null)
+        string? defaultVideosDir = null, Func<long>? clock = null, string? standingsLogoFolder = null,
+        ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null)
     {
         _dialogs = dialogs;
         _messages = messages;
@@ -38,9 +41,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Match = new MatchViewModel(assets, picker, logoFolder);
         General = new GeneralViewModel(picker, broadcastLogoFolder);
         Waiting = new WaitingViewModel(dialogs, defaultVideosDir, clock);
+        Standings = new StandingsViewModel(picker, standingsLogoFolder);
+        Bracket = new BracketViewModel(picker, standingsLogoFolder,
+            () => StandingsOperations.TeamsFromStandings(Standings.ApplyTo(State).Standings), teamPicker, messages, matchIds);
         Match.Edited += () => MarkUnsent("match");
         General.Edited += () => MarkUnsent("general");
         Waiting.Edited += () => MarkUnsent("waiting");
+        Standings.Edited += () => MarkUnsent("standings");
+        Bracket.Edited += () => MarkUnsent("bracket");
         Waiting.TimerCommanded += () => PublishTimer(announce: true);
         Waiting.TimerTicked += () => PublishTimer(announce: false);
         State = AppState.CreateDefault();
@@ -60,6 +68,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>The Waiting Screen tab (videos, countdown, texts, ticker, socials).</summary>
     public WaitingViewModel Waiting { get; }
+
+    /// <summary>The Standings tab (groups, tables, display group).</summary>
+    public StandingsViewModel Standings { get; }
+
+    /// <summary>The Bracket tab (template, team list, matches).</summary>
+    public BracketViewModel Bracket { get; }
 
     [ObservableProperty] private AppState _state;
     [ObservableProperty] private string _statusText = "Ready";
@@ -97,7 +111,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void CollectTabs()
     {
         _collecting = true;
-        try { State = Waiting.ApplyTo(General.ApplyTo(Match.ApplyTo(State))); }
+        try { State = Bracket.ApplyTo(Standings.ApplyTo(Waiting.ApplyTo(General.ApplyTo(Match.ApplyTo(State))))); }
         finally { _collecting = false; }
     }
 
@@ -107,6 +121,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         State = state;
         General.Load(state);
         Waiting.Load(state);
+        Standings.Load(state);
+        Bracket.Load(state);
     }
 
     // ---- General and Waiting tab actions -----------------------------------------------------------------
@@ -140,6 +156,40 @@ public sealed partial class MainWindowViewModel : ObservableObject
             StatusText = $"Could not write overlay files: {ex.Message}";
             return;
         }
+        Autosave();
+    }
+
+    /// <summary>Update + sort: orders and ranks every table, then publishes the standings.</summary>
+    [RelayCommand]
+    private void UpdateStandings()
+    {
+        Standings.SortAll();
+        CollectTabs();
+        PublishPart(PublishScope.Standings, "standings", "Standings");
+    }
+
+    [RelayCommand]
+    private void UpdateBracket()
+    {
+        CollectTabs();
+        PublishPart(PublishScope.Bracket, "bracket", "Bracket");
+    }
+
+    [RelayCommand]
+    private void ResetStandings()
+    {
+        Standings.ResetTab();
+        MarkUnsent("standings");
+        StatusText = "Standings tab reset (not published yet)";
+        Autosave();
+    }
+
+    [RelayCommand]
+    private void ResetBracket()
+    {
+        Bracket.ResetTab();
+        MarkUnsent("bracket");
+        StatusText = "Bracket tab reset (not published yet)";
         Autosave();
     }
 

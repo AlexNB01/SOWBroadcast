@@ -22,6 +22,13 @@ public interface IImagePicker
     Task<string?> PickImageAsync(string title, string? initialDirectory = null);
 }
 
+/// <summary>Lets the user choose which of the given teams to import (the bracket's "Import from Standings").</summary>
+public interface ITeamPicker
+{
+    /// <summary>The chosen teams in list order, or null when the user cancelled.</summary>
+    Task<IReadOnlyList<SowBroadcast.Core.Model.TeamRef>?> PickTeamsAsync(IReadOnlyList<SowBroadcast.Core.Model.TeamRef> teams);
+}
+
 /// <summary>Simple message surface (errors and notices) implemented by the window.</summary>
 public interface IMessages
 {

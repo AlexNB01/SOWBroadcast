@@ -531,6 +531,106 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Empty(_publisher.Parts);
     }
 
+    // ---- Standings and Bracket tabs ----------------------------------------------------------------------
+
+    [Fact]
+    public void Update_and_sort_sorts_the_tables_and_publishes_only_the_standings()
+    {
+        var vm = CreateWithClock();
+        var rows = vm.Standings.Groups[0].Rows;
+        rows[0].TeamName = "low";
+        rows[0].Points = 1;
+        vm.Standings.Groups[0].AddRowCommand.Execute(null);
+        rows[1].TeamName = "high";
+        rows[1].Points = 9;
+        vm.Match.Team1.Name = "Typed";
+
+        vm.UpdateStandingsCommand.Execute(null);
+
+        var (state, scope) = Assert.Single(_publisher.Parts);
+        Assert.Equal(PublishScope.Standings, scope);
+        Assert.Equal(new[] { "high", "low" }, state.Standings.Groups[0].Rows.Select(r => r.TeamName));
+        Assert.Equal(new[] { 1, 2 }, state.Standings.Groups[0].Rows.Select(r => r.Rank));
+        Assert.Equal(new[] { "high", "low" }, vm.Standings.Groups[0].Rows.Select(r => r.TeamName)); // the table on screen is sorted too
+        Assert.True(vm.HasUnsentChanges); // the Match tab is still unsent
+        Assert.Empty(_publisher.Published);
+    }
+
+    [Fact]
+    public void Update_bracket_publishes_only_the_bracket_and_clears_its_marker()
+    {
+        var vm = CreateWithClock();
+        vm.Bracket.SelectedTemplate = "4 team single elimination";
+        vm.Bracket.LoadTemplateCommand.Execute(null);
+        vm.Bracket.Title = "Playoffs";
+        Assert.True(vm.HasUnsentChanges);
+
+        vm.UpdateBracketCommand.Execute(null);
+
+        var (state, scope) = Assert.Single(_publisher.Parts);
+        Assert.Equal(PublishScope.Bracket, scope);
+        Assert.Equal("Playoffs", state.Bracket.Title);
+        Assert.Equal(2, state.Bracket.Rounds.Count);
+        Assert.False(vm.HasUnsentChanges);
+    }
+
+    [Fact]
+    public void Resetting_the_standings_or_bracket_tab_sends_nothing_and_marks_unsent()
+    {
+        var vm = CreateWithClock();
+        vm.Standings.Title = "Cup";
+        vm.Bracket.Title = "Playoffs";
+        vm.HasUnsentChanges = false;
+
+        vm.ResetStandingsCommand.Execute(null);
+        vm.ResetBracketCommand.Execute(null);
+
+        Assert.Equal("", vm.Standings.Title);
+        Assert.Equal("", vm.Bracket.Title);
+        Assert.True(vm.HasUnsentChanges);
+        Assert.Empty(_publisher.Parts);
+        Assert.Empty(_publisher.Published);
+    }
+
+    [Fact]
+    public async Task The_bracket_can_import_the_teams_typed_into_the_standings()
+    {
+        var vm = CreateWithClock();
+        vm.Standings.Groups[0].Rows[0].TeamName = "Gamma";
+        vm.Standings.Groups[0].Rows[0].Points = 3;
+        vm.Standings.Groups[0].AddRowCommand.Execute(null);
+        vm.Standings.Groups[0].Rows[1].TeamName = "Alpha";
+        vm.Standings.Groups[0].Rows[1].Points = 9;
+
+        await vm.Bracket.ImportFromStandingsCommand.ExecuteAsync(null);
+
+        // No picker in this view model: every team is taken, unranked ones by name.
+        Assert.Equal(new[] { "Alpha", "Gamma" }, vm.Bracket.Teams.Take(2).Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task Standings_and_bracket_survive_a_restart()
+    {
+        var vm = CreateWithClock();
+        vm.Standings.Title = "Cup";
+        vm.Standings.Groups[0].Rows[0].TeamName = "Alpha";
+        vm.Standings.Groups[0].Rows[0].Points = 4;
+        vm.Bracket.SelectedTemplate = "8 team double elimination";
+        vm.Bracket.LoadTemplateCommand.Execute(null);
+        vm.Bracket.Stage = "Finals";
+        vm.Autosave();
+
+        var again = CreateWithClock();
+        await again.LoadAutosaveAsync();
+
+        Assert.Equal("Cup", again.Standings.Title);
+        Assert.Equal("Alpha", again.Standings.Groups[0].Rows[0].TeamName);
+        Assert.Equal("Finals", again.Bracket.Stage);
+        Assert.True(again.Bracket.ShowDoubleView);
+        Assert.Equal(3, again.Bracket.Sections.Count);
+        Assert.False(again.HasUnsentChanges); // restoring is not an edit
+    }
+
     private sealed class FakePublisher : IOverlayPublisher
     {
         public string? BaseUrl => "http://127.0.0.1:8324";

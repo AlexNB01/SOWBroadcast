@@ -20,8 +20,42 @@ public static class SampleState
         maps[1] = maps[1] with { Map = "Circuit Royal", Pick = Picks.Team2, T1Ban = "Echo", T2Ban = "Genji" };
         maps[2] = maps[2] with { Map = "Ilios" };
 
+        static StandingsRow Row(string team, string abbr, int w, int l, int diff, int pts, string status = "") =>
+            new() { TeamName = team, Abbr = abbr, Wins = w, Losses = l, MapDiff = diff, Points = pts, Status = status };
+
+        var teams = new[] { "Northern Lights", "Midnight Sun", "Aurora Guard", "Polar Wolves" };
+        var bracketIds = new SowBroadcast.Core.Bracket.MatchIdSource(() => 1_760_000_000);
+        var rounds = SowBroadcast.Core.Bracket.BracketTemplates.Build(SowBroadcast.Core.Bracket.BracketTemplate.Double8, bracketIds)
+            .Select((r, i) => i == 0
+                ? r with { Matches = r.Matches.Select((m, j) => m with
+                {
+                    Team1 = new TeamRef { Name = teams[j % 4] },
+                    Team2 = new TeamRef { Name = teams[(j + 1) % 4] },
+                    Score1 = 2, Score2 = j,
+                }).ToArray() }
+                : r)
+            .ToArray();
+
         return AppState.CreateDefault() with
         {
+            Standings = new StandingsSettings
+            {
+                Title = "Group Stage", Subtitle = "Synthetic Cup",
+                Groups = new[]
+                {
+                    new StandingsGroup { Key = "group_1", Name = "Group A", Rows = new[]
+                    {
+                        Row("Midnight Sun", "MS", 2, 1, 1, 6), Row("Northern Lights", "NL", 3, 0, 5, 9, "qualified"), Row("Aurora Guard", "AG", 0, 3, -6, 0, "eliminated"),
+                    } },
+                    new StandingsGroup { Key = "group_2", Name = "Group B", Rows = new[] { Row("Polar Wolves", "PW", 1, 1, 0, 3) } },
+                },
+                DisplayGroup = "__all__",
+            },
+            Bracket = new BracketSettings
+            {
+                Title = "Playoffs", Stage = "Quarterfinals", Rounds = rounds, DoubleElimView = "upper",
+                Teams = teams.Select(t => new TeamRef { Name = t }).Concat(Enumerable.Range(0, 12).Select(_ => new TeamRef())).ToArray(),
+            },
             Team1 = TeamOf("Northern Lights", "NL", "#27aae1", 1,
                 ("Aurora", "Doomfist", "Tank"), ("Borealis", "Ashe", "Damage"), ("Cirrus", "Genji", "Damage"),
                 ("Dawn", "Ana", "Support"), ("Ember", "Baptiste", "Support")),

@@ -16,6 +16,12 @@ public enum PublishScope
     /// <summary>Update (Waiting): the waiting-screen files and the status text.</summary>
     Waiting,
 
+    /// <summary>Update + sort: the standings file.</summary>
+    Standings,
+
+    /// <summary>Update (Bracket): the bracket file.</summary>
+    Bracket,
+
     /// <summary>A timer command (start, pause, reset, adjust): the countdown files, announced as <c>waiting.timer</c> at once.</summary>
     Timer,
 
@@ -99,6 +105,12 @@ public sealed class OverlayPublisher : IOverlayPublisher
                 exporter.ExportWaiting(derived, written);
                 exporter.ExportStatus(derived, written);
                 break;
+            case PublishScope.Standings:
+                exporter.ExportStandings(derived, written);
+                break;
+            case PublishScope.Bracket:
+                exporter.ExportBracket(derived, written);
+                break;
             default:
                 exporter.ExportTimer(derived, written);
                 break;
@@ -110,6 +122,8 @@ public sealed class OverlayPublisher : IOverlayPublisher
     {
         PublishScope.General => key.StartsWith("general.", StringComparison.Ordinal),
         PublishScope.Waiting => key.StartsWith("waiting.", StringComparison.Ordinal) || key == "matchtext",
+        PublishScope.Standings => key == "standings",
+        PublishScope.Bracket => key == "bracket",
         _ => key == "waiting.timer",
     };
 
@@ -118,6 +132,8 @@ public sealed class OverlayPublisher : IOverlayPublisher
     {
         PublishScope.General => last with { General = now.General },
         PublishScope.Waiting => last with { Waiting = now.Waiting },
+        PublishScope.Standings => last with { Standings = now.Standings },
+        PublishScope.Bracket => last with { Bracket = now.Bracket },
         _ => last with { Waiting = last.Waiting with { TimerSeconds = now.Waiting.TimerSeconds, TimerRunning = now.Waiting.TimerRunning } },
     };
 

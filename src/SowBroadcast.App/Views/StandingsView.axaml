@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SowBroadcast.App.ViewModels"
+             xmlns:controls="using:SowBroadcast.App.Controls"
+             x:Class="SowBroadcast.App.Views.StandingsView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <DockPanel Margin="0,12,0,0">
+    <!-- Update + sort is the one primary button of this view -->
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
+      <Button Content="Reset this tab" Command="{Binding ResetStandingsCommand}" />
+      <Button Classes="primary" Content="Update + sort" MinWidth="150" Command="{Binding UpdateStandingsCommand}" />
+    </StackPanel>
+
+    <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,10">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,260" ColumnSpacing="14">
+        <Button Content="Add Group" Command="{Binding Standings.AddGroupCommand}" />
+        <TextBlock Grid.Column="2" Classes="label" VerticalAlignment="Center" Text="SHOW IN STANDINGS.HTML" />
+        <ComboBox Grid.Column="3" HorizontalAlignment="Stretch" ItemsSource="{Binding Standings.DisplayOptions}" SelectedItem="{Binding Standings.SelectedDisplay}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:DisplayOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </Grid>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,10">
+      <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="12">
+        <TextBlock Classes="label" VerticalAlignment="Center" Text="TITLE" />
+        <TextBox Grid.Column="1" Text="{Binding Standings.Title}" />
+        <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="SUBTITLE / GROUP" />
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Standings.Subtitle}" />
+      </Grid>
+    </Border>
+
+    <ScrollViewer>
+      <ItemsControl ItemsSource="{Binding Standings.Groups}" Margin="0,0,12,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:StandingsGroupViewModel">
+            <Border Classes="card" Padding="14">
+              <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                  <TextBlock Classes="label" VerticalAlignment="Center" Text="NAME" />
+                  <TextBox Grid.Column="1" Text="{Binding Name}" />
+                  <Button Grid.Column="2" Content="Remove" IsEnabled="{Binding CanRemove}" Command="{Binding RemoveGroupCommand}" />
+                </Grid>
+
+                <!-- Column headers -->
+                <Grid ColumnDefinitions="64,*,80,64,64,72,80,150,*,36" ColumnSpacing="6" Margin="0,4,0,0">
+                  <TextBlock Classes="label" Text="RANK" />
+                  <TextBlock Grid.Column="1" Classes="label" Text="TEAM" />
+                  <TextBlock Grid.Column="2" Classes="label" Text="ABBR" />
+                  <TextBlock Grid.Column="3" Classes="label" Text="W" />
+                  <TextBlock Grid.Column="4" Classes="label" Text="L" />
+                  <TextBlock Grid.Column="5" Classes="label" Text="+/-" />
+                  <TextBlock Grid.Column="6" Classes="label" Text="POINTS" />
+                  <TextBlock Grid.Column="7" Classes="label" Text="STATUS" />
+                  <TextBlock Grid.Column="8" Classes="label" Text="LOGO" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Rows}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:StandingsRowViewModel">
+                      <Grid ColumnDefinitions="64,*,80,64,64,72,80,150,*,36" ColumnSpacing="6">
+                        <NumericUpDown MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Rank}" />
+                        <TextBox Grid.Column="1" Text="{Binding TeamName}" Watermark="Team name" />
+                        <TextBox Grid.Column="2" Text="{Binding Abbr}" MaxLength="6" />
+                        <NumericUpDown Grid.Column="3" MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Wins}" />
+                        <NumericUpDown Grid.Column="4" MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Losses}" />
+                        <NumericUpDown Grid.Column="5" MinWidth="0" ShowButtonSpinner="False" Minimum="-99" Maximum="99" FormatString="0" Value="{Binding MapDiff}" />
+                        <NumericUpDown Grid.Column="6" MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="999" FormatString="0" Value="{Binding Points}" />
+                        <controls:SearchableComboBox Grid.Column="7" ItemsSource="{Binding StatusNames}" SelectedItem="{Binding Status}" NoneText="—" />
+                        <Grid Grid.Column="8" ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                          <TextBox Text="{Binding LogoPath}" Watermark="Logo file" />
+                          <Button Grid.Column="1" Content="…" Padding="10,0" Command="{Binding BrowseLogoCommand}" ToolTip.Tip="Browse for a logo" />
+                        </Grid>
+                        <Button Grid.Column="9" Content="✕" Padding="0" Width="32" MinWidth="0" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove this line" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Button Content="Add Row" HorizontalAlignment="Left" Command="{Binding AddRowCommand}" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

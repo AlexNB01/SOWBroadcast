@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SowBroadcast.App.ViewModels"
+        x:Class="SowBroadcast.App.Views.TeamImportWindow"
+        x:DataType="vm:TeamImportViewModel"
+        Title="Import Teams from Standings"
+        Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
+        Width="400" Height="480" MinWidth="320" MinHeight="320"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,12,0,0">
+      <Button Content="Cancel" Click="OnCancel" />
+      <Button Classes="primary" Content="Import" MinWidth="100" Click="OnImport" />
+    </StackPanel>
+    <TextBlock DockPanel.Dock="Top" Classes="muted" Margin="0,0,0,8" Text="Select teams to import." />
+    <Border Classes="card" Padding="8">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Choices}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TeamChoice">
+              <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="4,2" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</Window>
