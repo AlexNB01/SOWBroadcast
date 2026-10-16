@@ -105,11 +105,19 @@
   }
 
   /* Map background */
+  /* A plain positioning box: either its own background-image (the still) or the .map-media video inside it
+     (when Maps/<slug>.mp4 exists) carries the picture; both are sized to cover. */
   .map-bg{
-    position:absolute; inset:0;
+    position:absolute; inset:0; overflow:hidden;
     background-size:cover; background-position:center;
     filter:brightness(.65) saturate(.85);
   }
+  .map-media{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; object-position:center;
+    display:none;
+  }
+  .map-media.show{ display:block; }
 
   /* Gradient overlays */
   .map-overlay{
@@ -214,7 +222,9 @@
 
 <!-- MAIN SCENE -->
 <div class="draft-scene">
-  <div class="map-bg"      id="mapBg"></div>
+  <div class="map-bg"      id="mapBg">
+    <video class="map-media" id="mapBgVideo" muted loop playsinline autoplay></video>
+  </div>
   <div class="map-overlay"></div>
   <div class="hero-body hero-left"  id="heroLeft"></div>
   <div class="hero-body hero-right" id="heroRight"></div>
@@ -244,6 +254,40 @@ const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}
 const bySlug=list=>{ const m={}; (list||[]).forEach(x=>x?.slug&&(m[x.slug]=x)); return m; };
 const nameToSlug=n=>(n||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
   .toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
+// Shows map `name`'s video if one exists next to its usual still (same base slug, .mp4 - plain H.264, no alpha needed for a
+// full-bleed background), otherwise the .png still. Whether a file exists is asked once per map and remembered.
+const _mapMediaCache = {}; // slug -> "video" | "image" | null (no picture at all)
+async function setMapBg(name){
+  const wrap  = document.getElementById("mapBg");
+  const video = document.getElementById("mapBgVideo");
+  const stopVideo = ()=>{ video.classList.remove("show"); video.pause(); video.removeAttribute("src"); video.load(); delete video.dataset.slug; };
+
+  if(!name){ wrap.style.backgroundImage = "none"; stopVideo(); return; }
+
+  const slug = nameToSlug(name);
+  let kind = _mapMediaCache[slug];
+  if(kind === undefined){
+    kind = (await ok(`${SB}/Maps/${slug}.mp4`)) ? "video" : (await ok(`${SB}/Maps/${slug}.png`)) ? "image" : null;
+    _mapMediaCache[slug] = kind;
+  }
+
+  if(kind === "video"){
+    wrap.style.backgroundImage = "none";
+    if(video.dataset.slug !== slug){
+      video.dataset.slug = slug;
+      video.src = `${SB}/Maps/${slug}.mp4`;
+      video.play().catch(()=>{});
+    }
+    video.classList.add("show");
+  } else if(kind === "image"){
+    stopVideo();
+    wrap.style.backgroundImage = `url('${SB}/Maps/${slug}.png?_=${Date.now()}')`;
+  } else {
+    wrap.style.backgroundImage = "none";
+    stopVideo();
+  }
+}
+
 function hexToRgb(h){
   const s=((h||"").trim().replace(/^#/,"").toLowerCase());
   const x=s.length===3?s.split("").map(c=>c+c).join(""):s;
@@ -338,17 +382,16 @@ async function renderScene(state){
   const ci=Number(state.current_map||0);
   const cur=(ci>0&&(state.maps||[])[ci-1])?state.maps[ci-1]:null;
 
-  // Map background
-  const mapBg=document.getElementById("mapBg");
+  // Map background: a looping muted video when Maps/<slug>.mp4 exists, otherwise the still (Maps/<slug>.png)
   if(cur?.map){
     const slug=nameToSlug(cur.map);
-    mapBg.style.backgroundImage=`url('${SB}/Maps/${slug}.png?_=${Date.now()}')`;
+    await setMapBg(cur.map);
     const meta=mapsBySlug[slug];
     document.getElementById("mapNameLabel").textContent=(meta?.name||cur.map).toUpperCase();
     const mode=(meta?.mode||cur.mode||"").toUpperCase();
     document.getElementById("mapModeLabel").textContent=mode;
   } else {
-    mapBg.style.backgroundImage="none";
+    await setMapBg(null);
     document.getElementById("mapNameLabel").textContent="";
     document.getElementById("mapModeLabel").textContent="";
   }

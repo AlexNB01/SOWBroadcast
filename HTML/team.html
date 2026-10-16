@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>Team 1 Lineup</title>
+<title>Team Lineup</title>
 <style>
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Bold.ttf") format('TrueType');font-weight:bold}
   @font-face{font-family:'Rajdhani';src:url("fonts/Rajdhani/Rajdhani-Regular.ttf") format('TrueType');font-weight:normal}
@@ -160,7 +160,11 @@
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
   const HEROES_BODY = SB + "/HeroesBody";
   const ROLES = SB + "/Roles";
-  const TEAM="T1";
+  // Which team: team.html?side=1 (default) or team.html?side=2
+  const SIDE = new URLSearchParams(location.search).get("side") === "2" ? 2 : 1;
+  const TEAM = "T" + SIDE;
+  document.documentElement.style.setProperty("--tcolor", SIDE === 2 ? "#C80013" : "#27AAE1");
+  document.getElementById("tname").textContent = "TEAM " + SIDE;
 
   function read(p){ return SOW.read(p); }
   function ok(p){ return SOW.ok(p); }
@@ -227,7 +231,7 @@
     const kv={}; (await read(GENERAL+"/colors.txt")).split(/\r?\n/).forEach(l=>{ const m=l.match(/^\s*([^=#]+)\s*=\s*(.+?)\s*$/); if(m) kv[m[1].trim()]=m[2].trim();});
     document.documentElement.style.setProperty("--primary", hex(kv.primary,"#0f1114"));
     document.documentElement.style.setProperty("--text",    hex(kv.secondary,"#ffffff"));
-    const tcol=hex(await read(MATCH+"/"+TEAM+"Color.txt"), "#27AAE1");
+    const tcol=hex(await read(MATCH+"/"+TEAM+"Color.txt"), SIDE === 2 ? "#C80013" : "#27AAE1");
     document.documentElement.style.setProperty("--tcolor", tcol);
   }
 
@@ -375,7 +379,7 @@
       es.onmessage=async ev=>{
         try{
           const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
-          if(ch.some(k=>k.startsWith("t1.") || k==="general.colors")) await render();
+          if(ch.some(k=>k.startsWith(TEAM.toLowerCase() + ".") || k==="general.colors")) await render();
         }catch{}
       };
     }catch{}
