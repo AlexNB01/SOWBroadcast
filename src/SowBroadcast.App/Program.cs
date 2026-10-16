@@ -8,6 +8,9 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // First of all: the installer and updater start the program with special arguments (install, update, uninstall hooks).
+        Velopack.VelopackApp.Build().Run();
+
         AppLog.Init();
         try
         {

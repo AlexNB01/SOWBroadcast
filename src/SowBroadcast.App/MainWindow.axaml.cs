@@ -85,12 +85,13 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         };
     }
 
+#endif
+
     private void OnOpenScoreboardOverlay(object? sender, RoutedEventArgs e)
     {
         if (_viewModel.OverlayBaseUrl is { } url)
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url + "/HTML/scoreboard.html") { UseShellExecute = true });
     }
-#endif
 
 #if DEBUG
     // Dev aid: `--screenshot <file.png> [--tab <index>] [--size WxH]` renders the window to a PNG and exits.

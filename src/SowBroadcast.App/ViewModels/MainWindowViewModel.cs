@@ -410,15 +410,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         }
     }
 
-#if DEBUG
+    // Debug menu (hidden in the released program): a synthetic match to look at the overlays without typing data in.
     [RelayCommand]
     private void LoadSample()
     {
+#if DEBUG
         ShowState(SampleState.Create());
         MarkUnsent("file");
         StatusText = "Loaded the sample match (not published yet)";
-    }
 #endif
+    }
 
     public void Autosave()
     {
