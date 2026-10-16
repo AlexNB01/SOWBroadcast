@@ -31,6 +31,12 @@
         <Separator />
         <MenuItem Header="Open _scoreboard overlay in browser" Click="OnOpenScoreboardOverlay" />
       </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="_About SOW Broadcast…" Click="OnAbout" />
+        <Separator />
+        <MenuItem Header="Open _log folder" Click="OnOpenLogs" />
+        <MenuItem Header="Open _data folder" Click="OnOpenData" />
+      </MenuItem>
       <MenuItem Header="_Teams">
         <MenuItem Header="Export _Home…" Command="{Binding ExportHomeCommand}" />
         <MenuItem Header="Import H_ome…" Command="{Binding ImportHomeCommand}" />

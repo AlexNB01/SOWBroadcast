@@ -42,6 +42,7 @@ public sealed partial class LinkViewModel : ObservableObject
     private LinkUpdate? _last;
     private bool _rebuilding;
     private string _lastUpdateTime = "";
+    private string _loggedStatus = "";
 
     public LinkViewModel(LinkService service, LogoCache? logos, ILinkHost host, IMessages messages, Action<Action> post, Func<DateTime>? now = null)
     {
@@ -205,6 +206,12 @@ public sealed partial class LinkViewModel : ObservableObject
     private void RefreshStatus()
     {
         var status = _service.Status;
+        if (status.Text != _loggedStatus)
+        {
+            _loggedStatus = status.Text;
+            if (status.State == LinkState.Error) Serilog.Log.Warning("SOWDraft link: {Status}", status.Text);
+            else Serilog.Log.Information("SOWDraft link: {Status}", status.Text);
+        }
         IsLinked = _service.IsLinked;
         var linkedStates = status.State is LinkState.Linked or LinkState.WaitingForDraft or LinkState.MatchComplete or LinkState.NoMatchSelected;
         StatusText = linkedStates && _lastUpdateTime.Length > 0 ? $"{status.Text}  ·  last update {_lastUpdateTime}" : status.Text;

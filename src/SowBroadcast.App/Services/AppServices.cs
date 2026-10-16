@@ -73,7 +73,7 @@ public sealed class AppServices : IAsyncDisposable
             folders["/Scoreboard/" + asset] = new[] { userFolder, Path.Combine(content, "Scoreboard", asset) };
         }
 
-        var http = new HttpFetcher(typeof(AppServices).Assembly.GetName().Version?.ToString(3) ?? "3.0.0");
+        var http = new HttpFetcher(AppInfo.Version);
         var assets = new AssetService(AppPaths.ScoreboardDir, new[] { Path.Combine(content, "Scoreboard") });
         assets.Load();
 
@@ -86,10 +86,12 @@ public sealed class AppServices : IAsyncDisposable
         try
         {
             var server = Task.Run(() => OverlayServer.StartAsync(options)).GetAwaiter().GetResult();
+            Serilog.Log.Information("Overlay server listening on {Url}", server.BaseUrl);
             return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl), assets, server, null, http);
         }
         catch (IOException ex)
         {
+            Serilog.Log.Error(ex, "The overlay server could not start");
             return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message, http);
         }
     }

@@ -58,8 +58,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         Waiting.TimerCommanded += () => PublishTimer(announce: true);
         Waiting.TimerTicked += () => PublishTimer(announce: false);
         State = AppState.CreateDefault();
-        Version = typeof(MainWindowViewModel).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "3.0.0";
+        Version = AppInfo.Version;
     }
 
     public string Version { get; }
@@ -380,6 +379,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         }
         catch (StateLoadException ex)
         {
+            Serilog.Log.Error(ex, "The autosave could not be read");
             StatusText = "Autosave could not be read; starting with an empty match";
             await _messages.ShowErrorAsync("Autosave could not be read", ex.Message);
         }
@@ -405,6 +405,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            Serilog.Log.Warning(ex, "Could not write overlay files");
             StatusText = $"Could not write overlay files: {ex.Message}";
         }
     }
@@ -428,10 +429,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         }
         catch (IOException ex)
         {
+            Serilog.Log.Warning(ex, "Autosave failed");
             StatusText = $"Autosave failed: {ex.Message}";
         }
         catch (UnauthorizedAccessException ex)
         {
+            Serilog.Log.Warning(ex, "Autosave failed");
             StatusText = $"Autosave failed: {ex.Message}";
         }
     }

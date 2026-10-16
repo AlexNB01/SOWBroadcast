@@ -1,12 +1,23 @@
 using Avalonia;
+using SowBroadcast.App.Services;
 
 namespace SowBroadcast.App;
 
 internal static class Program
 {
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        AppLog.Init();
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            AppLog.Shutdown();
+        }
+    }
 
     // Also used by the visual designer.
     public static AppBuilder BuildAvaloniaApp()

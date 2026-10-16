@@ -38,7 +38,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         DataContext = _viewModel;
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
-        _services.Replay.ReplayReady += name => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = $"Replay clip saved: {name}");
+        _services.Replay.ReplayReady += name => Avalonia.Threading.Dispatcher.UIThread.Post(() => { Serilog.Log.Information("Replay clip saved: {Name}", name); _viewModel.StatusText = $"Replay clip saved: {name}"; });
         _services.Replay.Problem += message => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = message);
         try { _services.Replay.Start(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -123,6 +123,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
                 Window dialog = args[dialogArg + 1] switch
                 {
                     "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
+                    "about" => new AboutWindow(),
                     "maps" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Maps, _services.Assets, this, this)),
                     "modes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Modes, _services.Assets, this, this)),
                     _ => new BulkImportWindow(new BulkImportViewModel(_services.Assets, this)),
@@ -182,6 +183,12 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
 #endif
 
     private void OnQuit(object? sender, RoutedEventArgs e) => Close();
+
+    private async void OnAbout(object? sender, RoutedEventArgs e) => await new AboutWindow().ShowDialog(this);
+
+    private void OnOpenLogs(object? sender, RoutedEventArgs e) => FolderOpener.Open(AppLog.Folder);
+
+    private void OnOpenData(object? sender, RoutedEventArgs e) => FolderOpener.Open(AppPaths.DataRoot);
 
     private void OnManageHeroes(object? sender, RoutedEventArgs e) => OpenAssetManager(AssetCategory.Heroes);
     private void OnManageMaps(object? sender, RoutedEventArgs e) => OpenAssetManager(AssetCategory.Maps);
