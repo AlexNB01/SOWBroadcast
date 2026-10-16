@@ -48,11 +48,18 @@
         <MenuItem Header="Open _data folder" Click="OnOpenData" />
       </MenuItem>
       <MenuItem Header="_Teams">
-        <MenuItem Header="Export _Home…" Command="{Binding ExportHomeCommand}" />
-        <MenuItem Header="Import H_ome…" Command="{Binding ImportHomeCommand}" />
+        <MenuItem Header="Team _library…" Click="OnTeamLibrary" />
         <Separator />
-        <MenuItem Header="Export _Away…" Command="{Binding ExportAwayCommand}" />
-        <MenuItem Header="Import A_way…" Command="{Binding ImportAwayCommand}" />
+        <MenuItem Header="Keep _Home in the library" Command="{Binding SaveHomeToLibraryCommand}" />
+        <MenuItem Header="Keep _Away in the library" Command="{Binding SaveAwayToLibraryCommand}" />
+        <Separator />
+        <MenuItem Header="Team _files">
+          <MenuItem Header="Export _Home to file…" Command="{Binding ExportHomeCommand}" />
+          <MenuItem Header="Import H_ome from file…" Command="{Binding ImportHomeCommand}" />
+          <Separator />
+          <MenuItem Header="Export _Away to file…" Command="{Binding ExportAwayCommand}" />
+          <MenuItem Header="Import A_way from file…" Command="{Binding ImportAwayCommand}" />
+        </MenuItem>
       </MenuItem>
     </Menu>
 

@@ -155,6 +155,15 @@ public sealed partial class LinkViewModel : ObservableObject
         RefreshStatus();
     }
 
+    /// <summary>The teams of the linked tournament (empty when none is linked); the team library can take them over.</summary>
+    public IReadOnlyList<LinkTeam> LinkedTeams => _service.IsLinked && _last is { IsManualDraftRoom: false } last ? last.Snapshot.Teams : Array.Empty<LinkTeam>();
+
+    /// <summary>Downloads logos that are not here yet (nothing to do without a logo cache).</summary>
+    public Task<int> EnsureLogosAsync(IEnumerable<string> urls) => _logos is null ? Task.FromResult(0) : _logos.EnsureAsync(urls);
+
+    /// <summary>The downloaded file of a logo address, or null.</summary>
+    public string? LogoPathOf(string url) => _logos?.PathOf(url);
+
     partial void OnSelectedMatchChanged(MatchChoice? value)
     {
         if (_rebuilding || !_service.IsLinked) return;

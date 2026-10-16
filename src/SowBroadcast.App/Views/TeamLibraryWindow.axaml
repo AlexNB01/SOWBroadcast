@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SowBroadcast.App.ViewModels"
+        xmlns:conv="using:SowBroadcast.App.Converters"
+        x:Class="SowBroadcast.App.Views.TeamLibraryWindow"
+        x:DataType="vm:TeamLibraryViewModel"
+        Title="Team library"
+        Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
+        Width="720" Height="640" MinWidth="560" MinHeight="460"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <TextBlock Classes="muted" Text="{Binding Message}" TextWrapping="Wrap" MinHeight="18" />
+      <WrapPanel>
+        <Button Content="Load as Home" Command="{Binding LoadHomeCommand}" Margin="0,0,8,6" />
+        <Button Content="Load as Away" Command="{Binding LoadAwayCommand}" Margin="0,0,16,6" />
+        <Button Content="Keep Home panel" Command="{Binding SaveHomeCommand}" Margin="0,0,8,6" />
+        <Button Content="Keep Away panel" Command="{Binding SaveAwayCommand}" Margin="0,0,16,6" />
+        <Button Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,0,6" />
+      </WrapPanel>
+      <WrapPanel>
+        <Button Content="Import team file…" Command="{Binding ImportFileCommand}" Margin="0,0,8,0" />
+        <Button Content="Import SOWDraft teams" Command="{Binding ImportFromLinkCommand}" IsEnabled="{Binding CanImportFromLink}"
+                ToolTip.Tip="Takes every team of the linked SOWDraft tournament (link it on the Standings or Bracket tab first)." />
+      </WrapPanel>
+      <Button Classes="primary" Content="Close" HorizontalAlignment="Right" MinWidth="100" Click="OnClose" />
+    </StackPanel>
+
+    <TextBox DockPanel.Dock="Top" Text="{Binding Query}" Watermark="Search by team, abbreviation or player…" Margin="0,0,0,8" x:Name="SearchBox" />
+    <TextBlock DockPanel.Dock="Top" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap" Margin="0,4,0,8"
+               Text="The library is empty. Fill a team panel on the Match tab and press “Keep Home panel”, or import a SOWDraft tournament." />
+
+    <Border Classes="card" Padding="4">
+      <ListBox Background="Transparent" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" DoubleTapped="OnDoubleTapped">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:LibraryItemViewModel">
+            <Grid ColumnDefinitions="56,*" Margin="2,3">
+              <Border Grid.Column="0" Width="48" Height="48" CornerRadius="4" Background="{DynamicResource SowNightBrush}">
+                <Image Source="{Binding LogoPath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=96}" Stretch="Uniform" Margin="3" />
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                <TextBlock Classes="muted" Text="{Binding Details}" />
+              </StackPanel>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+  </DockPanel>
+</Window>

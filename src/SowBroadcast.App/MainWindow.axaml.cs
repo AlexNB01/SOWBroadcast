@@ -35,11 +35,14 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         Directory.CreateDirectory(teamsFolder);
         Directory.CreateDirectory(logoFolder);
         Directory.CreateDirectory(broadcastLogoFolder);
+        var teamLibrary = new SowBroadcast.Core.Teams.TeamLibrary(Path.Combine(AppPaths.ScoreboardDir, "TeamLibrary"), new SkiaLogoConverter());
+        teamLibrary.Load();
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
             _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir,
             standingsLogoFolder: teamsFolder, teamPicker: this,
             linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action),
-            archive: new SowBroadcast.Core.History.MatchArchive(Path.Combine(AppPaths.DataRoot, "History")));
+            archive: new SowBroadcast.Core.History.MatchArchive(Path.Combine(AppPaths.DataRoot, "History")),
+            library: teamLibrary);
         DataContext = _viewModel;
         _viewModel.UseAutomation(_services.ControlSettings.Automation);
         StartControl();
@@ -171,6 +174,9 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         else await ShowErrorAsync("Hero and map list", result.Message);
     }
 
+    private async void OnTeamLibrary(object? sender, RoutedEventArgs e) =>
+        await new Views.TeamLibraryWindow(new TeamLibraryViewModel(_viewModel)).ShowDialog(this);
+
     private async void OnRestoreMatch(object? sender, RoutedEventArgs e)
     {
         var window = new Views.RestoreMatchWindow(new RestoreMatchViewModel(_viewModel.ArchivedMatches()));
@@ -231,6 +237,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
                 {
                     "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
                     "about" => new AboutWindow(),
+                    "library" => new TeamLibraryWindow(new TeamLibraryViewModel(_viewModel)),
                     "restore" => new RestoreMatchWindow(new RestoreMatchViewModel(_viewModel.ArchivedMatches())),
                     "control" => new ControlSettingsWindow(new ControlSettingsViewModel(_services.ControlSettings, _viewModel.OverlayBaseUrl)),
                     "maps" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Maps, _services.Assets, this, this)),

@@ -7,6 +7,7 @@ using SowBroadcast.Core.Bracket;
 using SowBroadcast.Core.Standings;
 using SowBroadcast.Core.Export;
 using SowBroadcast.Core.History;
+using SowBroadcast.Core.Teams;
 using SowBroadcast.Core.Match;
 using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Storage;
@@ -34,9 +35,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         string? defaultVideosDir = null, Func<long>? clock = null, string? standingsLogoFolder = null,
         ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null,
         LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null, Func<long>? epochMs = null,
-        MatchArchive? archive = null, Func<DateTime>? now = null)
+        MatchArchive? archive = null, Func<DateTime>? now = null, TeamLibrary? library = null)
     {
         _archive = archive;
+        _library = library;
         _now = now ?? (() => DateTime.Now);
         _assets = assets;
         _dialogs = dialogs;
