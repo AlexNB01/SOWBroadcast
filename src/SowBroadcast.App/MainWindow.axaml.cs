@@ -6,6 +6,7 @@ using SowBroadcast.App.Services;
 using SowBroadcast.App.ViewModels;
 using SowBroadcast.App.Views;
 using SowBroadcast.Core.Assets;
+using SowBroadcast.Core.Control;
 using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Storage;
 
@@ -21,6 +22,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     private readonly MainWindowViewModel _viewModel;
     private bool _skipAutosave;
     private readonly AppServices _services;
+    private readonly GlobalHotkeys _hotkeys = new();
+    private Dictionary<HotkeyGesture, string> _windowKeys = new();
 
     public MainWindow()
     {
@@ -37,6 +40,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             standingsLogoFolder: teamsFolder, teamPicker: this,
             linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
         DataContext = _viewModel;
+        StartControl();
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
         _services.Replay.ReplayReady += name => Avalonia.Threading.Dispatcher.UIThread.Post(() => { Serilog.Log.Information("Replay clip saved: {Name}", name); _viewModel.StatusText = $"Replay clip saved: {name}"; });
@@ -69,6 +73,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         };
         Closing += (_, _) =>
         {
+            _hotkeys.Dispose();
             if (!_skipAutosave) _viewModel.Autosave();
             _services.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
         };
@@ -107,6 +112,62 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
 
 #endif
 
+    // ---- Hotkeys and the local control interface (EHD-7) ---------------------------------------------------
+
+    private void StartControl()
+    {
+        // The HTTP interface and the hotkeys run the same commands, on the UI thread.
+        var host = new ControlHost(_viewModel, _services.ControlSettings,
+            work => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(work).GetTask());
+        _services.ControlGateway.Handler = host.HandleAsync;
+
+        _hotkeys.Pressed += id => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.RunControl(id));
+        AddHandler(KeyDownEvent, OnControlKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        ApplyHotkeys();
+    }
+
+    // Registers the hotkeys with Windows (when they should work everywhere) and remembers them for this window, so a combination
+    // Windows would not give us still works while this window has the focus.
+    private void ApplyHotkeys()
+    {
+        var settings = _services.ControlSettings;
+        var active = settings.ActiveBindings();
+        _windowKeys = active.ToDictionary(b => b.Gesture, b => b.Id);
+
+        var failed = _hotkeys.Apply(settings.GlobalHotkeys ? active : Array.Empty<(string, HotkeyGesture)>());
+        if (failed.Count > 0)
+        {
+            var names = string.Join(", ", failed.Select(id => $"{ControlCatalog.Find(id)?.Label} ({settings.GestureFor(id)})"));
+            Serilog.Log.Warning("Hotkeys another program already uses: {Names}", names);
+            _viewModel.StatusText = $"These hotkeys are used by another program and only work in this window: {names}";
+        }
+    }
+
+    private void OnControlKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (Views.ControlSettingsWindow.GestureOf(e.Key, e.KeyModifiers) is { } gesture && _windowKeys.TryGetValue(gesture, out var id))
+        {
+            e.Handled = true;
+            _viewModel.RunControl(id);
+        }
+    }
+
+    private async void OnControlSettings(object? sender, RoutedEventArgs e)
+    {
+        var window = new Views.ControlSettingsWindow(new ControlSettingsViewModel(_services.ControlSettings, _viewModel.OverlayBaseUrl));
+        if (await window.ShowDialog<ControlSettings?>(this) is not { } chosen) return;
+
+        _services.ControlSettings.CopyFrom(chosen);
+        _services.ControlGateway.Token = chosen.Token;
+        try { _services.ControlSettings.Save(AppPaths.ControlSettingsPath); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            await ShowErrorAsync("Settings could not be saved", ex.Message);
+        }
+        ApplyHotkeys();
+        _viewModel.StatusText = "Hotkeys and remote control settings saved";
+    }
+
     private void OnOpenScoreboardOverlay(object? sender, RoutedEventArgs e)
     {
         if (_viewModel.OverlayBaseUrl is { } url)
@@ -138,13 +199,14 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         var dialogArg = Array.IndexOf(args, "--dialog");
         if (dialogArg >= 0 && dialogArg + 1 < args.Length)
         {
-            // `--dialog heroes|maps|modes|bulk` renders that dialog instead of the main window.
+            // `--dialog heroes|maps|modes|bulk|about|control` renders that dialog instead of the main window.
             Opened += async (_, _) =>
             {
                 Window dialog = args[dialogArg + 1] switch
                 {
                     "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
                     "about" => new AboutWindow(),
+                    "control" => new ControlSettingsWindow(new ControlSettingsViewModel(_services.ControlSettings, _viewModel.OverlayBaseUrl)),
                     "maps" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Maps, _services.Assets, this, this)),
                     "modes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Modes, _services.Assets, this, this)),
                     _ => new BulkImportWindow(new BulkImportViewModel(_services.Assets, this)),

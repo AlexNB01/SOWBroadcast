@@ -25,6 +25,9 @@
         <Separator />
         <MenuItem Header="_Bulk Import from Folders…" Click="OnBulkImport" />
       </MenuItem>
+      <MenuItem Header="C_ontrol">
+        <MenuItem Header="_Hotkeys and remote control…" Click="OnControlSettings" />
+      </MenuItem>
       <MenuItem x:Name="DebugMenu" Header="_Debug" IsVisible="False">
         <MenuItem Header="_Publish current state (Update)" Command="{Binding PublishNowCommand}" />
         <MenuItem Header="Load _sample match" Command="{Binding LoadSampleCommand}" />

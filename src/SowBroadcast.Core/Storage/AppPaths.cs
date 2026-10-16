@@ -26,6 +26,9 @@ public static class AppPaths
 
     public static string AutosavePath => Path.Combine(DataRoot, "autosave.json");
 
+    /// <summary>Hotkeys and the token of the local control interface (belongs to the computer, not to a match).</summary>
+    public static string ControlSettingsPath => Path.Combine(DataRoot, "control.json");
+
     /// <summary>The generated overlay data tree the overlays read.</summary>
     public static string ScoreboardDir => Path.Combine(DataRoot, "Scoreboard");
 

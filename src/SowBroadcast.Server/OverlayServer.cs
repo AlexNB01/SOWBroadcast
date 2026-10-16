@@ -34,6 +34,25 @@ public sealed class OverlayServerOptions
     public IReadOnlyList<string> FullRefreshKeys { get; init; } = Array.Empty<string>();
     public TimeSpan KeepAliveInterval { get; init; } = TimeSpan.FromSeconds(15);
     public int MaxNotifyBodyBytes { get; init; } = 64 * 1024;
+
+    /// <summary>The local control interface (<c>/api/control</c>); null leaves it switched off.</summary>
+    public ControlGateway? Control { get; init; }
+}
+
+/// <summary>What a control call got back: an HTTP status and a JSON body.</summary>
+public sealed record ControlReply(int Status, string Json);
+
+/// <summary>
+/// The door of the local control interface: a secret token and the handler that runs commands. The handler is set once the program
+/// has a window (the server starts first), and until then the interface answers 503.
+/// </summary>
+public sealed class ControlGateway
+{
+    /// <summary>Sent as <c>X-SOWB-Token</c> or <c>?token=</c>. May be replaced while the server runs.</summary>
+    public volatile string Token = "";
+
+    /// <summary>Runs <c>command</c> (empty = list the commands) with the query values; called on a server thread.</summary>
+    public volatile Func<string, IReadOnlyDictionary<string, string>, Task<ControlReply>>? Handler;
 }
 
 /// <summary>
@@ -116,6 +135,14 @@ public sealed class OverlayServer : IAsyncDisposable
             await context.Response.WriteAsync(json);
         });
         app.MapPost("/notify", (HttpContext context) => Notify(context, hub, options));
+        if (options.Control is { } control)
+        {
+            // GET as well as POST: Stream Deck and Companion buttons are easiest to set up with a plain URL. The token keeps
+            // other web pages out, because they cannot know it.
+            app.MapMethods("/api/control", new[] { "GET", "POST" }, (HttpContext context) => Control(context, control, ""));
+            app.MapMethods("/api/control/{command}", new[] { "GET", "POST" },
+                (HttpContext context, string command) => Control(context, control, command));
+        }
 
         foreach (var (prefix, folders) in options.StaticFolders)
         {
@@ -217,6 +244,34 @@ public sealed class OverlayServer : IAsyncDisposable
         {
             await BadRequest(response, "Body is not valid JSON.");
         }
+    }
+
+    private static async Task Control(HttpContext context, ControlGateway control, string command)
+    {
+        var response = context.Response;
+        var token = context.Request.Headers["X-SOWB-Token"].FirstOrDefault() ?? context.Request.Query["token"].FirstOrDefault();
+        var expected = control.Token;
+        if (string.IsNullOrEmpty(expected) || token is null ||
+            !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(token), Encoding.UTF8.GetBytes(expected)))
+        {
+            response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var handler = control.Handler;
+        if (handler is null)
+        {
+            response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return;
+        }
+
+        var arguments = context.Request.Query
+            .Where(q => !string.Equals(q.Key, "token", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(q => q.Key, q => q.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+        var reply = await handler(command, arguments);
+        response.StatusCode = reply.Status;
+        response.ContentType = "application/json; charset=utf-8";
+        await response.WriteAsync(reply.Json);
     }
 
     private static async Task BadRequest(HttpResponse response, string message)

@@ -1,4 +1,5 @@
-using SowBroadcast.Core.Assets;
+using SowBroadcast.Core.Assets;
+using SowBroadcast.Core.Control;
 using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Replay;
@@ -15,8 +16,11 @@ public sealed class AppServices : IAsyncDisposable
 
     private readonly HttpFetcher _http;
 
-    private AppServices(IOverlayPublisher publisher, AssetService assets, OverlayServer? server, string? startupError, HttpFetcher http)
+    private AppServices(IOverlayPublisher publisher, AssetService assets, OverlayServer? server, string? startupError, HttpFetcher http,
+        ControlSettings control, ControlGateway gateway)
     {
+        ControlSettings = control;
+        ControlGateway = gateway;
         Publisher = publisher;
         Assets = assets;
         _http = http;
@@ -30,6 +34,12 @@ public sealed class AppServices : IAsyncDisposable
     }
 
     public IOverlayPublisher Publisher { get; }
+
+    /// <summary>Hotkeys and the token of the local control interface.</summary>
+    public ControlSettings ControlSettings { get; }
+
+    /// <summary>The door of <c>/api/control</c>; the window sets its handler once the match is on screen.</summary>
+    public ControlGateway ControlGateway { get; }
 
     /// <summary>Takes the clips OBS' replay buffer saves into the playlist the replay overlay plays.</summary>
     public ReplayWatcher Replay { get; }
@@ -84,8 +94,16 @@ public sealed class AppServices : IAsyncDisposable
         {
             Json = OverlayStateJson.Build(AppState.CreateDefault(), exporter, 0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
         };
+        var controlSettings = ControlSettings.Load(AppPaths.ControlSettingsPath);
+        try { controlSettings.Save(AppPaths.ControlSettingsPath); }   // the first run writes the token, so it stays the same next time
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Serilog.Log.Warning(ex, "control.json could not be written");
+        }
+        var gateway = new ControlGateway { Token = controlSettings.Token };
         var options = new OverlayServerOptions
         {
+            Control = gateway,
             FullRefreshKeys = StateDiff.AllKeys,
             StaticFolders = folders,
             StateProvider = () => stateHolder.Json,
@@ -95,17 +113,18 @@ public sealed class AppServices : IAsyncDisposable
         {
             var server = Task.Run(() => OverlayServer.StartAsync(options)).GetAwaiter().GetResult();
             Serilog.Log.Information("Overlay server listening on {Url}", server.BaseUrl);
-            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl, stateHolder), assets, server, null, http);
+            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl, stateHolder), assets, server, null, http, controlSettings, gateway);
         }
         catch (IOException ex)
         {
             Serilog.Log.Error(ex, "The overlay server could not start");
-            return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message, http);
+            return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message, http, controlSettings, gateway);
         }
     }
 
     public async ValueTask DisposeAsync()
     {
+        ControlGateway.Handler = null;
         Replay.Dispose();
         await Link.DisposeAsync();
         _http.Dispose();

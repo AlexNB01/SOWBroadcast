@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SowBroadcast.App.ViewModels"
+        x:Class="SowBroadcast.App.Views.ControlSettingsWindow"
+        x:DataType="vm:ControlSettingsViewModel"
+        Title="Hotkeys and remote control"
+        Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
+        Width="760" Height="720" MinWidth="640" MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <TextBlock Text="{Binding Problems}" IsVisible="{Binding !CanSave}" Foreground="{DynamicResource SowErrorBrush}" TextWrapping="Wrap" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+        <Button Content="Cancel" Click="OnCancel" />
+        <Button Classes="primary" Content="Save" MinWidth="100" IsEnabled="{Binding CanSave}" Click="OnSave" />
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer>
+      <StackPanel Spacing="14">
+        <Border Classes="card" Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="REMOTE CONTROL (STREAM DECK, COMPANION)" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Buttons call this address on this computer. The token keeps other programs and web pages from pressing them; keep it private." />
+            <TextBlock Classes="label" Text="TOKEN" />
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+              <TextBox Grid.Column="0" Text="{Binding Token}" IsReadOnly="True" FontFamily="Consolas, Courier New, monospace" />
+              <Button Grid.Column="1" Content="Copy" Click="OnCopyToken" />
+              <Button Grid.Column="2" Content="New token" Command="{Binding NewTokenCommand}" />
+            </Grid>
+            <TextBlock Classes="label" Text="EXAMPLE (TEAM 1 SCORE +1)" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Grid.Column="0" Text="{Binding ExampleUrl}" IsReadOnly="True" FontFamily="Consolas, Courier New, monospace" />
+              <Button Grid.Column="1" Content="Copy" Click="OnCopyExample" />
+            </Grid>
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="GET or POST /api/control/&lt;command&gt;?token=…  Add &amp;publish=1 to send to the overlays right after the command. Answers 200 done, 409 could not do it, 404 unknown command. GET /api/control lists the commands." />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="HOTKEYS" />
+            <CheckBox IsChecked="{Binding GlobalHotkeys}"
+                      Content="Work in every program (OBS, the game), not only in this window" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Click a box and press the keys. Use Ctrl, Alt or Win with a key so typing is never mistaken for a command; function keys work alone." />
+            <ItemsControl ItemsSource="{Binding Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:HotkeyRowViewModel">
+                  <Grid ColumnDefinitions="*,200,Auto,Auto" ColumnSpacing="8" Margin="0,3">
+                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding Gesture}" IsReadOnly="True" Watermark="not set"
+                             KeyDown="OnGestureKeyDown" />
+                    <Button Grid.Column="2" Content="Default" Command="{Binding UseDefaultCommand}" ToolTip.Tip="{Binding DefaultText}" />
+                    <Button Grid.Column="3" Content="Clear" Command="{Binding ClearCommand}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Reset all to defaults" Command="{Binding ResetAllCommand}" HorizontalAlignment="Left" Margin="0,6,0,0" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

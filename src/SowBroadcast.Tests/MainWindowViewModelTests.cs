@@ -657,7 +657,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.False(again.HasUnsentChanges); // restoring is not an edit
     }
 
-    private sealed class FakePublisher : IOverlayPublisher
+    internal sealed class FakePublisher : IOverlayPublisher
     {
         public string? BaseUrl => "http://127.0.0.1:8324";
         public List<AppState> Published { get; } = new();
@@ -683,7 +683,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         public void AnnounceReplay() => ReplayAnnouncements++;
     }
 
-    private sealed class FakeDialogs : IFileDialogs, IMessages
+    internal sealed class FakeDialogs : IFileDialogs, IMessages
     {
         public string? OpenResult { get; set; }
         public string? SaveResult { get; set; }

@@ -32,6 +32,8 @@
       <SolidColorBrush x:Key="SowPauseHoverBrush" Color="#3E5871" />
       <SolidColorBrush x:Key="SowResetBrush" Color="#5D6D7E" />
       <SolidColorBrush x:Key="SowResetHoverBrush" Color="#7F8C9A" />
+      <!-- Error text (an accepted functional colour, KYS-3): light enough for 5:1 on the card blue -->
+      <SolidColorBrush x:Key="SowErrorBrush" Color="#FF9A8F" />
       <LinearGradientBrush x:Key="SowGradientBrush" StartPoint="0%,0%" EndPoint="0%,100%">
         <GradientStop Color="#1E8AB9" Offset="0" />
         <GradientStop Color="#0F356B" Offset="1" />
