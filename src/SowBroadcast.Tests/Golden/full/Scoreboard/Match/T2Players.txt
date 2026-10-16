@@ -1,0 +1,8 @@
+1	Zenith	Doomfist	Tank
+2	Yarrow	Echo	Damage
+3	Xenon	Cassidy	Damage
+4	Willow	Brigitte	Support
+5	Vesper	Ana	Support
+6			
+7			
+8			

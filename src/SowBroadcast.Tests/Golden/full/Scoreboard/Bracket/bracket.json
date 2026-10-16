@@ -1,0 +1,73 @@
+{
+  "title": "Playoffs",
+  "stage": "Upper bracket",
+  "rounds": [
+    {
+      "name": "Semifinals",
+      "side": "upper",
+      "matches": [
+        {
+          "id": "m1-1",
+          "bo_label": "BO5",
+          "team1": {
+            "name": "Northern Lights",
+            "abbr": "NL",
+            "logo": null
+          },
+          "team2": {
+            "name": "Midnight Sun",
+            "abbr": "MS",
+            "logo": null
+          },
+          "score1": 3,
+          "score2": 1,
+          "status": "completed",
+          "scheduled_at": 1760000000000
+        },
+        {
+          "id": "m1-2",
+          "bo_label": "BO5",
+          "team1": {
+            "name": "Aurora Borealis",
+            "abbr": "AB",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": "",
+          "scheduled_at": 0
+        }
+      ]
+    },
+    {
+      "name": "Final",
+      "side": "upper",
+      "matches": [
+        {
+          "id": "m1-3",
+          "bo_label": "BO5",
+          "team1": {
+            "name": "Northern Lights",
+            "abbr": "NL",
+            "logo": null
+          },
+          "team2": {
+            "name": "",
+            "abbr": "",
+            "logo": null
+          },
+          "score1": 0,
+          "score2": 0,
+          "status": "",
+          "scheduled_at": 0
+        }
+      ]
+    }
+  ],
+  "double_elim_view": ""
+}

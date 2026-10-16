@@ -100,17 +100,14 @@ public static class StateMigrations
         while (maps.Count < Limits.MapsPerSeries)
             maps.Add(new MapEntry { Index = maps.Count + 1 });
 
-        return state with
+        return StateDerivations.Apply(state with
         {
             SchemaVersion = StateSchema.Current,
             Team1 = NormalisePlayers(state.Team1),
             Team2 = NormalisePlayers(state.Team2),
-            Maps = maps.Take(Limits.MapsPerSeries).Select(WithWinner).ToArray(),
-        };
+            Maps = maps.Take(Limits.MapsPerSeries).ToArray(),
+        });
     }
-
-    public static MapEntry WithWinner(MapEntry m) =>
-        m with { Winner = m.T1 > m.T2 ? "t1" : m.T2 > m.T1 ? "t2" : "" };
 
     private static Team NormalisePlayers(Team team)
     {

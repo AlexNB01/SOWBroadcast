@@ -1,0 +1,486 @@
+{
+  "team1": {
+    "name": "Northern Lights",
+    "abbr": "NL",
+    "logo_path": "{FIXTURES}/logos/team1.png",
+    "score": 1,
+    "color_hex": "#27aae1",
+    "players": [
+      {
+        "name": "Aurora",
+        "hero": "Doomfist",
+        "role": "Tank"
+      },
+      {
+        "name": "Borealis",
+        "hero": "Ashe",
+        "role": "Damage"
+      },
+      {
+        "name": "Cirrus",
+        "hero": "Genji",
+        "role": "Damage"
+      },
+      {
+        "name": "Dawn",
+        "hero": "Ana",
+        "role": "Support"
+      },
+      {
+        "name": "Ember",
+        "hero": "Baptiste",
+        "role": "Support"
+      },
+      {
+        "name": "Frost",
+        "hero": "",
+        "role": ""
+      },
+      {
+        "name": "",
+        "hero": "",
+        "role": ""
+      },
+      {
+        "name": "",
+        "hero": "",
+        "role": ""
+      }
+    ],
+    "banned_hero": ""
+  },
+  "team2": {
+    "name": "Midnight Sun",
+    "abbr": "MS",
+    "logo_path": null,
+    "score": 0,
+    "color_hex": "#c80013",
+    "players": [
+      {
+        "name": "Zenith",
+        "hero": "Doomfist",
+        "role": "Tank"
+      },
+      {
+        "name": "Yarrow",
+        "hero": "Echo",
+        "role": "Damage"
+      },
+      {
+        "name": "Xenon",
+        "hero": "Cassidy",
+        "role": "Damage"
+      },
+      {
+        "name": "Willow",
+        "hero": "Brigitte",
+        "role": "Support"
+      },
+      {
+        "name": "Vesper",
+        "hero": "Ana",
+        "role": "Support"
+      },
+      {
+        "name": "",
+        "hero": "",
+        "role": ""
+      },
+      {
+        "name": "",
+        "hero": "",
+        "role": ""
+      },
+      {
+        "name": "",
+        "hero": "",
+        "role": ""
+      }
+    ],
+    "banned_hero": ""
+  },
+  "maps": [
+    {
+      "index": 1,
+      "map": "Busan",
+      "t1": 2,
+      "t2": 1,
+      "completed": true,
+      "pick": "T1",
+      "t1_ban": "Ana",
+      "t2_ban": "Ashe",
+      "winner": "t1"
+    },
+    {
+      "index": 2,
+      "map": "Circuit Royal",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "T2",
+      "t1_ban": "",
+      "t2_ban": "",
+      "winner": ""
+    },
+    {
+      "index": 3,
+      "map": "Ilios",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
+      "winner": ""
+    },
+    {
+      "index": 4,
+      "map": "",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
+      "winner": ""
+    },
+    {
+      "index": 5,
+      "map": "",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
+      "winner": ""
+    },
+    {
+      "index": 6,
+      "map": "",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
+      "winner": ""
+    },
+    {
+      "index": 7,
+      "map": "",
+      "t1": 0,
+      "t2": 0,
+      "completed": false,
+      "pick": "—",
+      "t1_ban": "",
+      "t2_ban": "",
+      "winner": ""
+    }
+  ],
+  "current_map": 2,
+  "map_pool": [],
+  "general": {
+    "first_to": 3,
+    "maps_count": 3,
+    "format_type": "First to",
+    "num_players": 5,
+    "division": "",
+    "host": "Host H",
+    "caster1": "Caster One @casterone",
+    "caster2": "Caster Two",
+    "status_text": "Synthetic Cup – Match 1",
+    "overlay_logo_path": "{FIXTURES}/logos/overlay.png",
+    "transition_logo_path": "{FIXTURES}/logos/transition.png",
+    "colors": {
+      "primary": "#101114",
+      "secondary": "#ffffff",
+      "tertiary": "#3a3a90",
+      "quaternary": "#006ea1",
+      "quinary": "#FFFFFF",
+      "senary": "#FFFFFF",
+      "septenary": "#001445",
+      "octonary": "#134380"
+    }
+  },
+  "waiting": {
+    "videos_dir": "",
+    "timer_seconds": 300,
+    "text_starting": "STARTING SOON!",
+    "text_brb": "BACK IN FIVE",
+    "text_end": "THANK YOU FOR WATCHING",
+    "timer_running": false,
+    "socials": {
+      "twitch": "SuomiOW",
+      "twitter": "suomiow",
+      "youtube": "SuomiOW"
+    },
+    "ticker_override": "Custom ticker text",
+    "ticker_override_enabled": true
+  },
+  "standings": {
+    "title": "Group Stage",
+    "subtitle": "Synthetic Cup",
+    "columns": {
+      "mode": "map_diff"
+    },
+    "rows": [
+      {
+        "team_name": "Northern Lights",
+        "abbr": "NL",
+        "logo_path": "{FIXTURES}/logos/standings1.png",
+        "wins": 3,
+        "losses": 0,
+        "map_diff": 5,
+        "points": 9,
+        "status": "qualified",
+        "rank": 1,
+        "played": null,
+        "draws": null,
+        "sf": null,
+        "sa": null
+      },
+      {
+        "team_name": "Midnight Sun",
+        "abbr": "MS",
+        "logo_path": null,
+        "wins": 1,
+        "losses": 2,
+        "map_diff": -1,
+        "points": 3,
+        "status": "",
+        "rank": 2,
+        "played": null,
+        "draws": null,
+        "sf": null,
+        "sa": null
+      },
+      {
+        "team_name": "Aurora Borealis",
+        "abbr": "AB",
+        "logo_path": null,
+        "wins": 1,
+        "losses": 2,
+        "map_diff": -2,
+        "points": 3,
+        "status": "eliminated",
+        "rank": 3,
+        "played": null,
+        "draws": null,
+        "sf": null,
+        "sa": null
+      }
+    ],
+    "groups": [
+      {
+        "key": "group_1",
+        "name": "Group 1",
+        "rows": [
+          {
+            "team_name": "Northern Lights",
+            "abbr": "NL",
+            "logo_path": "{FIXTURES}/logos/standings1.png",
+            "wins": 3,
+            "losses": 0,
+            "map_diff": 5,
+            "points": 9,
+            "status": "qualified",
+            "rank": 1,
+            "played": null,
+            "draws": null,
+            "sf": null,
+            "sa": null
+          },
+          {
+            "team_name": "Midnight Sun",
+            "abbr": "MS",
+            "logo_path": null,
+            "wins": 1,
+            "losses": 2,
+            "map_diff": -1,
+            "points": 3,
+            "status": "",
+            "rank": 2,
+            "played": null,
+            "draws": null,
+            "sf": null,
+            "sa": null
+          },
+          {
+            "team_name": "Aurora Borealis",
+            "abbr": "AB",
+            "logo_path": null,
+            "wins": 1,
+            "losses": 2,
+            "map_diff": -2,
+            "points": 3,
+            "status": "eliminated",
+            "rank": 3,
+            "played": null,
+            "draws": null,
+            "sf": null,
+            "sa": null
+          }
+        ]
+      }
+    ],
+    "display_group": "group_1"
+  },
+  "bracket": {
+    "title": "Playoffs",
+    "stage": "Upper bracket",
+    "rounds": [
+      {
+        "name": "Semifinals",
+        "side": "upper",
+        "matches": [
+          {
+            "id": "m1-1",
+            "bo_label": "BO5",
+            "team1": {
+              "name": "Northern Lights",
+              "abbr": "NL",
+              "logo_path": ""
+            },
+            "team2": {
+              "name": "Midnight Sun",
+              "abbr": "MS",
+              "logo_path": ""
+            },
+            "score1": 3,
+            "score2": 1,
+            "status": "completed",
+            "scheduled_at": 1760000000000
+          },
+          {
+            "id": "m1-2",
+            "bo_label": "BO5",
+            "team1": {
+              "name": "Aurora Borealis",
+              "abbr": "AB",
+              "logo_path": ""
+            },
+            "team2": {
+              "name": "",
+              "abbr": "",
+              "logo_path": ""
+            },
+            "score1": 0,
+            "score2": 0,
+            "status": "",
+            "scheduled_at": 0
+          }
+        ]
+      },
+      {
+        "name": "Final",
+        "side": "upper",
+        "matches": [
+          {
+            "id": "m1-3",
+            "bo_label": "BO5",
+            "team1": {
+              "name": "Northern Lights",
+              "abbr": "NL",
+              "logo_path": ""
+            },
+            "team2": {
+              "name": "",
+              "abbr": "",
+              "logo_path": ""
+            },
+            "score1": 0,
+            "score2": 0,
+            "status": "",
+            "scheduled_at": 0
+          }
+        ]
+      }
+    ],
+    "double_elim_view": "",
+    "teams": [
+      {
+        "name": "Northern Lights",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "Midnight Sun",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "Aurora Borealis",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      },
+      {
+        "name": "",
+        "abbr": "",
+        "logo_path": null
+      }
+    ]
+  },
+  "draft_link_url": "",
+  "tournament_link_url": ""
+}

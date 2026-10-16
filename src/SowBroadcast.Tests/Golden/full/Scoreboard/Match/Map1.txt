@@ -1,0 +1,7 @@
+Name=Busan
+T1=2
+T2=1
+Completed=1
+Pick=T1
+T1Ban=Ana
+T2Ban=Ashe

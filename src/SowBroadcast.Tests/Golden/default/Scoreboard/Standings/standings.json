@@ -1,0 +1,16 @@
+{
+  "title": "",
+  "subtitle": "",
+  "columns": {
+    "mode": "map_diff"
+  },
+  "rows": [],
+  "groups": [
+    {
+      "key": "group_1",
+      "name": "Group 1",
+      "rows": []
+    }
+  ],
+  "display_group": "__all__"
+}

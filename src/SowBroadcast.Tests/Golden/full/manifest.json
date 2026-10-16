@@ -1,0 +1,17 @@
+{
+  "absent": [],
+  "png": {
+    "General/OverlayLogo.png": [
+      96,
+      64
+    ],
+    "General/TransitionLogo.png": [
+      96,
+      64
+    ],
+    "Match/T1Logo.png": [
+      96,
+      64
+    ]
+  }
+}

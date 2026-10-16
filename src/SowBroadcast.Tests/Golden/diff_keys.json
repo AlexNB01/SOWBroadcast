@@ -1,0 +1,181 @@
+{
+  "first_update": [
+    "assets.heroes",
+    "assets.maps",
+    "assets.modes",
+    "general.colors",
+    "t1.name",
+    "t1.score",
+    "t1.color",
+    "t1.logo",
+    "t1.ban",
+    "t1.abbr",
+    "t1.players",
+    "t2.name",
+    "t2.score",
+    "t2.color",
+    "t2.logo",
+    "t2.ban",
+    "t2.abbr",
+    "t2.players",
+    "general.caster1",
+    "general.caster2",
+    "general.host",
+    "general.logo",
+    "general.first_to",
+    "general.status",
+    "waiting.texts",
+    "waiting.timer",
+    "waiting.videos",
+    "waiting.socials",
+    "maps",
+    "standings",
+    "bracket",
+    "matchtext"
+  ],
+  "steps": [
+    {
+      "name": "team1 score",
+      "keys": [
+        "matchtext",
+        "t1.score"
+      ]
+    },
+    {
+      "name": "team2 name",
+      "keys": [
+        "matchtext",
+        "t2.name"
+      ]
+    },
+    {
+      "name": "team1 color",
+      "keys": [
+        "t1.color"
+      ]
+    },
+    {
+      "name": "team1 abbr",
+      "keys": [
+        "t1.abbr"
+      ]
+    },
+    {
+      "name": "team1 player name",
+      "keys": [
+        "t1.players"
+      ]
+    },
+    {
+      "name": "map1 ban",
+      "keys": [
+        "maps",
+        "matchtext"
+      ]
+    },
+    {
+      "name": "map2 score",
+      "keys": [
+        "maps",
+        "matchtext"
+      ]
+    },
+    {
+      "name": "map2 pick",
+      "keys": [
+        "maps",
+        "matchtext"
+      ]
+    },
+    {
+      "name": "map name",
+      "keys": [
+        "maps",
+        "matchtext"
+      ]
+    },
+    {
+      "name": "map completed",
+      "keys": [
+        "maps",
+        "matchtext"
+      ]
+    },
+    {
+      "name": "general host",
+      "keys": [
+        "general.host"
+      ]
+    },
+    {
+      "name": "general caster1",
+      "keys": [
+        "general.caster1"
+      ]
+    },
+    {
+      "name": "general status",
+      "keys": [
+        "general.status"
+      ]
+    },
+    {
+      "name": "general maps_count",
+      "keys": [
+        "general.first_to"
+      ]
+    },
+    {
+      "name": "general colors",
+      "keys": [
+        "general.colors"
+      ]
+    },
+    {
+      "name": "waiting text",
+      "keys": [
+        "waiting.texts"
+      ]
+    },
+    {
+      "name": "waiting timer",
+      "keys": [
+        "waiting.timer"
+      ]
+    },
+    {
+      "name": "waiting timer running",
+      "keys": [
+        "waiting.timer"
+      ]
+    },
+    {
+      "name": "waiting socials",
+      "keys": [
+        "waiting.socials"
+      ]
+    },
+    {
+      "name": "waiting ticker",
+      "keys": [
+        "matchtext"
+      ]
+    },
+    {
+      "name": "standings title",
+      "keys": [
+        "standings"
+      ]
+    },
+    {
+      "name": "bracket title",
+      "keys": [
+        "bracket"
+      ]
+    },
+    {
+      "name": "no change",
+      "keys": []
+    }
+  ]
+}

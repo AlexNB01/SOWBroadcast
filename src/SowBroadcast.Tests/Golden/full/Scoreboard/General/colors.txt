@@ -1,0 +1,8 @@
+primary=#101114
+secondary=#ffffff
+tertiary=#3a3a90
+quaternary=#006ea1
+quinary=#FFFFFF
+senary=#FFFFFF
+septenary=#001445
+octonary=#134380

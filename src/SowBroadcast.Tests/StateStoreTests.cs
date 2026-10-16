@@ -63,7 +63,7 @@ public sealed class StateStoreTests : IDisposable
         Assert.Equal("King's Row", s.Maps[1].Map);
         Assert.Equal("—", s.Maps[1].Pick);
         Assert.Equal("Ana", s.Maps[0].T1Ban);
-        Assert.Null(s.CurrentMap);
+        Assert.Equal(2, s.CurrentMap); // derived: first visible map that is not completed (the file said null)
         Assert.Equal(3, s.General.MapsCount);
         Assert.Equal("C1 @c1", s.General.Caster1);
         Assert.Equal(90, s.Waiting.TimerSeconds);

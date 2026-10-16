@@ -1,0 +1,84 @@
+{
+  "title": "Group Stage",
+  "subtitle": "Synthetic Cup",
+  "columns": {
+    "mode": "map_diff"
+  },
+  "rows": [
+    {
+      "team": "Northern Lights",
+      "abbr": "NL",
+      "logo": "{FIXTURES}/logos/standings1.png",
+      "wins": 3,
+      "losses": 0,
+      "map_diff": 5,
+      "points": 9,
+      "status": "qualified",
+      "rank": 1
+    },
+    {
+      "team": "Midnight Sun",
+      "abbr": "MS",
+      "logo": null,
+      "wins": 1,
+      "losses": 2,
+      "map_diff": -1,
+      "points": 3,
+      "status": "",
+      "rank": 2
+    },
+    {
+      "team": "Aurora Borealis",
+      "abbr": "AB",
+      "logo": null,
+      "wins": 1,
+      "losses": 2,
+      "map_diff": -2,
+      "points": 3,
+      "status": "eliminated",
+      "rank": 3
+    }
+  ],
+  "groups": [
+    {
+      "key": "group_1",
+      "name": "Group 1",
+      "rows": [
+        {
+          "team": "Northern Lights",
+          "abbr": "NL",
+          "logo": "{FIXTURES}/logos/standings1.png",
+          "wins": 3,
+          "losses": 0,
+          "map_diff": 5,
+          "points": 9,
+          "status": "qualified",
+          "rank": 1
+        },
+        {
+          "team": "Midnight Sun",
+          "abbr": "MS",
+          "logo": null,
+          "wins": 1,
+          "losses": 2,
+          "map_diff": -1,
+          "points": 3,
+          "status": "",
+          "rank": 2
+        },
+        {
+          "team": "Aurora Borealis",
+          "abbr": "AB",
+          "logo": null,
+          "wins": 1,
+          "losses": 2,
+          "map_diff": -2,
+          "points": 3,
+          "status": "eliminated",
+          "rank": 3
+        }
+      ]
+    }
+  ],
+  "display_group": "group_1"
+}

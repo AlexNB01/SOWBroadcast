@@ -1,0 +1,8 @@
+1	Aurora	Doomfist	Tank
+2	Borealis	Ashe	Damage
+3	Cirrus	Genji	Damage
+4	Dawn	Ana	Support
+5	Ember	Baptiste	Support
+6	Frost		
+7			
+8			
