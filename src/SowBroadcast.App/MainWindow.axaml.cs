@@ -42,7 +42,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             standingsLogoFolder: teamsFolder, teamPicker: this,
             linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action),
             archive: new SowBroadcast.Core.History.MatchArchive(Path.Combine(AppPaths.DataRoot, "History")),
-            library: teamLibrary);
+            library: teamLibrary,
+            profiles: new SowBroadcast.Core.Profiles.ProfileStore(Path.Combine(AppPaths.DataRoot, "Profiles")));
         DataContext = _viewModel;
         _viewModel.UseAutomation(_services.ControlSettings.Automation);
         StartControl();
@@ -174,6 +175,9 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         else await ShowErrorAsync("Hero and map list", result.Message);
     }
 
+    private async void OnProfiles(object? sender, RoutedEventArgs e) =>
+        await new Views.ProfilesWindow(new ProfilesViewModel(_viewModel)).ShowDialog(this);
+
     private async void OnTeamLibrary(object? sender, RoutedEventArgs e) =>
         await new Views.TeamLibraryWindow(new TeamLibraryViewModel(_viewModel)).ShowDialog(this);
 
@@ -237,6 +241,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
                 {
                     "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
                     "about" => new AboutWindow(),
+                    "profiles" => new ProfilesWindow(new ProfilesViewModel(_viewModel)),
                     "library" => new TeamLibraryWindow(new TeamLibraryViewModel(_viewModel)),
                     "restore" => new RestoreMatchWindow(new RestoreMatchViewModel(_viewModel.ArchivedMatches())),
                     "control" => new ControlSettingsWindow(new ControlSettingsViewModel(_services.ControlSettings, _viewModel.OverlayBaseUrl)),

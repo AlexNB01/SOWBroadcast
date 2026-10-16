@@ -1,0 +1,48 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SowBroadcast.App.ViewModels"
+        x:Class="SowBroadcast.App.Views.ProfilesWindow"
+        x:DataType="vm:ProfilesViewModel"
+        Title="Profiles"
+        Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
+        Width="680" Height="600" MinWidth="520" MinHeight="440"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <TextBlock Classes="muted" Text="{Binding Message}" TextWrapping="Wrap" MinHeight="18" />
+      <WrapPanel>
+        <Button Content="Apply settings only" Command="{Binding ApplySettingsCommand}" Margin="0,0,8,6"
+                ToolTip.Tip="Status text, colours, logos, casters, waiting texts, standings, bracket. The teams, maps and scores on screen stay." />
+        <Button Content="Apply whole match" Command="{Binding ApplyWholeCommand}" Margin="0,0,16,6"
+                ToolTip.Tip="Everything, including the teams, maps and scores. The match on screen is kept under Restore previous match first." />
+        <Button Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,0,6" />
+      </WrapPanel>
+      <Button Classes="primary" Content="Close" HorizontalAlignment="Right" MinWidth="100" Click="OnClose" />
+    </StackPanel>
+
+    <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,10"
+               Text="A profile is the whole setup of one tournament or match, kept under a name. Applying one changes what you see here; the overlays get it with Update. The countdown and a running SOWDraft link are never touched." />
+
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,10">
+      <TextBox Grid.Column="0" Text="{Binding Name}" Watermark="Name of the profile (e.g. ESM Finals)" />
+      <Button Grid.Column="1" Classes="primary" Content="Save current as profile" Command="{Binding SaveCommand}" />
+    </Grid>
+
+    <TextBlock DockPanel.Dock="Top" IsVisible="{Binding IsEmpty}" Margin="0,4,0,8" TextWrapping="Wrap"
+               Text="No profiles yet. Set up the status text, colours and logos, give the profile a name and save it." />
+
+    <Border Classes="card" Padding="4">
+      <ListBox Background="Transparent" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" DoubleTapped="OnDoubleTapped">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:ProfileItemViewModel">
+            <StackPanel Margin="4,3">
+              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+              <TextBlock Classes="muted" Text="{Binding Details}" TextWrapping="Wrap" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+  </DockPanel>
+</Window>

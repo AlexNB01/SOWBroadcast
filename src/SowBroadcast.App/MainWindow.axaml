@@ -16,6 +16,7 @@
         <MenuItem Header="_Save" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
         <MenuItem Header="Save _As…" Command="{Binding SaveAsCommand}" InputGesture="Ctrl+Shift+S" />
         <MenuItem Header="_Restore previous match…" Click="OnRestoreMatch" />
+        <MenuItem Header="_Profiles…" Click="OnProfiles" />
         <Separator />
         <MenuItem Header="_Quit" Click="OnQuit" InputGesture="Alt+F4" />
       </MenuItem>
@@ -75,6 +76,9 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <Border Classes="pill" IsVisible="{Binding HasUnsentChanges}">
             <TextBlock Text="Unsent changes" FontWeight="SemiBold" />
+          </Border>
+          <Border Classes="pill" IsVisible="{Binding HasActiveProfile}">
+            <TextBlock Text="{Binding ActiveProfileName, StringFormat='Profile: {0}'}" FontWeight="SemiBold" />
           </Border>
           <Border Classes="pill">
             <TextBlock Text="{Binding Link.PillText}" FontWeight="SemiBold" />

@@ -35,9 +35,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         string? defaultVideosDir = null, Func<long>? clock = null, string? standingsLogoFolder = null,
         ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null,
         LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null, Func<long>? epochMs = null,
-        MatchArchive? archive = null, Func<DateTime>? now = null, TeamLibrary? library = null)
+        MatchArchive? archive = null, Func<DateTime>? now = null, TeamLibrary? library = null,
+        SowBroadcast.Core.Profiles.ProfileStore? profiles = null)
     {
         _archive = archive;
+        _profiles = profiles;
         _library = library;
         _now = now ?? (() => DateTime.Now);
         _assets = assets;
@@ -65,6 +67,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         State = AppState.CreateDefault();
         Version = AppInfo.Version;
         ResetHistory();
+        RefreshActiveProfile();
     }
 
     public string Version { get; }
