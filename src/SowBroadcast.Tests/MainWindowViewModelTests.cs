@@ -151,6 +151,149 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Empty(_publisher.Published);
     }
 
+    // ---- Match tab actions -------------------------------------------------------------------------------
+
+    [Fact]
+    public void Editing_the_match_marks_unsent_changes_without_publishing()
+    {
+        var vm = Create();
+
+        vm.Match.Team1.Name = "Typed";
+
+        Assert.True(vm.HasUnsentChanges);
+        Assert.Empty(_publisher.Published);
+    }
+
+    [Fact]
+    public void Update_publishes_what_is_on_the_tab_clears_the_marker_and_autosaves()
+    {
+        var vm = Create();
+        vm.Match.Team1.Name = "Typed";
+        vm.Match.Team1.Score = 2;
+
+        vm.UpdateMatchCommand.Execute(null);
+
+        Assert.Equal("Typed", _publisher.Published.Single().Team1.Name);
+        Assert.Equal(2, _publisher.Published.Single().Team1.Score);
+        Assert.False(vm.HasUnsentChanges);
+        Assert.Equal("Typed", StateStore.Load(_autosave).Team1.Name);
+    }
+
+    [Fact]
+    public void Swap_changes_the_tab_marks_unsent_and_publishes_nothing()
+    {
+        var vm = Create();
+        vm.Match.Team1.Name = "Home";
+        vm.Match.Team2.Name = "Away";
+        vm.HasUnsentChanges = false;
+
+        vm.SwapTeamsCommand.Execute(null);
+
+        Assert.Equal("Away", vm.Match.Team1.Name);
+        Assert.Equal("Home", vm.Match.Team2.Name);
+        Assert.True(vm.HasUnsentChanges);
+        Assert.Empty(_publisher.Published);
+        Assert.Equal("Away", StateStore.Load(_autosave).Team1.Name);
+    }
+
+    [Fact]
+    public void Reset_clears_the_tab_but_not_the_format_bar_and_publishes_nothing()
+    {
+        var vm = Create();
+        vm.Match.Team1.Name = "Home";
+        vm.Match.MapsCount = 3;
+        vm.Match.Maps[0].T1 = 2;
+
+        vm.ResetMatchCommand.Execute(null);
+
+        Assert.Equal("", vm.Match.Team1.Name);
+        Assert.Equal(0, vm.Match.Maps[0].T1);
+        Assert.Equal(3, vm.Match.MapsCount);
+        Assert.True(vm.HasUnsentChanges);
+        Assert.Empty(_publisher.Published);
+    }
+
+    [Fact]
+    public async Task Saving_includes_edits_that_were_never_sent()
+    {
+        var target = Path.Combine(_dir, "match.sowbroadcast.json");
+        _dialogs.SaveResult = target;
+        var vm = Create();
+        vm.Match.Team2.Name = "Unsent";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal("Unsent", StateStore.Load(target).Team2.Name);
+    }
+
+    [Fact]
+    public async Task Loading_a_file_shows_it_on_the_tab()
+    {
+        var source = Path.Combine(_dir, "other.json");
+        StateStore.Save(source, AppState.CreateDefault() with { Team2 = new Team { Name = "Loaded", Score = 4 } });
+        _dialogs.OpenResult = source;
+        var vm = Create();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal("Loaded", vm.Match.Team2.Name);
+        Assert.Equal(4, vm.Match.Team2.Score);
+    }
+
+    [Fact]
+    public async Task Exporting_a_team_writes_its_file_without_the_score()
+    {
+        var target = Path.Combine(_dir, "teams", "home.sowteam.json");
+        _dialogs.TeamSaveResult = target;
+        var vm = Create();
+        vm.Match.Team1.Name = "Northern Lights";
+        vm.Match.Team1.Score = 3;
+
+        await vm.ExportHomeCommand.ExecuteAsync(null);
+
+        Assert.Equal("northern-lights.sowteam.json", _dialogs.LastSuggestedTeamName);
+        var json = File.ReadAllText(target);
+        Assert.Contains("Northern Lights", json);
+        Assert.DoesNotContain("score", json);
+    }
+
+    [Fact]
+    public async Task Importing_a_team_fills_one_panel_and_keeps_its_score()
+    {
+        var file = Path.Combine(_dir, "away.sowteam.json");
+        File.WriteAllText(file, """{ "version": 1, "name": "Imported", "abbr": "IMP", "color_hex": "#112233", "players": [ { "name": "A", "hero": "", "role": "Tank" } ] }""");
+        _dialogs.TeamOpenResult = file;
+        var vm = Create();
+        vm.Match.Team2.Score = 7;
+        vm.Match.Team1.Name = "Untouched";
+        vm.HasUnsentChanges = false;
+
+        await vm.ImportAwayCommand.ExecuteAsync(null);
+
+        Assert.Equal("Imported", vm.Match.Team2.Name);
+        Assert.Equal("#112233", vm.Match.Team2.ColourHex);
+        Assert.Equal(7, vm.Match.Team2.Score);
+        Assert.Equal("Tank", vm.Match.Team2.Players[0].Role);
+        Assert.Equal("Untouched", vm.Match.Team1.Name);
+        Assert.True(vm.HasUnsentChanges);
+        Assert.Empty(_publisher.Published);
+    }
+
+    [Fact]
+    public async Task Importing_a_broken_team_file_changes_nothing_and_shows_an_error()
+    {
+        var file = Path.Combine(_dir, "broken.json");
+        File.WriteAllText(file, "nope");
+        _dialogs.TeamOpenResult = file;
+        var vm = Create();
+        vm.Match.Team1.Name = "Keep";
+
+        await vm.ImportHomeCommand.ExecuteAsync(null);
+
+        Assert.Equal("Keep", vm.Match.Team1.Name);
+        Assert.Single(_dialogs.Errors);
+    }
+
     private sealed class FakePublisher : IOverlayPublisher
     {
         public string? BaseUrl => "http://127.0.0.1:8324";
@@ -178,6 +321,18 @@ public sealed class MainWindowViewModelTests : IDisposable
         {
             SavePrompts++;
             return Task.FromResult(SaveResult);
+        }
+
+        public string? TeamOpenResult { get; set; }
+        public string? TeamSaveResult { get; set; }
+        public string? LastSuggestedTeamName { get; private set; }
+
+        public Task<string?> PickOpenTeamFileAsync(string? initialDirectory) => Task.FromResult(TeamOpenResult);
+
+        public Task<string?> PickSaveTeamFileAsync(string? initialDirectory, string suggestedName)
+        {
+            LastSuggestedTeamName = suggestedName;
+            return Task.FromResult(TeamSaveResult);
         }
 
         public Task ShowErrorAsync(string title, string message)

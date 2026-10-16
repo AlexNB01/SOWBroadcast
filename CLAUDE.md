@@ -169,7 +169,7 @@ Toteutuksessa tehdyt päätökset, jotka poikkeavat luvun 2b ehdotuksista:
   (`Heroes`, `HeroesBody`, `Maps`, `Gametypes`, `Roles`, `General/Icons`) palvellaan lisäksi asennuskansiosta (käyttäjän kansio ensin). Näin vanhat generoidut tiedostot asennuskansiossa eivät vuoda overlayihin. Palvelin palvelee vain kansiot jotka ovat olemassa käynnistyksessä → `AppServices` luo ne.
 - **Livetodennus**: vanha `scoreboard.html` (muuttamaton) renderöi uuden sovelluksen viennin ja päivittyi SSE:llä (`--demo-live`-kytkin Debug-käännöksessä nosti pisteet 1 → 6 ilman sivun latausta). Käynnistys julkaisee tallennetun tilan (KYS-11d). Julkaisu on toistaiseksi vain Debug → *Publish current state*; oikeat Update-napit tulevat välilehtien mukana (M3–M5).
 - **Dev-aputyökalut (vain Debug)**: Debug-valikko (*Publish current state*, *Load sample match*, *Open scoreboard overlay*), `--demo-live`.
-- **Valikot**: File (Load/Save/Save As/Quit) ja Customize (assetit, M2) toimivat; Teams-valikon kohdat ovat toistaiseksi pois käytöstä (M3). Välilehdet ovat paikkamerkkejä (M3–M5).
+- **Valikot**: File (Load/Save/Save As/Quit), Customize (assetit, M2) ja Teams (Export/Import Home/Away, M3) toimivat. Välilehdet GENERAL–BRACKET ovat paikkamerkkejä (M4–M5).
 
 **M2 valmis (2026-10-16)** – assetit (128 testiä yhteensä). Havainnot ja päätökset:
 - **Katalogi kerroksittain** (`Core/Assets/AssetService`): käyttäjän `Scoreboard/<Kat>/index.json` (datakansio) → bundlattu `Scoreboard/<Kat>/index.json` (asennuskansio) → kuvakansion skannaus. Bundlatut `index.json`-tiedostot (Heroes, Maps, Gametypes: 54 heroa, 31 mappia, 5 pelitilaa) ovat nyt versionhallinnassa; käyttäjän lisäykset kirjoitetaan vain datakansioon, eikä bundlattuja kuvia kopioida turhaan.
@@ -179,6 +179,17 @@ Toteutuksessa tehdyt päätökset, jotka poikkeavat luvun 2b ehdotuksista:
 - **Dialogit**: `AssetManagerWindow` (Heroes/Maps/Game Modes, vanhan käytöksen mukaiset virheilmoitukset `Missing name` / `Missing body image`), `BulkImportWindow` (`Imported X heroes and Y maps.`). Näkymämallit (`AssetManagerViewModel`, `BulkImportViewModel`) testataan feikatulla `IImagePicker`/`IMessages`-parilla.
 - **Dev-apu**: `--screenshot <png> --dialog heroes|maps|modes|bulk [--select <nimi>]` renderöi dialogin PNG:ksi.
 - **Tunnettu dataongelma**: `Scoreboard/Heroes/d-va.png` puuttuu vaikka indeksi listaa sen (vanhan sovelluksen virhe, luku 12 #16) – D.Va:n logo-esikatselu on tyhjä kunnes kuva toimitetaan.
+
+**M3 valmis (2026-10-16)** – MATCH-välilehti (159 testiä yhteensä). Havainnot ja päätökset:
+- **Rakenne**: `MatchViewModel` (muokattava puoli: `TeamPanelViewModel` ×2 + `PlayerRowViewModel` ×8, `MapCardViewModel` ×7, formaattipalkki) peilaa `AppState`n ottelun osan (`Load` / `ApplyTo`) ja ilmoittaa käyttäjän muokkauksista (`Edited`, ei latauksen aikana).
+  `MainWindowViewModel` omistaa tilan: `CollectMatch()` ottaa ruudun sisällön tilaan ennen julkaisua, tallennusta ja autosavea; ulkoa asetettu tila (Load, palautus, Swap, Reset, Import) näytetään ruudulla. Puhtaat toiminnot Coressa: `MatchOperations.Swap/Reset`, `TeamFile.Export/Import`.
+- **Julkaisusääntö**: vain **Update** lähettää (kirjoittaa kaikki viennit + SSE + autosave). Muokkaus, Reset, Swap Teams ja Team Import vain autosaavat ja nostavat "Unsent changes" -merkin (KYS-9). Swap/Reset/Import eivät kysy vahvistusta (kuten vanha).
+- **Säännöt vanhasta säilytetty**: Swap vaihtaa koko joukkueen (pisteet, pelaajat), väri kulkee mukana vain jos poikkeaa slotin oletuksesta, mapeissa vaihtuvat pisteet/pick/banit mutta `completed` ei; Reset nollaa joukkueet, värit oletuksiin ja mapit mutta ei formaattipalkkia, general-asetuksia eikä linkkejä;
+  heron valinta asettaa roolin katalogista (`HERO_ROLES`-taulukkoa ei ole), roolia ei koskaan tyhjennetä, ja lataus ei ylikirjoita tallennettua roolia (vanhan bugi #7 korjattu); pick-listan T1/T2 näyttävät joukkueen nimen, tallennusarvo pysyy `—`/`T1`/`T2`. Formaattipalkki piilottaa kortit/rivit mutta data säilyy; `general.first_to` = `maps_count` (kuten vanha).
+- **Parittomuustesti**: legacy-golden `full` kulkee ruudun läpi (Load → ApplyTo) ja vienti on tavutarkasti sama kuin suoraan viedessä.
+- **Värivalitsin**: `Controls/ColorField` (väripaletti + heksakenttä, teemattu flyout) on EHD-12:n ensimmäinen versio; "viimeksi käytetyt" ja kontrastivaroitus tulevat M9:ssä. General-välilehti (M4) käyttää samaa kontrollia.
+- **Ei vielä mukana**: *SOWDraft Live Link* -ryhmä (tulee M6:ssa luvun 8.4 mallilla, ei vanhana stream-URL-kenttänä). Joukkueen logon valinta tukee png/jpg/jpeg/webp (vanhan `.svg` jää pois, koska SkiaSharp ei pura SVG:tä ilman lisäpakettia).
+- **Dev-apu**: `--sample` (lataa esimerkkiottelun), `--open-colour` (avaa värivalitsimen) `--screenshot`-kytkimen kanssa.
 
 ---
 

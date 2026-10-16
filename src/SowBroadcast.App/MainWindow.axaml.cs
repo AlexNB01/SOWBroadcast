@@ -6,6 +6,7 @@ using SowBroadcast.App.Services;
 using SowBroadcast.App.ViewModels;
 using SowBroadcast.App.Views;
 using SowBroadcast.Core.Assets;
+using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Storage;
 
 namespace SowBroadcast.App;
@@ -24,7 +25,12 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
     {
         InitializeComponent();
         _services = AppServices.Start();
-        _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath);
+        var teamsFolder = Path.Combine(AppPaths.ScoreboardDir, "Teams");
+        var logoFolder = Path.Combine(AppPaths.ScoreboardDir, "Temp", "Team Logos");
+        Directory.CreateDirectory(teamsFolder);
+        Directory.CreateDirectory(logoFolder);
+        _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
+            _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder);
         DataContext = _viewModel;
         _services.Assets.Changed += _ => _viewModel.HasUnsentChanges = true;
 #if DEBUG
@@ -120,6 +126,16 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
 
         Opened += async (_, _) =>
         {
+            if (args.Contains("--sample"))
+            {
+                await Task.Delay(400); // after the autosave restore
+                _viewModel.LoadSampleCommand.Execute(null);
+            }
+            if (args.Contains("--open-colour"))
+            {
+                await Task.Delay(300);
+                Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(this).OfType<Controls.ColorField>().FirstOrDefault()?.OpenPanel();
+            }
             if (args.Contains("--focus")) ThemeView.FocusSample();
             var openCombo = Array.IndexOf(args, "--open-combo");
             if (openCombo >= 0) ThemeView.OpenSampleCombo(openCombo + 1 < args.Length && !args[openCombo + 1].StartsWith("--") ? args[openCombo + 1] : "");
@@ -188,6 +204,36 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
             SuggestedFileName = suggestedName,
             DefaultExtension = "json",
             FileTypeChoices = new[] { StateFiles },
+            SuggestedStartLocation = await StartFolderAsync(initialDirectory),
+        });
+        return file?.TryGetLocalPath();
+    }
+
+    private static readonly FilePickerFileType TeamFiles = new("SOW team")
+    {
+        Patterns = new[] { "*.json" },
+    };
+
+    public async Task<string?> PickOpenTeamFileAsync(string? initialDirectory)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import team",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { TeamFiles, FilePickerFileTypes.All },
+            SuggestedStartLocation = await StartFolderAsync(initialDirectory),
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<string?> PickSaveTeamFileAsync(string? initialDirectory, string suggestedName)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export team",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "json",
+            FileTypeChoices = new[] { TeamFiles },
             SuggestedStartLocation = await StartFolderAsync(initialDirectory),
         });
         return file?.TryGetLocalPath();

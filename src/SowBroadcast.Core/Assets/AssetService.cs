@@ -54,6 +54,14 @@ public sealed class AssetService
 
     public string? HeroRole(string? name) => Find(AssetCategory.Heroes, name)?.Role;
 
+    /// <summary>The picture file of an entry (user folder first, then the shipped one, else the file it was imported from).</summary>
+    public string? ImageFile(AssetCategory category, string? name)
+    {
+        var asset = Find(category, name);
+        if (asset is null) return null;
+        return AssetFiles.Resolve(asset.ImagePath, AllRoots) ?? (asset.SourcePath is { } s && File.Exists(s) ? s : null);
+    }
+
     private IReadOnlyList<string> AllRoots => new[] { _userRoot }.Concat(_shippedRoots).ToArray();
 
     // ---- loading -----------------------------------------------------------------------------------------

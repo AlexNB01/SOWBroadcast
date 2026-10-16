@@ -124,6 +124,13 @@
     <Setter Property="MinHeight" Value="32" />
   </Style>
 
+  <!-- Flyouts (colour panel) in the card colours -->
+  <Style Selector="FlyoutPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowShadowBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SowLineBrush}" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+
   <!-- Compact list rows (searchable combo popup) -->
   <Style Selector="ListBox.compact ListBoxItem">
     <Setter Property="MinHeight" Value="28" />

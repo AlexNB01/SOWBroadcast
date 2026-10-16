@@ -2,6 +2,9 @@ using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SowBroadcast.App.Services;
+using SowBroadcast.Core.Assets;
+using SowBroadcast.Core.Export;
+using SowBroadcast.Core.Match;
 using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Storage;
 
@@ -13,15 +16,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IMessages _messages;
     private readonly IOverlayPublisher _publisher;
     private readonly string _autosavePath;
+    private readonly ILogoConverter _logos;
+    private readonly string? _teamsFolder;
     private string? _currentSavePath;
+    private bool _collecting;
 
-    public MainWindowViewModel(IFileDialogs dialogs, IMessages messages, IOverlayPublisher publisher, string autosavePath)
+    public MainWindowViewModel(IFileDialogs dialogs, IMessages messages, IOverlayPublisher publisher, string autosavePath,
+        AssetService? assets = null, IImagePicker? images = null, ILogoConverter? logos = null,
+        string? teamsFolder = null, string? logoFolder = null)
     {
         _dialogs = dialogs;
         _messages = messages;
         _publisher = publisher;
         _autosavePath = autosavePath;
+        _logos = logos ?? new SkiaLogoConverter();
+        _teamsFolder = teamsFolder;
         ServerStatus = publisher.BaseUrl is null ? "Overlay server unavailable" : $"Overlays: {publisher.BaseUrl}";
+        Match = new MatchViewModel(assets, images ?? new NoImagePicker(), logoFolder);
+        Match.Edited += () => HasUnsentChanges = true;
         State = AppState.CreateDefault();
         Version = typeof(MainWindowViewModel).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "3.0.0";
@@ -31,12 +43,118 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string ServerStatus { get; }
     public string? OverlayBaseUrl => _publisher.BaseUrl;
 
+    /// <summary>The Match tab (team panels, map cards, format bar).</summary>
+    public MatchViewModel Match { get; }
+
     [ObservableProperty] private AppState _state;
     [ObservableProperty] private string _statusText = "Ready";
     [ObservableProperty] private bool _hasUnsentChanges;
     [ObservableProperty] private string _linkStatus = "Not linked";
 
     public string? CurrentSavePath => _currentSavePath;
+
+    // A state set from outside (load, restore, swap) is shown on the Match tab; collecting the tab back into the state is not.
+    partial void OnStateChanged(AppState value)
+    {
+        if (!_collecting) Match.Load(value);
+    }
+
+    /// <summary>Takes what is on the Match tab into <see cref="State"/>.</summary>
+    public void CollectMatch()
+    {
+        _collecting = true;
+        try { State = Match.ApplyTo(State); }
+        finally { _collecting = false; }
+    }
+
+    // ---- Match tab actions -------------------------------------------------------------------------------
+
+    /// <summary>The Update button: send everything to the overlays.</summary>
+    [RelayCommand]
+    private void UpdateMatch()
+    {
+        CollectMatch();
+        TryPublish(updateStatus: true);
+        Autosave();
+    }
+
+    [RelayCommand]
+    private void SwapTeams()
+    {
+        CollectMatch();
+        State = MatchOperations.Swap(State);
+        AfterLocalChange("Teams swapped (not published yet)");
+    }
+
+    [RelayCommand]
+    private void ResetMatch()
+    {
+        CollectMatch();
+        State = MatchOperations.Reset(State);
+        AfterLocalChange("Match reset (not published yet)");
+    }
+
+    private void AfterLocalChange(string status)
+    {
+        HasUnsentChanges = true;
+        StatusText = status;
+        Autosave();
+    }
+
+    [RelayCommand]
+    private Task ExportHomeAsync() => ExportAsync(1);
+
+    [RelayCommand]
+    private Task ExportAwayAsync() => ExportAsync(2);
+
+    [RelayCommand]
+    private Task ImportHomeAsync() => ImportAsync(1);
+
+    [RelayCommand]
+    private Task ImportAwayAsync() => ImportAsync(2);
+
+    private async Task ExportAsync(int slot)
+    {
+        CollectMatch();
+        var team = (slot == 1 ? State.Team1 : State.Team2) with { Score = 0, BannedHero = "" };
+        var path = await _dialogs.PickSaveTeamFileAsync(_teamsFolder, TeamFile.SuggestedFileName(team));
+        if (path is null) return;
+        try
+        {
+            var warning = TeamFile.Export(team, path, _logos);
+            StatusText = $"Exported {Path.GetFileName(path)}";
+            if (warning is not null) await _messages.ShowErrorAsync("Export", warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            await _messages.ShowErrorAsync("Export failed", ex.Message);
+        }
+    }
+
+    private async Task ImportAsync(int slot)
+    {
+        var path = await _dialogs.PickOpenTeamFileAsync(_teamsFolder);
+        if (path is null) return;
+        CollectMatch();
+        var current = slot == 1 ? State.Team1 : State.Team2;
+        Team imported;
+        try
+        {
+            imported = TeamFile.Import(path, current.Score, slot == 1 ? Defaults.Team1Color : Defaults.Team2Color);
+        }
+        catch (StateLoadException ex)
+        {
+            await _messages.ShowErrorAsync("Import failed", ex.Message);
+            return;
+        }
+        State = slot == 1 ? State with { Team1 = imported } : State with { Team2 = imported };
+        AfterLocalChange($"Imported {Path.GetFileName(path)} (not published yet)");
+    }
+
+    private sealed class NoImagePicker : IImagePicker
+    {
+        public Task<string?> PickImageAsync(string title, string? initialDirectory = null) => Task.FromResult<string?>(null);
+    }
 
     /// <summary>Restores the autosave (if any) at startup.</summary>
     public async Task LoadAutosaveAsync()
@@ -65,6 +183,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void TryPublish(bool updateStatus)
     {
+        CollectMatch();
         try
         {
             var result = _publisher.Publish(State);
@@ -92,6 +211,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void Autosave()
     {
+        CollectMatch();
         try
         {
             StateStore.Save(_autosavePath, State);
@@ -149,6 +269,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task WriteAsync(string path)
     {
+        CollectMatch();
         try
         {
             StateStore.Save(path, State);

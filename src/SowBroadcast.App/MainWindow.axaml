@@ -32,11 +32,11 @@
         <MenuItem Header="Open _scoreboard overlay in browser" Click="OnOpenScoreboardOverlay" />
       </MenuItem>
       <MenuItem Header="_Teams">
-        <MenuItem Header="Export _Home…" IsEnabled="False" />
-        <MenuItem Header="Import H_ome…" IsEnabled="False" />
+        <MenuItem Header="Export _Home…" Command="{Binding ExportHomeCommand}" />
+        <MenuItem Header="Import H_ome…" Command="{Binding ImportHomeCommand}" />
         <Separator />
-        <MenuItem Header="Export _Away…" IsEnabled="False" />
-        <MenuItem Header="Import A_way…" IsEnabled="False" />
+        <MenuItem Header="Export _Away…" Command="{Binding ExportAwayCommand}" />
+        <MenuItem Header="Import A_way…" Command="{Binding ImportAwayCommand}" />
       </MenuItem>
     </Menu>
 
@@ -72,7 +72,7 @@
 
     <TabControl x:Name="Tabs" Margin="14,10,14,10">
       <TabItem Header="MATCH">
-        <views:Placeholder Title="Match" Milestone="M3" />
+        <views:MatchView />
       </TabItem>
       <TabItem Header="GENERAL">
         <views:Placeholder Title="General" Milestone="M4" />

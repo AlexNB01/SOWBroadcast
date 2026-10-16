@@ -77,7 +77,7 @@ public partial class SearchableComboBox : UserControl
         var text = SelectedItem;
         if (string.IsNullOrEmpty(text)) text = NoneText ?? Placeholder;
         DisplayText.Text = text;
-        DisplayText.Classes.Set("placeholder", SelectedItem is null);
+        DisplayText.Classes.Set("placeholder", string.IsNullOrEmpty(SelectedItem));
     }
 
     private void RefreshRows()
