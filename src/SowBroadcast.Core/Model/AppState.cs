@@ -174,11 +174,31 @@ public sealed record AppState
     public BracketSettings Bracket { get; init; } = new();
     public string DraftLinkUrl { get; init; } = "";
     public string TournamentLinkUrl { get; init; } = "";
+    public LinkSettings Link { get; init; } = new();
 
     public static AppState CreateDefault() => new();
 
     public static IReadOnlyList<MapEntry> DefaultMaps() =>
         Enumerable.Range(1, Limits.MapsPerSeries).Select(i => new MapEntry { Index = i }).ToArray();
+}
+
+/// <summary>
+/// The SOWDraft link as it is saved, so a restart can connect again: the tournament, the match the user chose, which side is
+/// which, and the last value received for every linked field (so a manual correction is only overwritten when SOWDraft itself changes).
+/// </summary>
+public sealed record LinkSettings
+{
+    public string TournamentUrl { get; init; } = "";
+    public string Origin { get; init; } = "";
+    public string TournamentId { get; init; } = "";
+    public string SelectedMatchId { get; init; } = "";
+    public bool SidesSwapped { get; init; }
+    /// <summary>A draft room address linked by hand ("Advanced"), instead of a tournament.</summary>
+    public string ManualDraftUrl { get; init; } = "";
+    public IReadOnlyDictionary<string, string> Received { get; init; } = new Dictionary<string, string>();
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsLinked => TournamentId.Length > 0 || ManualDraftUrl.Length > 0;
 }
 
 public static class StateSchema

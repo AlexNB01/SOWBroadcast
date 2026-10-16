@@ -16,6 +16,7 @@ public static class LegacyMatchJson
         var derived = StateDerivations.Apply(state);
         var root = JsonSerializer.SerializeToNode(derived, StateStore.Options)!.AsObject();
         root.Remove("schema_version");
+        root.Remove("link"); // the link settings are the app's own (they hold no overlay data)
         root["map_pool"] = new JsonArray();
 
         var general = root["general"]!.AsObject();
