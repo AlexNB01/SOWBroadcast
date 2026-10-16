@@ -38,7 +38,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
             _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir,
             standingsLogoFolder: teamsFolder, teamPicker: this,
-            linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
+            linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action),
+            archive: new SowBroadcast.Core.History.MatchArchive(Path.Combine(AppPaths.DataRoot, "History")));
         DataContext = _viewModel;
         _viewModel.UseAutomation(_services.ControlSettings.Automation);
         StartControl();
@@ -55,6 +56,10 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         // The countdown counts on a monotonic clock; this only refreshes what is shown (and the timer files) a few times a second.
         var clock = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         clock.Tick += (_, _) => _viewModel.Waiting.Tick();
+        // What was edited since the last look becomes one undo step once the typing pauses.
+        var steps = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+        steps.Tick += (_, _) => _viewModel.FlushHistory();
+        steps.Start();
         clock.Start();
 #if DEBUG
         ThemeTab.IsVisible = true;
@@ -75,7 +80,11 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         Closing += (_, _) =>
         {
             _hotkeys.Dispose();
-            if (!_skipAutosave) _viewModel.Autosave();
+            if (!_skipAutosave)
+            {
+                _viewModel.Autosave();
+                _viewModel.ArchiveOnClose();
+            }
             _services.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
         };
     }
@@ -153,6 +162,12 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         }
     }
 
+    private async void OnRestoreMatch(object? sender, RoutedEventArgs e)
+    {
+        var window = new Views.RestoreMatchWindow(new RestoreMatchViewModel(_viewModel.ArchivedMatches()));
+        if (await window.ShowDialog<string?>(this) is { } path) await _viewModel.RestoreArchivedAsync(path);
+    }
+
     private async void OnControlSettings(object? sender, RoutedEventArgs e)
     {
         var window = new Views.ControlSettingsWindow(new ControlSettingsViewModel(_services.ControlSettings, _viewModel.OverlayBaseUrl));
@@ -200,13 +215,14 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         var dialogArg = Array.IndexOf(args, "--dialog");
         if (dialogArg >= 0 && dialogArg + 1 < args.Length)
         {
-            // `--dialog heroes|maps|modes|bulk|about|control` renders that dialog instead of the main window.
+            // `--dialog heroes|maps|modes|bulk|about|control|restore` renders that dialog instead of the main window.
             Opened += async (_, _) =>
             {
                 Window dialog = args[dialogArg + 1] switch
                 {
                     "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
                     "about" => new AboutWindow(),
+                    "restore" => new RestoreMatchWindow(new RestoreMatchViewModel(_viewModel.ArchivedMatches())),
                     "control" => new ControlSettingsWindow(new ControlSettingsViewModel(_services.ControlSettings, _viewModel.OverlayBaseUrl)),
                     "maps" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Maps, _services.Assets, this, this)),
                     "modes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Modes, _services.Assets, this, this)),

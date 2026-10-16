@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SowBroadcast.App.ViewModels"
+        x:Class="SowBroadcast.App.Views.RestoreMatchWindow"
+        x:DataType="vm:RestoreMatchViewModel"
+        Title="Restore previous match"
+        Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
+        Width="520" Height="480" MinWidth="380" MinHeight="320"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,12,0,0">
+      <Button Content="Cancel" Click="OnCancel" />
+      <Button Classes="primary" Content="Restore" MinWidth="100" IsEnabled="{Binding HasSelection}" Click="OnRestore" />
+    </StackPanel>
+    <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,8"
+               Text="The match on screen is kept in this list first, so you can come back to it. Nothing is sent to the overlays until you press Update." />
+    <TextBlock DockPanel.Dock="Top" Text="No earlier matches yet." IsVisible="{Binding IsEmpty}" Margin="0,8" />
+    <Border Classes="card" Padding="4">
+      <ListBox Background="Transparent" ItemsSource="{Binding Matches}" SelectedItem="{Binding Selected}" DoubleTapped="OnDoubleTapped">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:ArchivedMatchItem">
+            <StackPanel Margin="4,3">
+              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+              <TextBlock Classes="muted" Text="{Binding When}" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+  </DockPanel>
+</Window>

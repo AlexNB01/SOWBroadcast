@@ -6,6 +6,7 @@ using SowBroadcast.Core.Assets;
 using SowBroadcast.Core.Bracket;
 using SowBroadcast.Core.Standings;
 using SowBroadcast.Core.Export;
+using SowBroadcast.Core.History;
 using SowBroadcast.Core.Match;
 using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Storage;
@@ -32,8 +33,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         string? teamsFolder = null, string? logoFolder = null, string? broadcastLogoFolder = null,
         string? defaultVideosDir = null, Func<long>? clock = null, string? standingsLogoFolder = null,
         ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null,
-        LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null, Func<long>? epochMs = null)
+        LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null, Func<long>? epochMs = null,
+        MatchArchive? archive = null, Func<DateTime>? now = null)
     {
+        _archive = archive;
+        _now = now ?? (() => DateTime.Now);
         _assets = assets;
         _dialogs = dialogs;
         _messages = messages;
@@ -58,6 +62,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         Waiting.TimerCommanded += PublishTimer;
         State = AppState.CreateDefault();
         Version = AppInfo.Version;
+        ResetHistory();
     }
 
     public string Version { get; }
@@ -98,8 +103,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
 
     IReadOnlyList<string> ILinkHost.MapNames => _assets?.Names(AssetCategory.Maps) ?? Array.Empty<string>();
 
+    void ILinkHost.BeforeMatchChange()
+    {
+        FlushHistory();
+        ArchiveCurrent("linked match changed");
+    }
+
     void ILinkHost.ApplyLinked(AppState state)
     {
+        _historyDirty = true;
         _collecting = true;
         try { State = state; }
         finally { _collecting = false; }
@@ -137,6 +149,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
     /// <summary>Notes that <paramref name="source"/> (a tab, assets, a loaded file) has changes the overlays do not have yet.</summary>
     public void MarkUnsent(string source)
     {
+        _historyDirty = true;
         _unsentSources.Add(source);
         HasUnsentChanges = true;
     }
@@ -276,11 +289,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         CollectTabs();
         TryPublish(updateStatus: true);
         Autosave();
+        if (_now() - _lastArchiveAt >= ArchiveInterval) ArchiveCurrent("update");
     }
 
     [RelayCommand]
     private void SwapTeams()
     {
+        FlushHistory();
         if (Link.IsLinked)
         {
             // The teams come from SOWDraft: swapping them means choosing the other sides, which writes everything again.
@@ -296,6 +311,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
     [RelayCommand]
     private void ResetMatch()
     {
+        FlushHistory();
+        ArchiveCurrent("reset");
         CollectTabs();
         State = MatchOperations.Reset(State);
         AfterLocalChange("Match reset (not published yet)");
@@ -343,6 +360,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
     {
         var path = await _dialogs.PickOpenTeamFileAsync(_teamsFolder);
         if (path is null) return;
+        FlushHistory();
         CollectTabs();
         var current = slot == 1 ? State.Team1 : State.Team2;
         Team imported;
@@ -373,6 +391,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
             if (loaded is not null)
             {
                 ShowState(loaded);
+                ResetHistory();
                 StatusText = $"Restored autosave from {_autosavePath}";
             }
         }
@@ -444,9 +463,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
     {
         var path = await _dialogs.PickOpenStateFileAsync(Path.GetDirectoryName(_currentSavePath));
         if (path is null) return;
+        FlushHistory();
         try
         {
-            ShowState(StateStore.Load(path));
+            var loaded = StateStore.Load(path);
+            ArchiveCurrent("load");
+            ShowState(loaded);
         }
         catch (StateLoadException ex)
         {

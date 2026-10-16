@@ -23,8 +23,10 @@ public static class ControlCatalog
     public const string TimerPlusMinute = "timer.plus1m";
     public const string TimerMinusMinute = "timer.minus1m";
     public const string Update = "update";
+    public const string Undo = "undo";
+    public const string Redo = "redo";
 
-    // Defaults are Ctrl+Alt+F-keys: nothing else on Windows uses them, and they work while OBS or the game has the focus.
+    // Defaults are Ctrl+Alt+F-keys (and Ctrl+Alt+Z / Y for undo / redo): nothing else on Windows uses them, and they work while OBS or the game has the focus.
     public static IReadOnlyList<ControlCommandInfo> All { get; } = new ControlCommandInfo[]
     {
         new(Team1ScoreUp, "Team 1 score +1", "Ctrl+Alt+F1"),
@@ -36,6 +38,8 @@ public static class ControlCatalog
         new(TimerToggle, "Countdown start / pause", "Ctrl+Alt+F7"),
         new(TimerReset, "Countdown reset", "Ctrl+Alt+F8"),
         new(Update, "Update (send to the overlays)", "Ctrl+Alt+F9"),
+        new(Undo, "Undo the last change", "Ctrl+Alt+Z"),
+        new(Redo, "Redo", "Ctrl+Alt+Y"),
         new(MapTeam1Up, "Current map: team 1 +1", null),
         new(MapTeam1Down, "Current map: team 1 −1", null),
         new(MapTeam2Up, "Current map: team 2 +1", null),

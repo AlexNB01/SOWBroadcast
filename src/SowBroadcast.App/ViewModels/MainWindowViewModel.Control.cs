@@ -25,8 +25,11 @@ public sealed partial class MainWindowViewModel
         var known = ControlCatalog.Find(id);
         if (known is null) return Describe(false, $"Unknown command \"{id}\"");
 
+        FlushHistory();   // what was typed before this command is a step of its own
         var (ok, message) = known.Id switch
         {
+            ControlCatalog.Undo => StepHistory(undo: true),
+            ControlCatalog.Redo => StepHistory(undo: false),
             ControlCatalog.Team1ScoreUp => Bump(Match.Team1, +1),
             ControlCatalog.Team1ScoreDown => Bump(Match.Team1, -1),
             ControlCatalog.Team2ScoreUp => Bump(Match.Team2, +1),
@@ -49,7 +52,7 @@ public sealed partial class MainWindowViewModel
         };
 
         // A command changes the match on the screen only; the overlays get it with Update. The autosave keeps it safe.
-        if (ok && known.Id != ControlCatalog.Update) Autosave();
+        if (ok && known.Id is not (ControlCatalog.Update or ControlCatalog.Undo or ControlCatalog.Redo)) Autosave();
         StatusText = ok ? message : $"Control: {message}";
         return Describe(ok, message);
     }

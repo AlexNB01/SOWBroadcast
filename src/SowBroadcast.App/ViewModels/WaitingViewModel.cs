@@ -190,6 +190,19 @@ public sealed partial class WaitingViewModel : ObservableObject
     /// <summary>Shows the waiting part of <paramref name="state"/>. A saved countdown comes back stopped.</summary>
     public void Load(AppState state)
     {
+        LoadSettings(state);
+        _loading = true;
+        try
+        {
+            Timer.Set(state.Waiting.TimerSeconds);
+            RefreshTimer();
+        }
+        finally { _loading = false; }
+    }
+
+    /// <summary>Shows everything of the waiting tab except the countdown, which keeps running as it is (undo uses this).</summary>
+    public void LoadSettings(AppState state)
+    {
         var w = state.Waiting;
         _loading = true;
         try
@@ -203,8 +216,6 @@ public sealed partial class WaitingViewModel : ObservableObject
             TickerOverrideEnabled = w.TickerOverrideEnabled;
             foreach (var social in Socials)
                 social.Text = w.Socials.TryGetValue(social.Kind, out var handle) ? handle : "";
-            Timer.Set(w.TimerSeconds);
-            RefreshTimer();
         }
         finally { _loading = false; }
     }

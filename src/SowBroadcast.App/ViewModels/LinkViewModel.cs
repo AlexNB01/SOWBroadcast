@@ -20,6 +20,9 @@ public interface ILinkHost
 
     /// <summary>Shows linked data on the Match, Standings and Bracket tabs and sends it to the overlays at once (KYS-11a).</summary>
     void ApplyLinked(AppState state);
+
+    /// <summary>The user is about to follow another match: the one on screen can be archived first.</summary>
+    void BeforeMatchChange() { }
 }
 
 /// <summary>An entry of the match list: a tournament match the user can choose to follow.</summary>
@@ -152,6 +155,7 @@ public sealed partial class LinkViewModel : ObservableObject
     partial void OnSelectedMatchChanged(MatchChoice? value)
     {
         if (_rebuilding || !_service.IsLinked) return;
+        _host.BeforeMatchChange();
         _ = _service.SelectMatchAsync(value?.Id);
     }
 

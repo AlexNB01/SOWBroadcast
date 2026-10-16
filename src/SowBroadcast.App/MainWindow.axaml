@@ -15,8 +15,13 @@
         <MenuItem Header="_Load…" Command="{Binding LoadCommand}" InputGesture="Ctrl+O" />
         <MenuItem Header="_Save" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
         <MenuItem Header="Save _As…" Command="{Binding SaveAsCommand}" InputGesture="Ctrl+Shift+S" />
+        <MenuItem Header="_Restore previous match…" Click="OnRestoreMatch" />
         <Separator />
         <MenuItem Header="_Quit" Click="OnQuit" InputGesture="Alt+F4" />
+      </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem Header="_Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" HotKey="Ctrl+Z" IsEnabled="{Binding CanUndo}" />
+        <MenuItem Header="_Redo" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" HotKey="Ctrl+Y" IsEnabled="{Binding CanRedo}" />
       </MenuItem>
       <MenuItem Header="_Customize">
         <MenuItem Header="Manage _Heroes…" Click="OnManageHeroes" />
