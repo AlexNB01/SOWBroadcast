@@ -15,7 +15,7 @@ namespace SowBroadcast.App.ViewModels;
 public sealed partial class MatchViewModel : ObservableObject
 {
     // Properties that follow from others and are not user edits.
-    private static readonly HashSet<string> NotEdits = new() { "IsShown", "MapImagePath", "PickLabel", "Label", "Title", "HeroNames", "MapNames" };
+    private static readonly HashSet<string> NotEdits = new() { "IsShown", "MapImagePath", "PickLabel", "Label", "Title", "HeroNames", "MapNames", "ColourWarning", "HasColourWarning" };
 
     private readonly AssetService? _assets;
     private bool _loading;
@@ -56,6 +56,13 @@ public sealed partial class MatchViewModel : ObservableObject
 
     /// <summary>Raised when the user changed something (not while a state is being loaded).</summary>
     public event Action? Edited;
+
+    /// <summary>Tells both panels which colours the overlays use for text and for the plate behind it (for the team colour advice).</summary>
+    public void SetOverlayColours(string text, string background)
+    {
+        Team1.SetOverlayColours(text, background);
+        Team2.SetOverlayColours(text, background);
+    }
 
     /// <summary>The automations the producer has switched on (EHD-4); null = none.</summary>
     public AutomationSettings? Automation { get; set; }

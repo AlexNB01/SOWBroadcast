@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using SowBroadcast.Core.Colour;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -32,6 +33,8 @@ public sealed class ColorField : UserControl
     private readonly TextBox _hexBox = new() { Watermark = "#rrggbb", MaxLength = 7, MinWidth = 120 };
     private readonly Button _button;
     private readonly Flyout _flyout;
+    private readonly WrapPanel _recent = new() { Width = 200 };
+    private readonly TextBlock _recentLabel = new() { Text = "RECENT" };
 
     public ColorField()
     {
@@ -57,19 +60,22 @@ public sealed class ColorField : UserControl
             };
             FrostBorder(pick, Button.BorderBrushProperty);
             ToolTip.SetTip(pick, hex);
-            pick.Click += (_, _) => { Hex = hex; _flyout!.Hide(); };
+            pick.Click += (_, _) => { Choose(hex); _flyout!.Hide(); };
             swatches.Children.Add(pick);
         }
 
         _hexBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) { CommitHex(); e.Handled = true; } };
         _hexBox.LostFocus += (_, _) => CommitHex();
 
+        _recentLabel.Classes.Add("label");
         var panel = new StackPanel { Spacing = 8 };
         panel.Children.Add(swatches);
+        panel.Children.Add(_recentLabel);
+        panel.Children.Add(_recent);
         panel.Children.Add(_hexBox);
 
         _flyout = new Flyout { Placement = PlacementMode.BottomEdgeAlignedLeft, Content = panel };
-        _flyout.Opened += (_, _) => { _hexBox.Text = Hex; };
+        _flyout.Opened += (_, _) => { _hexBox.Text = Hex; RefreshRecent(); };
         _button.Flyout = _flyout;
 
         Content = _button;
@@ -90,8 +96,36 @@ public sealed class ColorField : UserControl
     private void CommitHex()
     {
         var match = HexPattern.Match((_hexBox.Text ?? "").Trim());
-        if (match.Success) Hex = "#" + match.Groups[1].Value.ToLowerInvariant();
+        if (match.Success) Choose("#" + match.Groups[1].Value.ToLowerInvariant());
         else _hexBox.Text = Hex;
+    }
+
+    // A colour the user picked (not one a binding set): it also goes to the shared "recent" row.
+    private void Choose(string hex)
+    {
+        if (!string.Equals(Hex, hex, StringComparison.OrdinalIgnoreCase)) Hex = hex;
+        RecentColours.Shared.Add(hex);
+    }
+
+    // The colours picked last, newest first (one list for every colour field of the program).
+    private void RefreshRecent()
+    {
+        _recent.Children.Clear();
+        _recentLabel.IsVisible = _recent.IsVisible = RecentColours.Shared.Items.Count > 0;
+        foreach (var hex in RecentColours.Shared.Items)
+        {
+            var pick = new Button
+            {
+                Width = 28, Height = 28, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(2),
+                Background = new SolidColorBrush(Color.Parse(hex)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+            };
+            FrostBorder(pick, Button.BorderBrushProperty);
+            ToolTip.SetTip(pick, hex);
+            pick.Click += (_, _) => { Choose(hex); _flyout.Hide(); };
+            _recent.Children.Add(pick);
+        }
     }
 
     private void UpdateFace()

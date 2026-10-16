@@ -33,6 +33,25 @@
         <Separator />
         <MenuItem Header="_Update hero and map list…" Click="OnUpdateAssetList" />
       </MenuItem>
+      <MenuItem Header="_Preview">
+        <MenuItem Header="_All overlays at once" Click="OnPreviewAll" />
+        <Separator />
+        <MenuItem Header="In-game _scoreboard" Tag="scoreboard.html" Click="OnPreview" />
+        <MenuItem Header="Map _draft" Tag="MapDraft.html" Click="OnPreview" />
+        <MenuItem Header="_Maps" Tag="maps.html" Click="OnPreview" />
+        <MenuItem Header="Team _1 roster" Tag="team.html?side=1" Click="OnPreview" />
+        <MenuItem Header="Team _2 roster" Tag="team.html?side=2" Click="OnPreview" />
+        <MenuItem Header="S_tarting soon" Tag="waiting.html?mode=start" Click="OnPreview" />
+        <MenuItem Header="_Be right back" Tag="waiting.html?mode=brb" Click="OnPreview" />
+        <MenuItem Header="Thank _you for watching" Tag="waiting.html?mode=end" Click="OnPreview" />
+        <MenuItem Header="S_tandings" Tag="standings.html" Click="OnPreview" />
+        <MenuItem Header="Brac_ket" Tag="bracket.html" Click="OnPreview" />
+        <MenuItem Header="Duo camera _row" Tag="duorow.html" Click="OnPreview" />
+        <MenuItem Header="Trio camera r_ow" Tag="triorow.html" Click="OnPreview" />
+        <MenuItem Header="Single _camera" Tag="singlecam.html" Click="OnPreview" />
+        <MenuItem Header="Instant _replay" Tag="replay.html" Click="OnPreview" />
+        <MenuItem Header="Trans_ition" Tag="transition.html" Click="OnPreview" />
+      </MenuItem>
       <MenuItem Header="C_ontrol">
         <MenuItem Header="_OBS panel…" Click="OnObsPanel" />
         <MenuItem Header="_Hotkeys, remote control and automation…" Click="OnControlSettings" />

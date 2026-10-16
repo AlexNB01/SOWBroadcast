@@ -241,4 +241,24 @@
   }
 
   window.SOW = SOW;
+
+  // ---- ?preview: one overlay on a checkerboard, scaled to the browser window (the program's Preview menu) ------
+  // Only for looking at an overlay outside OBS; OBS never adds ?preview, so nothing changes there.
+  if (typeof location !== "undefined" && typeof document !== "undefined" && /[?&]preview(=|&|$)/.test(location.search)) {
+    var style = document.createElement("style");
+    style.textContent =
+      "html{overflow:hidden!important;width:100%!important;height:100%!important;" +
+      "background:conic-gradient(#3a3f4d 25%,#2b2f3b 0 50%,#3a3f4d 0 75%,#2b2f3b 0) 0 0/24px 24px!important}" +
+      "body{position:absolute!important;left:0!important;top:0!important;transform-origin:0 0!important}";
+    (document.head || document.documentElement).appendChild(style);
+
+    var fit = function () {
+      if (!document.body) return;
+      var scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+      var x = (window.innerWidth - 1920 * scale) / 2, y = (window.innerHeight - 1080 * scale) / 2;
+      document.body.style.transform = "translate(" + x + "px," + y + "px) scale(" + scale + ")";
+    };
+    window.addEventListener("resize", fit);
+    document.addEventListener("DOMContentLoaded", fit);
+  }
 })();

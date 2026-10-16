@@ -29,6 +29,9 @@ public static class AppPaths
     /// <summary>Hotkeys and the token of the local control interface (belongs to the computer, not to a match).</summary>
     public static string ControlSettingsPath => Path.Combine(DataRoot, "control.json");
 
+    /// <summary>The colours picked last (the colour picker's "recent" row).</summary>
+    public static string RecentColoursPath => Path.Combine(DataRoot, "recent-colours.json");
+
     /// <summary>How to reach OBS Studio (host, port, protected password).</summary>
     public static string ObsSettingsPath => Path.Combine(DataRoot, "obs.json");
 

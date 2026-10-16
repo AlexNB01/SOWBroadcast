@@ -37,6 +37,29 @@ public sealed partial class TeamPanelViewModel : ObservableObject
 
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(PickLabel));
 
+    // Advice on the team colour against the overlay's text and background colours (EHD-12); empty when the colour is fine.
+    private string _overlayText = "#000000";
+    private string _overlayBackground = "#FFFFFF";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasColourWarning))]
+    private string _colourWarning = "";
+
+    public bool HasColourWarning => ColourWarning.Length > 0;
+
+    partial void OnColourHexChanged(string value) => UpdateColourWarning();
+
+    /// <summary>The overlay colours of the General tab: the text colour ("secondary") and the plate behind text ("primary").</summary>
+    public void SetOverlayColours(string text, string background)
+    {
+        _overlayText = text;
+        _overlayBackground = background;
+        UpdateColourWarning();
+    }
+
+    private void UpdateColourWarning() =>
+        ColourWarning = SowBroadcast.Core.Colour.ColourContrast.TeamColourAdvice(ColourHex, _overlayText, _overlayBackground);
+
     [RelayCommand]
     private async Task LoadLogoAsync()
     {

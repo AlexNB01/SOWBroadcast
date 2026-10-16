@@ -59,7 +59,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
             () => StandingsOperations.TeamsFromStandings(Standings.ApplyTo(State).Standings), teamPicker, messages, matchIds);
         Link = new LinkViewModel(linkService ?? UnavailableLink(), logoCache, this, messages, uiPost ?? (action => action()));
         Match.Edited += () => MarkUnsent("match");
-        General.Edited += () => MarkUnsent("general");
+        General.Edited += () => { MarkUnsent("general"); RefreshColourAdvice(); };
         Waiting.Edited += () => MarkUnsent("waiting");
         Standings.Edited += () => MarkUnsent("standings");
         Bracket.Edited += () => MarkUnsent("bracket");
@@ -67,6 +67,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         State = AppState.CreateDefault();
         Version = AppInfo.Version;
         ResetHistory();
+        RefreshColourAdvice();
         RefreshActiveProfile();
     }
 
@@ -167,6 +168,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         HasUnsentChanges = _unsentSources.Count > 0;
     }
 
+    // The team colour advice follows the overlay colours of the General tab.
+    private void RefreshColourAdvice()
+    {
+        var colours = General.ApplyTo(State).General.Colors;
+        Match.SetOverlayColours(colours.GetValueOrDefault("secondary", "#000000"), colours.GetValueOrDefault("primary", "#FFFFFF"));
+    }
+
     /// <summary>Takes what is on the Match, General and Waiting tabs into <see cref="State"/>.</summary>
     public void CollectTabs()
     {
@@ -180,6 +188,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
     {
         State = state;
         General.Load(state);
+        RefreshColourAdvice();
         Waiting.Load(state);
         Standings.Load(state);
         Bracket.Load(state);

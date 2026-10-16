@@ -38,6 +38,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         Directory.CreateDirectory(teamsFolder);
         Directory.CreateDirectory(logoFolder);
         Directory.CreateDirectory(broadcastLogoFolder);
+        SowBroadcast.Core.Colour.RecentColours.Shared.UseFile(AppPaths.RecentColoursPath);
         var teamLibrary = new SowBroadcast.Core.Teams.TeamLibrary(Path.Combine(AppPaths.ScoreboardDir, "TeamLibrary"), new SkiaLogoConverter());
         teamLibrary.Load();
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
@@ -252,6 +253,23 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         }
         ApplyHotkeys();
         _viewModel.StatusText = "Hotkeys, remote control and automation settings saved";
+    }
+
+    // ---- overlay preview (EHD-13): the overlays in the default browser, no WebView in the program ----------------
+
+    private void OnPreviewAll(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel.OverlayBaseUrl is { } url) BrowserOpener.Open(SowBroadcast.Core.Overlays.OverlayCatalog.OverviewUrl(url));
+        else _viewModel.StatusText = "The overlay server is not running, so there is nothing to preview.";
+    }
+
+    private void OnPreview(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string path }) return;
+        var page = SowBroadcast.Core.Overlays.OverlayCatalog.All.FirstOrDefault(p => p.Path == path);
+        if (page is null) return;
+        if (_viewModel.OverlayBaseUrl is { } url) BrowserOpener.Open(SowBroadcast.Core.Overlays.OverlayCatalog.PreviewUrl(url, page));
+        else _viewModel.StatusText = "The overlay server is not running, so there is nothing to preview.";
     }
 
     private void OnOpenScoreboardOverlay(object? sender, RoutedEventArgs e)

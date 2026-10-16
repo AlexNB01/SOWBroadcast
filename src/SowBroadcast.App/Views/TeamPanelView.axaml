@@ -23,7 +23,11 @@
                          Minimum="0" Maximum="200" FormatString="0" Value="{Binding Score}" />
 
           <TextBlock Grid.Row="3" Classes="label" VerticalAlignment="Center" Text="TEAM COLOUR" />
-          <controls:ColorField Grid.Row="3" Grid.Column="1" HorizontalAlignment="Left" MinWidth="170" Hex="{Binding ColourHex}" />
+          <StackPanel Grid.Row="3" Grid.Column="1" Spacing="4">
+            <controls:ColorField HorizontalAlignment="Left" MinWidth="170" Hex="{Binding ColourHex}" />
+            <TextBlock IsVisible="{Binding HasColourWarning}" Text="{Binding ColourWarning}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource SowErrorBrush}" FontSize="12" />
+          </StackPanel>
         </Grid>
 
         <StackPanel Grid.Column="1" Spacing="8">

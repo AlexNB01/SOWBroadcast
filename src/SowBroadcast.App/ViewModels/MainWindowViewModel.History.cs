@@ -98,6 +98,7 @@ public sealed partial class MainWindowViewModel
         };
         State = merged;   // the Match tab shows it
         General.Load(merged);
+        RefreshColourAdvice();
         Waiting.LoadSettings(merged);
         Standings.Load(merged);
         Bracket.Load(merged);
