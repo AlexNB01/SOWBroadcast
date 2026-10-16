@@ -19,11 +19,11 @@
         <MenuItem Header="_Quit" Click="OnQuit" InputGesture="Alt+F4" />
       </MenuItem>
       <MenuItem Header="_Customize">
-        <MenuItem Header="Manage _Heroes…" IsEnabled="False" />
-        <MenuItem Header="Manage _Maps…" IsEnabled="False" />
-        <MenuItem Header="Manage Game _Modes…" IsEnabled="False" />
+        <MenuItem Header="Manage _Heroes…" Click="OnManageHeroes" />
+        <MenuItem Header="Manage _Maps…" Click="OnManageMaps" />
+        <MenuItem Header="Manage Game _Modes…" Click="OnManageModes" />
         <Separator />
-        <MenuItem Header="_Bulk Import from Folders…" IsEnabled="False" />
+        <MenuItem Header="_Bulk Import from Folders…" Click="OnBulkImport" />
       </MenuItem>
       <MenuItem x:Name="DebugMenu" Header="_Debug" IsVisible="False">
         <MenuItem Header="_Publish current state (Update)" Command="{Binding PublishNowCommand}" />

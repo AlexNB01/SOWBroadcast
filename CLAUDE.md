@@ -169,7 +169,16 @@ Toteutuksessa tehdyt päätökset, jotka poikkeavat luvun 2b ehdotuksista:
   (`Heroes`, `HeroesBody`, `Maps`, `Gametypes`, `Roles`, `General/Icons`) palvellaan lisäksi asennuskansiosta (käyttäjän kansio ensin). Näin vanhat generoidut tiedostot asennuskansiossa eivät vuoda overlayihin. Palvelin palvelee vain kansiot jotka ovat olemassa käynnistyksessä → `AppServices` luo ne.
 - **Livetodennus**: vanha `scoreboard.html` (muuttamaton) renderöi uuden sovelluksen viennin ja päivittyi SSE:llä (`--demo-live`-kytkin Debug-käännöksessä nosti pisteet 1 → 6 ilman sivun latausta). Käynnistys julkaisee tallennetun tilan (KYS-11d). Julkaisu on toistaiseksi vain Debug → *Publish current state*; oikeat Update-napit tulevat välilehtien mukana (M3–M5).
 - **Dev-aputyökalut (vain Debug)**: Debug-valikko (*Publish current state*, *Load sample match*, *Open scoreboard overlay*), `--demo-live`.
-- **Valikot**: File (Load/Save/Save As/Quit) toimii; Customize ja Teams -valikkojen kohdat ovat toistaiseksi pois käytöstä (M2/M3). Välilehdet ovat paikkamerkkejä (M3–M5).
+- **Valikot**: File (Load/Save/Save As/Quit) ja Customize (assetit, M2) toimivat; Teams-valikon kohdat ovat toistaiseksi pois käytöstä (M3). Välilehdet ovat paikkamerkkejä (M3–M5).
+
+**M2 valmis (2026-10-16)** – assetit (128 testiä yhteensä). Havainnot ja päätökset:
+- **Katalogi kerroksittain** (`Core/Assets/AssetService`): käyttäjän `Scoreboard/<Kat>/index.json` (datakansio) → bundlattu `Scoreboard/<Kat>/index.json` (asennuskansio) → kuvakansion skannaus. Bundlatut `index.json`-tiedostot (Heroes, Maps, Gametypes: 54 heroa, 31 mappia, 5 pelitilaa) ovat nyt versionhallinnassa; käyttäjän lisäykset kirjoitetaan vain datakansioon, eikä bundlattuja kuvia kopioida turhaan.
+  Hero→rooli luetaan indeksistä (`HERO_ROLES`-taulukkoa ei toteuteta); `Slug.Make` käyttää ei-latinalaisille nimille hajautetta, joten ne eivät enää törmää `"item"`-arvoon (luku 12 #16). `Slug.HeroBodyFile` säilyttää vanhat ylikirjoitukset (EHD-10:n manifesti korvaa ne myöhemmin).
+- **Julkaisusääntö (KYS-9/EHD-3)**: assetin lisäys/muutos/poisto kirjoitetaan levylle heti, mutta `assets.<kategoria>` ilmoitetaan overlayille vasta seuraavassa Updatessa (`IOverlayPublisher.MarkAssetsChanged` kerää avaimet; Update liittää ne `changed`-listaan). Muutos nostaa "Unsent changes" -merkin. Vanhan diffin vertailuaukko (rooli/body/kuva ei laukaise) poistuu, koska avain tulee suoraan muutoksesta.
+- **Haettava combo** (`Controls/SearchableComboBox`, `SearchableListModel` testattavana ilman UI:ta): substring-haku kirjainkoosta riippumatta, ylös/alas/Enter/Esc, rulla vaihtaa arvoa, leveys max(combo, 220), korkeus clamp(40+22·rivit, 120..320). Win32:ssa `OverlayPopups = true` (`Program.cs`), jotta popup piirtyy ikkunan sisällä ja kuvakaappaus (RenderTargetBitmap) näkee sen.
+- **Dialogit**: `AssetManagerWindow` (Heroes/Maps/Game Modes, vanhan käytöksen mukaiset virheilmoitukset `Missing name` / `Missing body image`), `BulkImportWindow` (`Imported X heroes and Y maps.`). Näkymämallit (`AssetManagerViewModel`, `BulkImportViewModel`) testataan feikatulla `IImagePicker`/`IMessages`-parilla.
+- **Dev-apu**: `--screenshot <png> --dialog heroes|maps|modes|bulk [--select <nimi>]` renderöi dialogin PNG:ksi.
+- **Tunnettu dataongelma**: `Scoreboard/Heroes/d-va.png` puuttuu vaikka indeksi listaa sen (vanhan sovelluksen virhe, luku 12 #16) – D.Va:n logo-esikatselu on tyhjä kunnes kuva toimitetaan.
 
 ---
 

@@ -4,11 +4,13 @@ using Avalonia.Layout;
 using Avalonia.Platform.Storage;
 using SowBroadcast.App.Services;
 using SowBroadcast.App.ViewModels;
+using SowBroadcast.App.Views;
+using SowBroadcast.Core.Assets;
 using SowBroadcast.Core.Storage;
 
 namespace SowBroadcast.App;
 
-public partial class MainWindow : Window, IFileDialogs, IMessages
+public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
 {
     private static readonly FilePickerFileType StateFiles = new("SOW Broadcast state")
     {
@@ -24,6 +26,7 @@ public partial class MainWindow : Window, IFileDialogs, IMessages
         _services = AppServices.Start();
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath);
         DataContext = _viewModel;
+        _services.Assets.Changed += _ => _viewModel.HasUnsentChanges = true;
 #if DEBUG
         ThemeTab.IsVisible = true;
         DebugMenu.IsVisible = true;
@@ -87,6 +90,34 @@ public partial class MainWindow : Window, IFileDialogs, IMessages
             }
         }
 
+        var dialogArg = Array.IndexOf(args, "--dialog");
+        if (dialogArg >= 0 && dialogArg + 1 < args.Length)
+        {
+            // `--dialog heroes|maps|modes|bulk` renders that dialog instead of the main window.
+            Opened += async (_, _) =>
+            {
+                Window dialog = args[dialogArg + 1] switch
+                {
+                    "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
+                    "maps" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Maps, _services.Assets, this, this)),
+                    "modes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Modes, _services.Assets, this, this)),
+                    _ => new BulkImportWindow(new BulkImportViewModel(_services.Assets, this)),
+                };
+                var selectArg = Array.IndexOf(args, "--select");
+                if (selectArg >= 0 && selectArg + 1 < args.Length && dialog.DataContext is AssetManagerViewModel manager)
+                    manager.SelectedName = args[selectArg + 1];
+                dialog.Show();
+                await Task.Delay(1200);
+                var dialogSize = new Avalonia.PixelSize((int)dialog.Bounds.Width, (int)dialog.Bounds.Height);
+                using var dialogBitmap = new Avalonia.Media.Imaging.RenderTargetBitmap(dialogSize, new Avalonia.Vector(96, 96));
+                dialogBitmap.Render(dialog);
+                dialogBitmap.Save(path);
+                dialog.Close();
+                Close();
+            };
+            return;
+        }
+
         Opened += async (_, _) =>
         {
             if (args.Contains("--focus")) ThemeView.FocusSample();
@@ -104,6 +135,38 @@ public partial class MainWindow : Window, IFileDialogs, IMessages
 #endif
 
     private void OnQuit(object? sender, RoutedEventArgs e) => Close();
+
+    private void OnManageHeroes(object? sender, RoutedEventArgs e) => OpenAssetManager(AssetCategory.Heroes);
+    private void OnManageMaps(object? sender, RoutedEventArgs e) => OpenAssetManager(AssetCategory.Maps);
+    private void OnManageModes(object? sender, RoutedEventArgs e) => OpenAssetManager(AssetCategory.Modes);
+
+    private async void OpenAssetManager(AssetCategory category)
+    {
+        var window = new AssetManagerWindow(new AssetManagerViewModel(category, _services.Assets, this, this));
+        await window.ShowDialog(this);
+    }
+
+    private async void OnBulkImport(object? sender, RoutedEventArgs e)
+    {
+        var window = new BulkImportWindow(new BulkImportViewModel(_services.Assets, this));
+        await window.ShowDialog(this);
+    }
+
+    public async Task<string?> PickImageAsync(string title, string? initialDirectory = null)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Images") { Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.webp" } },
+                FilePickerFileTypes.All,
+            },
+            SuggestedStartLocation = await StartFolderAsync(initialDirectory),
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
 
     public async Task<string?> PickOpenStateFileAsync(string? initialDirectory)
     {
@@ -135,7 +198,11 @@ public partial class MainWindow : Window, IFileDialogs, IMessages
             ? null
             : await StorageProvider.TryGetFolderFromPathAsync(directory);
 
-    public async Task ShowErrorAsync(string title, string message)
+    public Task ShowErrorAsync(string title, string message) => ShowMessageAsync(title, message);
+
+    public Task ShowInfoAsync(string title, string message) => ShowMessageAsync(title, message);
+
+    private async Task ShowMessageAsync(string title, string message)
     {
         var ok = new Button { Content = "OK", HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 88 };
         var dialog = new Window

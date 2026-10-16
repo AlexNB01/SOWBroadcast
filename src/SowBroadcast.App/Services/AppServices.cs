@@ -1,3 +1,4 @@
+using SowBroadcast.Core.Assets;
 using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Storage;
 using SowBroadcast.Server;
@@ -9,14 +10,19 @@ public sealed class AppServices : IAsyncDisposable
 {
     private readonly OverlayServer? _server;
 
-    private AppServices(IOverlayPublisher publisher, OverlayServer? server, string? startupError)
+    private AppServices(IOverlayPublisher publisher, AssetService assets, OverlayServer? server, string? startupError)
     {
         Publisher = publisher;
+        Assets = assets;
         _server = server;
         StartupError = startupError;
+        assets.Changed += publisher.MarkAssetsChanged;
     }
 
     public IOverlayPublisher Publisher { get; }
+
+    /// <summary>Heroes, maps and game modes.</summary>
+    public AssetService Assets { get; }
 
     /// <summary>Set when the server could not start (the app still works and writes files).</summary>
     public string? StartupError { get; }
@@ -49,6 +55,9 @@ public sealed class AppServices : IAsyncDisposable
             folders["/Scoreboard/" + asset] = new[] { userFolder, Path.Combine(content, "Scoreboard", asset) };
         }
 
+        var assets = new AssetService(AppPaths.ScoreboardDir, new[] { Path.Combine(content, "Scoreboard") });
+        assets.Load();
+
         var options = new OverlayServerOptions
         {
             FullRefreshKeys = StateDiff.AllKeys,
@@ -58,11 +67,11 @@ public sealed class AppServices : IAsyncDisposable
         try
         {
             var server = Task.Run(() => OverlayServer.StartAsync(options)).GetAwaiter().GetResult();
-            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl), server, null);
+            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl), assets, server, null);
         }
         catch (IOException ex)
         {
-            return new AppServices(new FileOnlyPublisher(exporter), null, ex.Message);
+            return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message);
         }
     }
 

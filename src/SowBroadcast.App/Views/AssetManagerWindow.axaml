@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SowBroadcast.App.ViewModels"
+        xmlns:controls="using:SowBroadcast.App.Controls"
+        xmlns:conv="using:SowBroadcast.App.Converters"
+        x:Class="SowBroadcast.App.Views.AssetManagerWindow"
+        x:DataType="vm:AssetManagerViewModel"
+        Title="{Binding Title}"
+        Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
+        Width="760" MinWidth="640" MinHeight="460"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid ColumnDefinitions="240,*" Margin="16" ColumnSpacing="16">
+    <Border Classes="card" Padding="8">
+      <ListBox Classes="compact" Background="Transparent" ItemsSource="{Binding Names}" SelectedItem="{Binding SelectedName}" />
+    </Border>
+
+    <ScrollViewer Grid.Column="1">
+      <StackPanel Spacing="12" Margin="0,0,12,0">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="label" Text="NAME" />
+          <TextBox Text="{Binding Name}" />
+        </StackPanel>
+
+        <StackPanel Spacing="4" IsVisible="{Binding IsMaps}">
+          <TextBlock Classes="label" Text="MODE" />
+          <controls:SearchableComboBox ItemsSource="{Binding ModeNames}" SelectedItem="{Binding Mode}" Placeholder="Choose a mode" />
+        </StackPanel>
+
+        <StackPanel Spacing="4" IsVisible="{Binding IsHeroes}">
+          <TextBlock Classes="label" Text="ROLE" />
+          <controls:SearchableComboBox ItemsSource="{Binding RoleNames}" SelectedItem="{Binding Role}" NoneText="- Role -" />
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Classes="label" Text="LOGO" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Text="{Binding ImagePath}" IsReadOnly="True" />
+            <Button Grid.Column="1" Content="Browse…" Command="{Binding BrowseImageCommand}" />
+          </Grid>
+          <Border Classes="card" Height="180" Padding="8">
+            <Image Source="{Binding ImagePath, Converter={x:Static conv:PathToBitmapConverter.Instance}}" Stretch="Uniform"
+                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+          </Border>
+        </StackPanel>
+
+        <StackPanel Spacing="4" IsVisible="{Binding IsHeroes}">
+          <TextBlock Classes="label" Text="FULL BODY IMAGE" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Text="{Binding BodyPath}" IsReadOnly="True" />
+            <Button Grid.Column="1" Content="Browse…" Command="{Binding BrowseBodyCommand}" />
+          </Grid>
+          <Border Classes="card" Height="140" Padding="8">
+            <Image Source="{Binding BodyPath, Converter={x:Static conv:PathToBitmapConverter.Instance}}" Stretch="Uniform"
+                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+          </Border>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <Button Classes="primary" Content="Add / Update" Command="{Binding AddOrUpdateCommand}" />
+          <Button Content="Delete" Command="{Binding DeleteCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</Window>

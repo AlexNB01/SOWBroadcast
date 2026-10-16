@@ -161,6 +161,8 @@ public sealed class MainWindowViewModelTests : IDisposable
             Published.Add(state);
             return new PublishResult(new[] { "maps" }, Array.Empty<string>());
         }
+
+        public void MarkAssetsChanged(SowBroadcast.Core.Assets.AssetCategory category) { }
     }
 
     private sealed class FakeDialogs : IFileDialogs, IMessages
@@ -183,5 +185,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             Errors.Add(title + ": " + message);
             return Task.CompletedTask;
         }
+
+        public Task ShowInfoAsync(string title, string message) => Task.CompletedTask;
     }
 }
