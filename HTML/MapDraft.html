@@ -233,11 +233,12 @@
   </div>
 </div>
 
+<script src="sow-data.js"></script>
 <script>
 const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
-async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
-async function readJSON(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.json():{}; }catch{ return {}; } }
-async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  function read(p){ return SOW.read(p); }
+  function ok(p){ return SOW.ok(p); }
+function readJSON(p){ return SOW.readJSON(p); }
 const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
 const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
 const bySlug=list=>{ const m={}; (list||[]).forEach(x=>x?.slug&&(m[x.slug]=x)); return m; };

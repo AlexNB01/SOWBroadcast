@@ -194,13 +194,14 @@
   </div>
 </div>
 <div class="maps-area" id="maps"></div>
+<script src="sow-data.js"></script>
 <script>
 const ROOT="..";
 const SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes", MAPS=SB+"/Maps";
 
-async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
-async function readJSON(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.json():{}; }catch{ return {}; } }
-async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  function read(p){ return SOW.read(p); }
+  function ok(p){ return SOW.ok(p); }
+function readJSON(p){ return SOW.readJSON(p); }
 
 const slug = (s)=> (s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
   .replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");

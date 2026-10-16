@@ -150,10 +150,11 @@ body.leaving       .scoreboardwrapper { transform: translateY(-40px); opacity: 0
     </div>
   </div>
 <div id="status"></div>
+<script src="sow-data.js"></script>
 <script>
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General";
-  async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
-  async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  function read(p){ return SOW.read(p); }
+  function ok(p){ return SOW.ok(p); }
   const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
   const setBg=(el,url)=>el&&(el.style.backgroundImage=`url('${url}?_=${Date.now()}')`);
 
@@ -250,7 +251,7 @@ async function upStatus(){
 
   function startSSE(){
     try{
-      const es=new EventSource("/events");
+      const es=SOW.events();
       es.onmessage=async ev=>{
         try{
           const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];

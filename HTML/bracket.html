@@ -76,6 +76,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
       <div class="rounds" id="rounds"></div>
     </div>
   </div>
+<script src="sow-data.js"></script>
 <script>
   const ROOT = "..";
   const SB = `${ROOT}/Scoreboard`;
@@ -83,7 +84,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
   const BRACKET_JSON = `${SB}/Bracket/bracket.json`;
   let previous = null;
 
-  async function read(p){ try{ const r=await fetch(`${p}?_=${Date.now()}`); return r.ok?await r.text():""; }catch{ return ""; } }
+  function read(p){ return SOW.read(p); }
   const hex = (s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
   function hexToRgb(value){
     const clean = (value || "").replace("#", "");
@@ -624,9 +625,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
   async function load(){
     try{
       await applyColors();
-      const res = await fetch(`${BRACKET_JSON}?_=${Date.now()}`);
-      if(!res.ok) return;
-      const data = await res.json();
+      const data = await SOW.readJSON(BRACKET_JSON);
       render(data);
     }catch(e){
       // ignore
@@ -635,7 +634,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
 
   function startSSE(){
     try{
-      const es=new EventSource("/events");
+      const es=SOW.events();
       es.onmessage=async ev=>{
         try{
           const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];

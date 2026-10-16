@@ -54,17 +54,12 @@
     animation: stingerwipe .35s ease-out calc(1.05s + var(--start-delay)) forwards;
   }
 </style>
+<script src="sow-data.js"></script>
 <script>
   const ROOT="..", SB=ROOT+"/Scoreboard", GENERAL=SB+"/General";
 
-  async function fetchText(p){
-    try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }
-    catch{ return ""; }
-  }
-  async function ok(p){
-    try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }
-    catch{ return false; }
-  }
+  function fetchText(p){ return SOW.read(p); }
+  function ok(p){ return SOW.ok(p); }
   const hex=(s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||null);
 
   async function applyColors(){

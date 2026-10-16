@@ -192,12 +192,13 @@
     <div class="flag" id="t2logo"></div>
   </div>
 
+<script src="sow-data.js"></script>
 <script>
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
 
-  async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
-  async function readJSON(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.json():{}; }catch{ return {}; } }
-  async function headOK(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  function read(p){ return SOW.read(p); }
+  function headOK(p){ return SOW.ok(p); }
+  function readJSON(p){ return SOW.readJSON(p); }
   const hex = (s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
   const slug = s=>(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"item";
   const setBg = (el,url)=>el.style.backgroundImage=`url('${url}?_=${Date.now()}')`;
@@ -362,7 +363,7 @@
   }
 
   function startSSE(){
-    const es=new EventSource("/events");
+    const es=SOW.events();
     es.onmessage=async ev=>{
       try{
         const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
