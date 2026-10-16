@@ -27,6 +27,7 @@ public sealed class AppServices : IAsyncDisposable
         Link = new LinkService(http, () => new SocketIoConnection());
         Replay = new ReplayWatcher(Path.Combine(AppPaths.ScoreboardDir, "Replay"));
         Replay.ReplayReady += _ => Publisher.AnnounceReplay();
+        AssetUpdater = new SowBroadcast.Integrations.Assets.ManifestUpdater(http, assets, AppInfo.Repository);
         Logos = new LogoCache(Path.Combine(AppPaths.ScoreboardDir, "TeamLogos"), http);
         _server = server;
         StartupError = startupError;
@@ -49,6 +50,9 @@ public sealed class AppServices : IAsyncDisposable
 
     /// <summary>Team logos downloaded from SOWDraft (served to the overlays with the rest of the Scoreboard folder).</summary>
     public LogoCache Logos { get; }
+
+    /// <summary>Fetches a newer hero and map list from GitHub (only when the user asks).</summary>
+    public SowBroadcast.Integrations.Assets.ManifestUpdater AssetUpdater { get; }
 
     /// <summary>Heroes, maps and game modes.</summary>
     public AssetService Assets { get; }

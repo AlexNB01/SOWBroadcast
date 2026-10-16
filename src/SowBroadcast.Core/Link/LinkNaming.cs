@@ -55,22 +55,18 @@ public static class LinkNaming
     }
 
     /// <summary>
-    /// Finds a draft map name in the catalogue: exactly, else ignoring case and punctuation ("King's Row" matches "Kings Row").
-    /// Returns null when it is not there.
+    /// Finds a name in a plain list of names: exactly, else ignoring only letter case and extra spaces. Returns null when it is not
+    /// there. Other spellings ("King's Row" for "King S Row") are the business of the aliases in the asset manifest
+    /// (<c>AssetService.Resolve</c>); this fallback never guesses.
     /// </summary>
     public static string? ResolveName(string name, IEnumerable<string> catalogue)
     {
         var names = catalogue as IReadOnlyCollection<string> ?? catalogue.ToArray();
         var exact = names.FirstOrDefault(n => n == name);
         if (exact is not null) return exact;
-        var key = Squash(name);
-        return key.Length == 0 ? null : names.FirstOrDefault(n => Squash(n) == key);
+        var key = Squeeze(name);
+        return key.Length == 0 ? null : names.FirstOrDefault(n => string.Equals(Squeeze(n), key, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string Squash(string s)
-    {
-        var sb = new StringBuilder();
-        foreach (var c in s) if (char.IsLetterOrDigit(c)) sb.Append(char.ToLowerInvariant(c));
-        return sb.ToString();
-    }
+    private static string Squeeze(string s) => string.Join(' ', s.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }

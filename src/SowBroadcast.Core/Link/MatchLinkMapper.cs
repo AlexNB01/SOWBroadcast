@@ -6,7 +6,14 @@ namespace SowBroadcast.Core.Link;
 /// <param name="SidesSwapped">SOWDraft's team 1 goes to the Team 2 panel (the user's "Swap sides" switch).</param>
 /// <param name="MapNames">The map catalogue the names are resolved against.</param>
 /// <param name="LogoPathOf">The local file of a logo address, or null while it has not been downloaded yet.</param>
-public sealed record LinkApplyOptions(bool SidesSwapped, IReadOnlyList<string> MapNames, Func<string, string?> LogoPathOf);
+public sealed record LinkApplyOptions(bool SidesSwapped, IReadOnlyList<string> MapNames, Func<string, string?> LogoPathOf)
+{
+    /// <summary>Finds a map by its name or an alias of the asset manifest; when null, <see cref="MapNames"/> is searched.</summary>
+    public Func<string, string?>? ResolveMap { get; init; }
+
+    /// <summary>Finds a hero by its name or an alias; when null the draft's spelling is used as it is.</summary>
+    public Func<string, string?>? ResolveHero { get; init; }
+}
 
 /// <param name="State">The state with the linked values filled in.</param>
 /// <param name="Received">The last value received per field, to be stored with the link.</param>
@@ -46,6 +53,9 @@ public static class MatchLinkMapper
             if (had && previous == value) return false;
             return had || value.Length > 0;
         }
+
+        // A hero name as the catalogue spells it (by name or alias); the draft's own spelling when the catalogue does not know it.
+        string Hero(string? name) => string.IsNullOrWhiteSpace(name) ? "" : options.ResolveHero?.Invoke(name) ?? name;
 
         // SOWDraft slot -> panel.
         string PanelOf(string? slot) => slot switch
@@ -123,7 +133,7 @@ public static class MatchLinkMapper
                 var card = maps[lm.Order - 1];
                 var key = $"m{lm.Order}";
 
-                var resolved = LinkNaming.ResolveName(lm.Map, options.MapNames);
+                var resolved = options.ResolveMap?.Invoke(lm.Map) ?? LinkNaming.ResolveName(lm.Map, options.MapNames);
                 if (resolved is null && lm.Map.Length > 0) warnings.Add($"Map \"{lm.Map}\" is not in the map list.");
                 var mapName = resolved ?? lm.Map;
                 if (mapName.Length > 0 && Changed($"{key}.map", mapName, out _)) card = card with { Map = mapName };
@@ -132,8 +142,8 @@ public static class MatchLinkMapper
                 if (Changed($"{key}.pick", pick, out _)) card = card with { Pick = pick };
 
                 // One ban per team per map on the card.
-                var ban1 = lm.Bans.FirstOrDefault(b => PanelOf(b.Team) == "t1")?.Hero ?? "";
-                var ban2 = lm.Bans.FirstOrDefault(b => PanelOf(b.Team) == "t2")?.Hero ?? "";
+                var ban1 = Hero(lm.Bans.FirstOrDefault(b => PanelOf(b.Team) == "t1")?.Hero);
+                var ban2 = Hero(lm.Bans.FirstOrDefault(b => PanelOf(b.Team) == "t2")?.Hero);
                 if (Changed($"{key}.t1ban", ban1, out _)) card = card with { T1Ban = ban1 };
                 if (Changed($"{key}.t2ban", ban2, out _)) card = card with { T2Ban = ban2 };
 

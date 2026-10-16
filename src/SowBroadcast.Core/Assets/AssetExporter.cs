@@ -37,7 +37,7 @@ public sealed class AssetExporter
             foreach (var asset in assets)
             {
                 if (asset.BodySourcePath is not { } body || !File.Exists(body)) continue;
-                CopyImage(body, $"HeroesBody/{Slug.HeroBodyFile(asset.Name)}.png");
+                CopyImage(body, asset.BodyImagePath ?? $"HeroesBody/{Slug.HeroBodyFile(asset.Name)}.png");
             }
         }
 

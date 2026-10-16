@@ -162,6 +162,15 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         }
     }
 
+    private async void OnUpdateAssetList(object? sender, RoutedEventArgs e)
+    {
+        _viewModel.StatusText = "Checking for a newer hero and map list…";
+        var result = await _services.AssetUpdater.UpdateAsync();
+        _viewModel.StatusText = result.Message;
+        if (result.Ok) await ShowInfoAsync("Hero and map list", result.Message);
+        else await ShowErrorAsync("Hero and map list", result.Message);
+    }
+
     private async void OnRestoreMatch(object? sender, RoutedEventArgs e)
     {
         var window = new Views.RestoreMatchWindow(new RestoreMatchViewModel(_viewModel.ArchivedMatches()));

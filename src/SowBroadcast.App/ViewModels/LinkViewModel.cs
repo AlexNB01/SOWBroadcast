@@ -18,6 +18,9 @@ public interface ILinkHost
     /// <summary>The maps SOWDraft's map names are matched against.</summary>
     IReadOnlyList<string> MapNames { get; }
 
+    /// <summary>The catalogue name for a name or alias SOWDraft sends (null when unknown, or when the host has no catalogue).</summary>
+    string? ResolveName(SowBroadcast.Core.Assets.AssetCategory category, string name) => null;
+
     /// <summary>Shows linked data on the Match, Standings and Bracket tabs and sends it to the overlays at once (KYS-11a).</summary>
     void ApplyLinked(AppState state);
 
@@ -241,7 +244,11 @@ public sealed partial class LinkViewModel : ObservableObject
 
         if (update.SelectedMatchId.Length > 0)
         {
-            var options = new LinkApplyOptions(SidesSwapped, _host.MapNames, url => _logos?.PathOf(url));
+            var options = new LinkApplyOptions(SidesSwapped, _host.MapNames, url => _logos?.PathOf(url))
+            {
+                ResolveMap = name => _host.ResolveName(SowBroadcast.Core.Assets.AssetCategory.Maps, name),
+                ResolveHero = name => _host.ResolveName(SowBroadcast.Core.Assets.AssetCategory.Heroes, name),
+            };
             var applied = MatchLinkMapper.Apply(next, snapshot, update.SelectedMatchId, options, received);
             next = applied.State;
             received = applied.Received;

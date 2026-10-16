@@ -165,8 +165,41 @@
     return ensure().then(function () { return virtualFile(rel); });
   }
 
+  // ---- heroes: the full-body picture comes from the manifest (Heroes/index.json), not from a naming rule here ---
+
+  var heroes = null;      // the Heroes/index.json list, as a promise
+  var heroesAt = 0;
+
+  function heroList() {
+    var now = Date.now();
+    if (heroes && now - heroesAt < 5000) return heroes;
+    heroesAt = now;
+    heroes = fetch("/Scoreboard/Heroes/index.json?_=" + now, { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (j) { return (j && j.heroes) || []; })
+      .catch(function () { return []; });
+    return heroes;
+  }
+
+  function squeeze(text) { return String(text || "").trim().replace(/\s+/g, " ").toLowerCase(); }
+
+  // "HeroesBody/Ana.png" for a hero (by name or alias), or null when the catalogue does not know it.
+  function heroBodyPath(name) {
+    var key = squeeze(name);
+    if (!key) return Promise.resolve(null);
+    return heroList().then(function (list) {
+      for (var i = 0; i < list.length; i++) if (squeeze(list[i].name) === key) return list[i].body_image || null;
+      for (var j = 0; j < list.length; j++) {
+        var aliases = list[j].aliases || [];
+        for (var k = 0; k < aliases.length; k++) if (squeeze(aliases[k]) === key) return list[j].body_image || null;
+      }
+      return null;
+    });
+  }
+
   var SOW = {
     state: function () { return state; },
+    heroBodyPath: heroBodyPath,
     timerSeconds: timerSeconds,
 
     read: function (path) {

@@ -40,13 +40,13 @@ public sealed class LinkNamingTests
         Assert.Equal(expected, LinkNaming.SuggestAbbreviation(name));
 
     [Fact]
-    public void Map_names_match_exactly_then_ignoring_case_and_punctuation()
+    public void Names_match_exactly_then_ignoring_only_case_and_extra_spaces()
     {
         var catalogue = new[] { "King S Row", "Busan", "Lijiang Tower" };
 
         Assert.Equal("Busan", LinkNaming.ResolveName("Busan", catalogue));
-        Assert.Equal("King S Row", LinkNaming.ResolveName("King's Row", catalogue));
         Assert.Equal("Lijiang Tower", LinkNaming.ResolveName("lijiang  tower", catalogue));
+        Assert.Null(LinkNaming.ResolveName("King's Row", catalogue));   // punctuation is not guessed at: that is what aliases are for
         Assert.Null(LinkNaming.ResolveName("Nowhere", catalogue));
         Assert.Null(LinkNaming.ResolveName("'''", catalogue));
     }
@@ -285,6 +285,13 @@ public sealed class MatchLinkMapperTests
     private static LinkApplyOptions Options(bool swapped = false, Func<string, string?>? logos = null) =>
         new(swapped, MapNames, logos ?? (_ => null));
 
+    // The catalogue's aliases (from the asset manifest) are what finds "King's Row" in the list.
+    private static LinkApplyOptions OptionsWithAliases() => Options() with
+    {
+        ResolveMap = name => name == "King's Row" ? "King S Row" : null,
+        ResolveHero = name => name == "Soldier 76" ? "Soldier: 76" : null,
+    };
+
     private static AppState Blank() => AppState.CreateDefault();
 
     private static readonly IReadOnlyDictionary<string, string> NoHistory = new Dictionary<string, string>();
@@ -403,9 +410,9 @@ public sealed class MatchLinkMapperTests
         };
         var state = Blank() with { General = Blank().General with { MapsCount = 1 } };
 
-        var result = MatchLinkMapper.Apply(state, snap with { Live = live }, "m1", Options(), NoHistory);
+        var result = MatchLinkMapper.Apply(state, snap with { Live = live }, "m1", OptionsWithAliases(), NoHistory);
 
-        Assert.Equal("King S Row", result.State.Maps[0].Map);        // matched ignoring punctuation
+        Assert.Equal("King S Row", result.State.Maps[0].Map);        // found by an alias of the manifest
         Assert.Equal("Atlantis", result.State.Maps[1].Map);          // not silently dropped
         Assert.Contains(result.Warnings, w => w.Contains("Atlantis"));
         Assert.Contains(result.Warnings, w => w.Contains("2 maps") && w.Contains("shows 1"));

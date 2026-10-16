@@ -1,0 +1,644 @@
+{
+  "schema": 1,
+  "revision": 1,
+  "updated": "2026-10-16",
+  "heroes": [
+    {
+      "name": "Ana",
+      "slug": "ana",
+      "role": "Support",
+      "image": "Heroes/ana.png",
+      "body_image": "HeroesBody/Ana.png"
+    },
+    {
+      "name": "Ashe",
+      "slug": "ashe",
+      "role": "Damage",
+      "image": "Heroes/ashe.png",
+      "body_image": "HeroesBody/Ashe.png"
+    },
+    {
+      "name": "Baptiste",
+      "slug": "baptiste",
+      "role": "Support",
+      "image": "Heroes/baptiste.png",
+      "body_image": "HeroesBody/Baptiste.png"
+    },
+    {
+      "name": "Bastion",
+      "slug": "bastion",
+      "role": "Damage",
+      "image": "Heroes/bastion.png",
+      "body_image": "HeroesBody/Bastion.png"
+    },
+    {
+      "name": "Brigitte",
+      "slug": "brigitte",
+      "role": "Support",
+      "image": "Heroes/brigitte.png",
+      "body_image": "HeroesBody/Brigitte.png"
+    },
+    {
+      "name": "Cassidy",
+      "slug": "cassidy",
+      "role": "Damage",
+      "image": "Heroes/cassidy.png",
+      "body_image": "HeroesBody/Cassidy.png",
+      "aliases": [
+        "McCree"
+      ]
+    },
+    {
+      "name": "Doomfist",
+      "slug": "doomfist",
+      "role": "Tank",
+      "image": "Heroes/doomfist.png",
+      "body_image": "HeroesBody/Doomfist.png"
+    },
+    {
+      "name": "Echo",
+      "slug": "echo",
+      "role": "Damage",
+      "image": "Heroes/echo.png",
+      "body_image": "HeroesBody/Echo.png"
+    },
+    {
+      "name": "Freja",
+      "slug": "freja",
+      "role": "Damage",
+      "image": "Heroes/freja.png",
+      "body_image": "HeroesBody/Freja.png"
+    },
+    {
+      "name": "Genji",
+      "slug": "genji",
+      "role": "Damage",
+      "image": "Heroes/genji.png",
+      "body_image": "HeroesBody/Genji.png"
+    },
+    {
+      "name": "Hanzo",
+      "slug": "hanzo",
+      "role": "Damage",
+      "image": "Heroes/hanzo.png",
+      "body_image": "HeroesBody/Hanzo.png"
+    },
+    {
+      "name": "Hazard",
+      "slug": "hazard",
+      "role": "Tank",
+      "image": "Heroes/hazard.png",
+      "body_image": "HeroesBody/Hazard.png"
+    },
+    {
+      "name": "Illari",
+      "slug": "illari",
+      "role": "Support",
+      "image": "Heroes/illari.png",
+      "body_image": "HeroesBody/Illari.png"
+    },
+    {
+      "name": "Junker Queen",
+      "slug": "junker-queen",
+      "role": "Tank",
+      "image": "Heroes/junker-queen.png",
+      "body_image": "HeroesBody/Junker_Queen.png"
+    },
+    {
+      "name": "Junkrat",
+      "slug": "junkrat",
+      "role": "Damage",
+      "image": "Heroes/junkrat.png",
+      "body_image": "HeroesBody/Junkrat.png"
+    },
+    {
+      "name": "Juno",
+      "slug": "juno",
+      "role": "Support",
+      "image": "Heroes/juno.png",
+      "body_image": "HeroesBody/Juno.png"
+    },
+    {
+      "name": "Kiriko",
+      "slug": "kiriko",
+      "role": "Support",
+      "image": "Heroes/kiriko.png",
+      "body_image": "HeroesBody/Kiriko.png"
+    },
+    {
+      "name": "Lifeweaver",
+      "slug": "lifeweaver",
+      "role": "Support",
+      "image": "Heroes/lifeweaver.png",
+      "body_image": "HeroesBody/Lifeweaver.png"
+    },
+    {
+      "name": "Mauga",
+      "slug": "mauga",
+      "role": "Tank",
+      "image": "Heroes/mauga.png",
+      "body_image": "HeroesBody/Mauga.png"
+    },
+    {
+      "name": "Mei",
+      "slug": "mei",
+      "role": "Damage",
+      "image": "Heroes/mei.png",
+      "body_image": "HeroesBody/Mei.png"
+    },
+    {
+      "name": "Mercy",
+      "slug": "mercy",
+      "role": "Support",
+      "image": "Heroes/mercy.png",
+      "body_image": "HeroesBody/Mercy.png"
+    },
+    {
+      "name": "Moira",
+      "slug": "moira",
+      "role": "Support",
+      "image": "Heroes/moira.png",
+      "body_image": "HeroesBody/Moira.png"
+    },
+    {
+      "name": "Orisa",
+      "slug": "orisa",
+      "role": "Tank",
+      "image": "Heroes/orisa.png",
+      "body_image": "HeroesBody/Orisa.png"
+    },
+    {
+      "name": "Pharah",
+      "slug": "pharah",
+      "role": "Damage",
+      "image": "Heroes/pharah.png",
+      "body_image": "HeroesBody/Pharah.png"
+    },
+    {
+      "name": "Ramattra",
+      "slug": "ramattra",
+      "role": "Tank",
+      "image": "Heroes/ramattra.png",
+      "body_image": "HeroesBody/Ramattra.png"
+    },
+    {
+      "name": "Reaper",
+      "slug": "reaper",
+      "role": "Damage",
+      "image": "Heroes/reaper.png",
+      "body_image": "HeroesBody/Reaper.png"
+    },
+    {
+      "name": "Reinhardt",
+      "slug": "reinhardt",
+      "role": "Tank",
+      "image": "Heroes/reinhardt.png",
+      "body_image": "HeroesBody/Reinhardt.png"
+    },
+    {
+      "name": "Roadhog",
+      "slug": "roadhog",
+      "role": "Tank",
+      "image": "Heroes/roadhog.png",
+      "body_image": "HeroesBody/Roadhog.png"
+    },
+    {
+      "name": "Sigma",
+      "slug": "sigma",
+      "role": "Tank",
+      "image": "Heroes/sigma.png",
+      "body_image": "HeroesBody/Sigma.png"
+    },
+    {
+      "name": "Sojourn",
+      "slug": "sojourn",
+      "role": "Damage",
+      "image": "Heroes/sojourn.png",
+      "body_image": "HeroesBody/Sojourn.png"
+    },
+    {
+      "name": "Sombra",
+      "slug": "sombra",
+      "role": "Damage",
+      "image": "Heroes/sombra.png",
+      "body_image": "HeroesBody/Sombra.png"
+    },
+    {
+      "name": "Symmetra",
+      "slug": "symmetra",
+      "role": "Damage",
+      "image": "Heroes/symmetra.png",
+      "body_image": "HeroesBody/Symmetra.png"
+    },
+    {
+      "name": "Torbjorn",
+      "slug": "torbjorn",
+      "role": "Damage",
+      "image": "Heroes/torbjorn.png",
+      "body_image": "HeroesBody/Torbjörn.png",
+      "aliases": [
+        "Torbjörn"
+      ]
+    },
+    {
+      "name": "Tracer",
+      "slug": "tracer",
+      "role": "Damage",
+      "image": "Heroes/tracer.png",
+      "body_image": "HeroesBody/Tracer.png"
+    },
+    {
+      "name": "Venture",
+      "slug": "venture",
+      "role": "Damage",
+      "image": "Heroes/venture.png",
+      "body_image": "HeroesBody/Venture.png"
+    },
+    {
+      "name": "Widowmaker",
+      "slug": "widowmaker",
+      "role": "Damage",
+      "image": "Heroes/widowmaker.png",
+      "body_image": "HeroesBody/Widowmaker.png"
+    },
+    {
+      "name": "Winston",
+      "slug": "winston",
+      "role": "Tank",
+      "image": "Heroes/winston.png",
+      "body_image": "HeroesBody/Winston.png"
+    },
+    {
+      "name": "Wrecking Ball",
+      "slug": "wrecking-ball",
+      "role": "Tank",
+      "image": "Heroes/wrecking-ball.png",
+      "body_image": "HeroesBody/Wrecking_Ball.png",
+      "aliases": [
+        "Hammond"
+      ]
+    },
+    {
+      "name": "Wuyang",
+      "slug": "wuyang",
+      "role": "Support",
+      "image": "Heroes/wuyang.png",
+      "body_image": "HeroesBody/Wuyang.png"
+    },
+    {
+      "name": "Zarya",
+      "slug": "zarya",
+      "role": "Tank",
+      "image": "Heroes/zarya.png",
+      "body_image": "HeroesBody/Zarya.png"
+    },
+    {
+      "name": "Zenyatta",
+      "slug": "zenyatta",
+      "role": "Support",
+      "image": "Heroes/zenyatta.png",
+      "body_image": "HeroesBody/Zenyatta.png"
+    },
+    {
+      "name": "Anran",
+      "slug": "anran",
+      "role": "Damage",
+      "image": "Heroes/anran.png",
+      "body_image": "HeroesBody/Anran.png"
+    },
+    {
+      "name": "Domina",
+      "slug": "domina",
+      "role": "Tank",
+      "image": "Heroes/domina.png",
+      "body_image": "HeroesBody/Domina.png"
+    },
+    {
+      "name": "Emre",
+      "slug": "emre",
+      "role": "Damage",
+      "image": "Heroes/emre.png",
+      "body_image": "HeroesBody/Emre.png"
+    },
+    {
+      "name": "Jetpack Cat",
+      "slug": "jetpack-cat",
+      "role": "Support",
+      "image": "Heroes/jetpack-cat.png",
+      "body_image": "HeroesBody/Jetpack_Cat.png"
+    },
+    {
+      "name": "Mizuki",
+      "slug": "mizuki",
+      "role": "Support",
+      "image": "Heroes/mizuki.png",
+      "body_image": "HeroesBody/Mizuki.png"
+    },
+    {
+      "name": "Shion",
+      "slug": "shion",
+      "role": "Damage",
+      "image": "Heroes/shion.png",
+      "body_image": "HeroesBody/Shion.png"
+    },
+    {
+      "name": "Sierra",
+      "slug": "sierra",
+      "role": "Damage",
+      "image": "Heroes/sierra.png",
+      "body_image": "HeroesBody/Sierra.png"
+    },
+    {
+      "name": "Vendetta",
+      "slug": "vendetta",
+      "role": "Damage",
+      "image": "Heroes/vendetta.png",
+      "body_image": "HeroesBody/Vendetta.png"
+    },
+    {
+      "name": "Lúcio",
+      "slug": "lucio",
+      "role": "Support",
+      "image": "Heroes/lucio.png",
+      "body_image": "HeroesBody/Lucio.png",
+      "aliases": [
+        "Lucio"
+      ]
+    },
+    {
+      "name": "D.Va",
+      "slug": "d-va",
+      "role": "Tank",
+      "image": "Heroes/d-va.png",
+      "body_image": "HeroesBody/Dva.png",
+      "aliases": [
+        "D Va",
+        "DVa",
+        "Dva"
+      ]
+    },
+    {
+      "name": "D.Mon",
+      "slug": "d-mon",
+      "role": "Tank",
+      "image": "Heroes/d-mon.png",
+      "body_image": "HeroesBody/D.Mon.png",
+      "aliases": [
+        "D Mon",
+        "DMon"
+      ]
+    },
+    {
+      "name": "Soldier: 76",
+      "slug": "soldier-76",
+      "role": "Damage",
+      "image": "Heroes/soldier-76.png",
+      "body_image": "HeroesBody/Soldier_76.png",
+      "aliases": [
+        "Soldier 76",
+        "Soldier76"
+      ]
+    },
+    {
+      "name": "Doctorine",
+      "slug": "doctorine",
+      "role": "Support",
+      "image": "Heroes/doctorine.png",
+      "body_image": "HeroesBody/Doctorine.png"
+    }
+  ],
+  "maps": [
+    {
+      "name": "Aatlis",
+      "slug": "aatlis",
+      "mode": "Flashpoint",
+      "image": "Maps/aatlis.png"
+    },
+    {
+      "name": "Blizzard World",
+      "slug": "blizzard-world",
+      "mode": "Hybrid",
+      "image": "Maps/blizzard-world.png"
+    },
+    {
+      "name": "Busan",
+      "slug": "busan",
+      "mode": "Control",
+      "image": "Maps/busan.png"
+    },
+    {
+      "name": "Circuit Royal",
+      "slug": "circuit-royal",
+      "mode": "Escort",
+      "image": "Maps/circuit-royal.png"
+    },
+    {
+      "name": "Colosseo",
+      "slug": "colosseo",
+      "mode": "Push",
+      "image": "Maps/colosseo.png"
+    },
+    {
+      "name": "Dorado",
+      "slug": "dorado",
+      "mode": "Escort",
+      "image": "Maps/dorado.png"
+    },
+    {
+      "name": "Eichenwalde",
+      "slug": "eichenwalde",
+      "mode": "Hybrid",
+      "image": "Maps/eichenwalde.png"
+    },
+    {
+      "name": "Esperança",
+      "slug": "esperanca",
+      "mode": "Push",
+      "image": "Maps/esperanca.png",
+      "aliases": [
+        "Esperanca"
+      ]
+    },
+    {
+      "name": "Havana",
+      "slug": "havana",
+      "mode": "Escort",
+      "image": "Maps/havana.png"
+    },
+    {
+      "name": "Hollywood",
+      "slug": "hollywood",
+      "mode": "Hybrid",
+      "image": "Maps/hollywood.png"
+    },
+    {
+      "name": "Ilios",
+      "slug": "ilios",
+      "mode": "Control",
+      "image": "Maps/ilios.png"
+    },
+    {
+      "name": "Junkertown",
+      "slug": "junkertown",
+      "mode": "Escort",
+      "image": "Maps/junkertown.png"
+    },
+    {
+      "name": "King's Row",
+      "slug": "king-s-row",
+      "mode": "Hybrid",
+      "image": "Maps/king-s-row.png",
+      "aliases": [
+        "King s Row",
+        "Kings Row",
+        "King’s Row"
+      ]
+    },
+    {
+      "name": "Lijiang Tower",
+      "slug": "lijiang-tower",
+      "mode": "Control",
+      "image": "Maps/lijiang-tower.png"
+    },
+    {
+      "name": "Midtown",
+      "slug": "midtown",
+      "mode": "Hybrid",
+      "image": "Maps/midtown.png"
+    },
+    {
+      "name": "Nepal",
+      "slug": "nepal",
+      "mode": "Control",
+      "image": "Maps/nepal.png"
+    },
+    {
+      "name": "New Junk City",
+      "slug": "new-junk-city",
+      "mode": "Flashpoint",
+      "image": "Maps/new-junk-city.png"
+    },
+    {
+      "name": "New Queen Street",
+      "slug": "new-queen-street",
+      "mode": "Push",
+      "image": "Maps/new-queen-street.png"
+    },
+    {
+      "name": "Numbani",
+      "slug": "numbani",
+      "mode": "Hybrid",
+      "image": "Maps/numbani.png"
+    },
+    {
+      "name": "Oasis",
+      "slug": "oasis",
+      "mode": "Control",
+      "image": "Maps/oasis.png"
+    },
+    {
+      "name": "Paraíso",
+      "slug": "paraiso",
+      "mode": "Hybrid",
+      "image": "Maps/paraiso.png",
+      "aliases": [
+        "Paraiso"
+      ]
+    },
+    {
+      "name": "Rialto",
+      "slug": "rialto",
+      "mode": "Escort",
+      "image": "Maps/rialto.png"
+    },
+    {
+      "name": "Route 66",
+      "slug": "route-66",
+      "mode": "Escort",
+      "image": "Maps/route-66.png"
+    },
+    {
+      "name": "Runasapi",
+      "slug": "runasapi",
+      "mode": "Push",
+      "image": "Maps/runasapi.png"
+    },
+    {
+      "name": "Samoa",
+      "slug": "samoa",
+      "mode": "Control",
+      "image": "Maps/samoa.png"
+    },
+    {
+      "name": "Shambali Monastery",
+      "slug": "shambali-monastery",
+      "mode": "Escort",
+      "image": "Maps/shambali-monastery.png"
+    },
+    {
+      "name": "Suravasa",
+      "slug": "suravasa",
+      "mode": "Flashpoint",
+      "image": "Maps/suravasa.png"
+    },
+    {
+      "name": "Watchpoint: Gibraltar",
+      "slug": "watchpoint-gibraltar",
+      "mode": "Escort",
+      "image": "Maps/watchpoint-gibraltar.png",
+      "aliases": [
+        "Watchpoint Gibraltar"
+      ]
+    },
+    {
+      "name": "Antarctic Peninsula",
+      "slug": "antarctic-peninsula",
+      "mode": "Control",
+      "image": "Maps/antarctic-peninsula.png"
+    },
+    {
+      "name": "Neon Junction",
+      "slug": "neon-junction",
+      "mode": "Hybrid",
+      "image": "Maps/neon-junction.png"
+    },
+    {
+      "name": "Watchpoint: Grimsvötn",
+      "slug": "watchpoint-grimsvotn",
+      "mode": "Escort",
+      "image": "Maps/watchpoint-grimsvotn.png",
+      "aliases": [
+        "Watchpoint Grimsvotn",
+        "Watchpoint Grimsvötn",
+        "Watchpoint: Grimsvotn"
+      ]
+    }
+  ],
+  "modes": [
+    {
+      "name": "Control",
+      "slug": "control",
+      "image": "Gametypes/control.png"
+    },
+    {
+      "name": "Escort",
+      "slug": "escort",
+      "image": "Gametypes/escort.png"
+    },
+    {
+      "name": "Flashpoint",
+      "slug": "flashpoint",
+      "image": "Gametypes/flashpoint.png"
+    },
+    {
+      "name": "Hybrid",
+      "slug": "hybrid",
+      "image": "Gametypes/hybrid.png"
+    },
+    {
+      "name": "Push",
+      "slug": "push",
+      "image": "Gametypes/push.png"
+    }
+  ]
+}

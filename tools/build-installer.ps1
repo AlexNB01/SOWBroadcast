@@ -44,6 +44,10 @@ foreach ($folder in 'Heroes', 'HeroesBody', 'Maps', 'Gametypes', 'Roles', 'Gener
     New-Item -ItemType Directory -Force (Split-Path -Parent $to) | Out-Null
     Copy-Item $from $to -Recurse
 }
+# The asset manifest: every hero, map and game mode with roles, picture files and aliases (a newer one can be fetched later).
+$manifest = Join-Path $root 'Scoreboard\manifest.json'
+if (-not (Test-Path $manifest)) { throw "Missing $manifest (run tools/make-manifest.py)" }
+Copy-Item $manifest (Join-Path $publish 'Scoreboard\manifest.json')
 # Generated name lists are rebuilt by the program; only the catalogues (index.json) are shipped.
 Get-ChildItem (Join-Path $publish 'Scoreboard') -Recurse -Filter 'index.txt' | Remove-Item -Force
 

@@ -29,6 +29,8 @@
         <MenuItem Header="Manage Game _Modes…" Click="OnManageModes" />
         <Separator />
         <MenuItem Header="_Bulk Import from Folders…" Click="OnBulkImport" />
+        <Separator />
+        <MenuItem Header="_Update hero and map list…" Click="OnUpdateAssetList" />
       </MenuItem>
       <MenuItem Header="C_ontrol">
         <MenuItem Header="_Hotkeys, remote control and automation…" Click="OnControlSettings" />

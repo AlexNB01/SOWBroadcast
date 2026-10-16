@@ -55,22 +55,13 @@ public sealed record Asset
     public string? BodySourcePath { get; init; }
     /// <summary>Heroes only: Tank, Damage or Support.</summary>
     public string? Role { get; init; }
+    /// <summary>Other spellings of the name (how SOWDraft or players write it); the match against them is exact, not fuzzy.</summary>
+    public IReadOnlyList<string> Aliases { get; init; } = Array.Empty<string>();
 }
 
 public static class Slug
 {
     private static readonly Regex NonAlphanumeric = new("[^a-z0-9]+", RegexOptions.Compiled);
-
-    private static readonly Dictionary<string, string> HeroBodyOverrides = new(StringComparer.Ordinal)
-    {
-        ["d.va"] = "Dva", ["dva"] = "Dva",
-        ["lúcio"] = "Lucio", ["lucio"] = "Lucio",
-        ["soldier: 76"] = "Soldier_76", ["soldier 76"] = "Soldier_76", ["soldier:76"] = "Soldier_76",
-        ["wrecking ball"] = "Wrecking_Ball",
-        ["junker queen"] = "Junker_Queen",
-        ["jetpack cat"] = "Jetpack_Cat",
-        ["torbjörn"] = "Torbjörn", ["torbjorn"] = "Torbjörn",
-    };
 
     /// <summary>
     /// File-name slug: lowercase, accents removed, anything else becomes "-". Names with no Latin letters or digits
@@ -93,15 +84,21 @@ public static class Slug
     }
 
     /// <summary>
-    /// File name (without extension) of a hero's full-body image in <c>HeroesBody</c>. Must match <c>heroBodyFile()</c>
-    /// in <c>MapDraft.html</c>.
+    /// The file name (without extension) a NEW hero's full-body image gets in <c>HeroesBody</c>: words in Title Case joined with "_",
+    /// accents removed and anything but letters, digits and "-" dropped ("Soldier: 76" becomes "Soldier_76"). Heroes that are already
+    /// known keep the file their manifest entry names (<see cref="Asset.BodyImagePath"/>); there is no table of exceptions any more.
     /// </summary>
     public static string HeroBodyFile(string? name)
     {
-        var trimmed = (name ?? "").Trim();
-        if (HeroBodyOverrides.TryGetValue(trimmed.ToLowerInvariant(), out var mapped)) return mapped;
-        var words = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        var joined = string.Join("_", words.Select(w => char.ToUpperInvariant(w[0]) + w[1..]));
+        var folded = new StringBuilder();
+        foreach (var ch in (name ?? "").Trim().Normalize(NormalizationForm.FormKD))
+            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark) folded.Append(ch);
+
+        var words = folded.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => new string(w.Where(c => c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '-').ToArray()))
+            .Where(w => w.Length > 0)
+            .Select(w => char.ToUpperInvariant(w[0]) + w[1..]);
+        var joined = string.Join("_", words);
         return joined.Length == 0 ? "Hero" : joined;
     }
 

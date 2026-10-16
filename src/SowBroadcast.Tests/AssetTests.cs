@@ -48,10 +48,10 @@ public sealed class AssetTests : IDisposable
     }
 
     [Theory]
-    [InlineData("D.Va", "Dva")]
+    [InlineData("D.Va", "DVa")]                  // new heroes get a rule-made name; known ones keep the file the manifest names
     [InlineData("Lúcio", "Lucio")]
     [InlineData("Soldier: 76", "Soldier_76")]
-    [InlineData("Torbjörn", "Torbjörn")]
+    [InlineData("Torbjörn", "Torbjorn")]
     [InlineData("Wrecking Ball", "Wrecking_Ball")]
     [InlineData("Junker Queen", "Junker_Queen")]
     [InlineData("Jetpack Cat", "Jetpack_Cat")]
@@ -59,7 +59,7 @@ public sealed class AssetTests : IDisposable
     [InlineData("mei", "Mei")]
     [InlineData("cat woman", "Cat_Woman")]
     [InlineData("", "Hero")]
-    public void Hero_body_file_names_match_the_overlay_lookup(string name, string expected) =>
+    public void New_heroes_get_a_plain_body_file_name_by_rule(string name, string expected) =>
         Assert.Equal(expected, Slug.HeroBodyFile(name));
 
     [Theory]
@@ -74,8 +74,8 @@ public sealed class AssetTests : IDisposable
     private static List<Asset> LegacyFixtureHeroes(string fx) => new()
     {
         new Asset { Name = "Ana", SourcePath = Path.Combine(fx, "ana.png"), Role = "Support" },
-        new Asset { Name = "D.Va", SourcePath = Path.Combine(fx, "dva.png"), Role = "Tank", BodySourcePath = Path.Combine(fx, "dva_body.png") },
-        new Asset { Name = "Lúcio", SourcePath = Path.Combine(fx, "lucio.png"), Role = "Support", BodySourcePath = Path.Combine(fx, "lucio_body.png") },
+        new Asset { Name = "D.Va", SourcePath = Path.Combine(fx, "dva.png"), Role = "Tank", BodyImagePath = "HeroesBody/Dva.png", BodySourcePath = Path.Combine(fx, "dva_body.png") },
+        new Asset { Name = "Lúcio", SourcePath = Path.Combine(fx, "lucio.png"), Role = "Support", BodyImagePath = "HeroesBody/Lucio.png", BodySourcePath = Path.Combine(fx, "lucio_body.png") },
     };
 
     [Fact]

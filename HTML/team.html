@@ -158,7 +158,6 @@
 <script>
   /* ---------- Helpers & paths ---------- */
   const ROOT="..", SB=ROOT+"/Scoreboard", MATCH=SB+"/Match", GENERAL=SB+"/General", HEROES=SB+"/Heroes";
-  const HEROES_BODY = SB + "/HeroesBody";
   const ROLES = SB + "/Roles";
   // Which team: team.html?side=1 (default) or team.html?side=2
   const SIDE = new URLSearchParams(location.search).get("side") === "2" ? 2 : 1;
@@ -170,23 +169,9 @@
   function ok(p){ return SOW.ok(p); }
   const hex=(s,f)=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():(f||"#000");
 
-  // Mirrors MapDraft.html's heroBodyFile()/SOWBroadcast.py's _hero_body_filename() -
-  // HeroesBody files are named Title_Case_With_Underscores, not the simple
-  // lowercase-hyphen slug used for the small Heroes/ icons.
-  const heroBodyOverrides={
-    "d.va":"Dva","dva":"Dva",
-    "lúcio":"Lucio","lucio":"Lucio",
-    "soldier: 76":"Soldier_76","soldier 76":"Soldier_76","soldier:76":"Soldier_76",
-    "wrecking ball":"Wrecking_Ball",
-    "junker queen":"Junker_Queen",
-    "jetpack cat":"Jetpack_Cat",
-    "torbjörn":"Torbjörn","torbjorn":"Torbjörn",
-  };
-  function heroBodyFile(name){
-    if(!name) return null;
-    const lo=(name||"").toLowerCase().trim();
-    if(heroBodyOverrides[lo]) return heroBodyOverrides[lo];
-    return name.trim().split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join("_");
+  // The full-body picture of a hero: the asset manifest (Heroes/index.json) names the file; a hero it does not list gets its plain name.
+  async function heroBodyRel(name){
+    return await SOW.heroBodyPath(name) || "HeroesBody/"+String(name).trim().split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join("_")+".png";
   }
 
   function parseRole(raw){
@@ -266,8 +251,7 @@
 
     let hasHero = false;
     if(p.hero){
-      const bodyFile = heroBodyFile(p.hero);
-      const path = `${HEROES_BODY}/${bodyFile}.png`;
+      const path = `${SB}/${await heroBodyRel(p.hero)}`;
       if(await ok(path)){
         const img = document.createElement("img");
         img.alt = p.hero;

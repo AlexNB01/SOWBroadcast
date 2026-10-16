@@ -50,6 +50,8 @@ public static class AssetFiles
                 SourcePath = Resolve(image, scoreboardRoots),
                 Mode = category == AssetCategory.Maps ? node?["mode"]?.GetValue<string>() : null,
                 Role = category == AssetCategory.Heroes ? Blank(node?["role"]?.GetValue<string>()) : null,
+                Aliases = (node?["aliases"] as JsonArray)?.Select(a => Blank(a?.GetValue<string>())).Where(a => a is not null).Select(a => a!).ToArray()
+                          ?? Array.Empty<string>(),
                 BodyImagePath = body,
                 BodySourcePath = bodySource,
             });
@@ -94,9 +96,10 @@ public static class AssetFiles
             if (category == AssetCategory.Heroes)
             {
                 item["role"] = asset.Role ?? "";
-                var body = $"HeroesBody/{Slug.HeroBodyFile(asset.Name)}.png";
+                var body = asset.BodyImagePath ?? $"HeroesBody/{Slug.HeroBodyFile(asset.Name)}.png";
                 if (imageExists(body)) item["body_image"] = body;
             }
+            if (asset.Aliases.Count > 0) item["aliases"] = new JsonArray(asset.Aliases.Select(a => (JsonNode)JsonValue.Create(a)!).ToArray());
             items.Add(item);
         }
 

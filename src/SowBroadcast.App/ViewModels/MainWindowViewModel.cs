@@ -103,6 +103,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
 
     IReadOnlyList<string> ILinkHost.MapNames => _assets?.Names(AssetCategory.Maps) ?? Array.Empty<string>();
 
+    string? ILinkHost.ResolveName(AssetCategory category, string name) => _assets?.Resolve(category, name);
+
     void ILinkHost.BeforeMatchChange()
     {
         FlushHistory();

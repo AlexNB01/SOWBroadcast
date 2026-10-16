@@ -295,21 +295,10 @@ function hexToRgb(h){
   return [(n>>16)&255,(n>>8)&255,n&255];
 }
 
-// Map hero name → HeroesBody filename (without extension)
-const heroBodyOverrides={
-  "d.va":"Dva","dva":"Dva",
-  "lúcio":"Lucio","lucio":"Lucio",
-  "soldier: 76":"Soldier_76","soldier 76":"Soldier_76","soldier:76":"Soldier_76",
-  "wrecking ball":"Wrecking_Ball",
-  "junker queen":"Junker_Queen",
-  "jetpack cat":"Jetpack_Cat",
-  "torbjörn":"Torbjörn","torbjorn":"Torbjörn",
-};
-function heroBodyFile(name){
-  if(!name) return null;
-  const lo=(name||"").toLowerCase().trim();
-  if(heroBodyOverrides[lo]) return heroBodyOverrides[lo];
-  return name.trim().split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join("_");
+// Full-body picture of a hero. The asset manifest (Heroes/index.json) names the file; a hero it does not list gets its plain name.
+async function heroBodyUrl(name){
+  const rel=await SOW.heroBodyPath(name) || "HeroesBody/"+String(name).trim().split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join("_")+".png";
+  return `${SB}/${rel}?_=${Date.now()}`;
 }
 
 /* Colors */
@@ -402,7 +391,7 @@ async function renderScene(state){
 
   const heroLeft=document.getElementById("heroLeft");
   if(t1ban){
-    heroLeft.style.backgroundImage=`url('${SB}/HeroesBody/${heroBodyFile(t1ban)}.png?_=${Date.now()}')`;
+    heroLeft.style.backgroundImage=`url('${await heroBodyUrl(t1ban)}')`;
     heroLeft.style.display="block";
     document.getElementById("heroNameLeft").textContent=t1ban.toUpperCase();
   } else {
@@ -412,7 +401,7 @@ async function renderScene(state){
 
   const heroRight=document.getElementById("heroRight");
   if(t2ban){
-    heroRight.style.backgroundImage=`url('${SB}/HeroesBody/${heroBodyFile(t2ban)}.png?_=${Date.now()}')`;
+    heroRight.style.backgroundImage=`url('${await heroBodyUrl(t2ban)}')`;
     heroRight.style.display="block";
     document.getElementById("heroNameRight").textContent=t2ban.toUpperCase();
   } else {
