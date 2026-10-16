@@ -37,6 +37,9 @@ public sealed class CountdownTimer
         }
     }
 
+    /// <summary>Milliseconds left (exact, not rounded up); 0 when stopped at zero. Used for the end time the overlays count down to.</summary>
+    public long RemainingMs => IsRunning ? Math.Max(0, _endsAtMs - _nowMs()) : _remaining * 1000L;
+
     /// <summary>Loads a saved value: stopped, with the value as both remaining time and preset.</summary>
     public void Set(int seconds)
     {

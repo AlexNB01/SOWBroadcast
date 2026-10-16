@@ -19,6 +19,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     };
 
     private readonly MainWindowViewModel _viewModel;
+    private bool _skipAutosave;
     private readonly AppServices _services;
 
     public MainWindow()
@@ -55,6 +56,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         DebugMenu.IsVisible = true;
         WireDevScreenshot();
         WireDemoLive();
+        WireServeSample();
 #endif
         Opened += async (_, _) =>
         {
@@ -67,12 +69,30 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         };
         Closing += (_, _) =>
         {
-            _viewModel.Autosave();
+            if (!_skipAutosave) _viewModel.Autosave();
             _services.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
         };
     }
 
 #if DEBUG
+    // Dev aid: `--serve-sample <seconds>` loads the sample match, sends it to the overlays and keeps running for that long
+    // (so a headless browser can take pictures of the overlays), then closes.
+    private void WireServeSample()
+    {
+        var args = Environment.GetCommandLineArgs();
+        var at = Array.IndexOf(args, "--serve-sample");
+        if (at < 0 || at + 1 >= args.Length || !double.TryParse(args[at + 1], out var seconds)) return;
+        Opened += async (_, _) =>
+        {
+            await Task.Delay(1500);
+            _viewModel.LoadSampleCommand.Execute(null);
+            _viewModel.UpdateMatchCommand.Execute(null);
+            await Task.Delay(TimeSpan.FromSeconds(seconds));
+            _skipAutosave = true; // the sample is not the user's match
+            Close();
+        };
+    }
+
     // Dev aid: `--demo-live` bumps team 1's score a few seconds after start and publishes it, to watch an open overlay update.
     private void WireDemoLive()
     {

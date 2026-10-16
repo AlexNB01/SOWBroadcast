@@ -1,5 +1,6 @@
 using SowBroadcast.Core.Assets;
 using SowBroadcast.Core.Export;
+using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Replay;
 using SowBroadcast.Core.Storage;
 using SowBroadcast.Integrations.Link;
@@ -47,7 +48,8 @@ public sealed class AppServices : IAsyncDisposable
 
     public static AppServices Start()
     {
-        var exporter = new ScoreboardExporter(AppPaths.ScoreboardDir, new SkiaLogoConverter(), AppPaths.DefaultHighlightsDir);
+        // The old flat text/JSON files are not written any more: the overlays read /api/state.
+        var exporter = new ScoreboardExporter(AppPaths.ScoreboardDir, new SkiaLogoConverter(), AppPaths.DefaultHighlightsDir, legacyFiles: false);
         var content = AppPaths.ContentRoot;
         var data = AppPaths.DataRoot;
 
@@ -77,17 +79,23 @@ public sealed class AppServices : IAsyncDisposable
         var assets = new AssetService(AppPaths.ScoreboardDir, new[] { Path.Combine(content, "Scoreboard") });
         assets.Load();
 
+        // What /api/state serves; starts as an empty match and is rebuilt after every publish.
+        var stateHolder = new OverlayStateHolder
+        {
+            Json = OverlayStateJson.Build(AppState.CreateDefault(), exporter, 0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+        };
         var options = new OverlayServerOptions
         {
             FullRefreshKeys = StateDiff.AllKeys,
             StaticFolders = folders,
+            StateProvider = () => stateHolder.Json,
         };
 
         try
         {
             var server = Task.Run(() => OverlayServer.StartAsync(options)).GetAwaiter().GetResult();
             Serilog.Log.Information("Overlay server listening on {Url}", server.BaseUrl);
-            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl), assets, server, null, http);
+            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl, stateHolder), assets, server, null, http);
         }
         catch (IOException ex)
         {

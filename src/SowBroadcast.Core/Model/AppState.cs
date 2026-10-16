@@ -74,6 +74,8 @@ public sealed record WaitingSettings
     public string TextBrb { get; init; } = "BE RIGHT BACK!";
     public string TextEnd { get; init; } = "THANK YOU FOR WATCHING";
     public bool TimerRunning { get; init; }
+    /// <summary>While the countdown runs: when it reaches zero, in epoch milliseconds (the overlays count down to this themselves).</summary>
+    public long TimerEndsAtMs { get; init; }
     public IReadOnlyDictionary<string, string> Socials { get; init; } = new Dictionary<string, string>();
     public string TickerOverride { get; init; } = "";
     public bool TickerOverrideEnabled { get; init; }

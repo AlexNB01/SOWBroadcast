@@ -36,11 +36,13 @@ public sealed partial class WaitingViewModel : ObservableObject
     private static readonly HashSet<string> NotEdits = new() { nameof(TimerText), nameof(IsRunning), nameof(VideosFolderText) };
 
     private readonly IFileDialogs _dialogs;
+    private readonly Func<long> _epochMs;
     private bool _loading;
 
-    public WaitingViewModel(IFileDialogs dialogs, string? defaultVideosDir, Func<long>? clock = null)
+    public WaitingViewModel(IFileDialogs dialogs, string? defaultVideosDir, Func<long>? clock = null, Func<long>? epochMs = null)
     {
         _dialogs = dialogs;
+        _epochMs = epochMs ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         DefaultVideosDir = defaultVideosDir ?? "";
         var stopwatch = Stopwatch.StartNew();
         Timer = new CountdownTimer(clock ?? (() => stopwatch.ElapsedMilliseconds));
@@ -82,9 +84,6 @@ public sealed partial class WaitingViewModel : ObservableObject
     /// <summary>A timer command was issued: the new value goes to the overlays at once.</summary>
     public event Action? TimerCommanded;
 
-    /// <summary>A second passed while the timer runs: the files are refreshed, nothing is announced.</summary>
-    public event Action? TimerTicked;
-
     partial void OnUseDefaultVideosChanged(bool value)
     {
         if (value) VideosDir = "";
@@ -112,15 +111,15 @@ public sealed partial class WaitingViewModel : ObservableObject
         IsRunning = Timer.IsRunning;
     }
 
-    /// <summary>Called by the window's clock. Refreshes the display and the files when the second changed.</summary>
+    /// <summary>
+    /// Called by the window's clock: refreshes the display. Nothing is sent while the countdown runs (the overlays count down to the
+    /// end time they were given); only when it runs out the stop is announced.
+    /// </summary>
     public void Tick()
     {
         var wasRunning = Timer.IsRunning;
-        var before = TimerText;
         RefreshTimer();
-        if (!wasRunning) return;
-        if (!Timer.IsRunning) TimerCommanded?.Invoke(); // ran out: announce the stop
-        else if (TimerText != before) TimerTicked?.Invoke();
+        if (wasRunning && !Timer.IsRunning) TimerCommanded?.Invoke();
     }
 
     [RelayCommand]
@@ -213,7 +212,12 @@ public sealed partial class WaitingViewModel : ObservableObject
     /// <summary>The countdown as it is now, written into the state (what the timer files are made from).</summary>
     public AppState ApplyTimerTo(AppState state) => state with
     {
-        Waiting = state.Waiting with { TimerSeconds = Timer.Remaining, TimerRunning = Timer.IsRunning },
+        Waiting = state.Waiting with
+        {
+            TimerSeconds = Timer.Remaining,
+            TimerRunning = Timer.IsRunning,
+            TimerEndsAtMs = Timer.IsRunning ? _epochMs() + Timer.RemainingMs : 0,
+        },
     };
 
     public AppState ApplyTo(AppState state) => ApplyTimerTo(state with

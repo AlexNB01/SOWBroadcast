@@ -237,21 +237,6 @@ public sealed class PartialPublishTests : IDisposable
     }
 
     [Fact]
-    public void The_running_clock_refreshes_the_files_without_announcing_anything()
-    {
-        _publisher.Publish(AppState.CreateDefault());
-        var reader = _hub.Subscribe(null).Reader;
-        var state = AppState.CreateDefault() with { Waiting = new WaitingSettings { TimerSeconds = 59, TimerRunning = true } };
-
-        _publisher.PublishPart(state, PublishScope.TimerTick);
-        var full = _publisher.Publish(state);
-
-        Assert.Equal("59", Read("Waiting/timer_seconds.txt"));
-        Assert.False(reader.TryRead(out _));
-        Assert.DoesNotContain("waiting.timer", full.ChangedKeys); // the tick moved the baseline
-    }
-
-    [Fact]
     public void Partial_publishes_before_the_first_full_one_report_only_their_own_keys()
     {
         var result = _publisher.PublishPart(AppState.CreateDefault(), PublishScope.General);

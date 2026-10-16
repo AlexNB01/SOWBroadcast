@@ -221,7 +221,7 @@ public sealed class OverlayServerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Notify_reaches_connected_event_clients_in_legacy_format()
+    public async Task Notify_reaches_connected_event_clients_with_the_changed_keys_and_the_version()
     {
         using var reader = await OpenEventsAsync();
         await ReadBlocksAsync(reader, 1);
@@ -229,7 +229,43 @@ public sealed class OverlayServerTests : IAsyncLifetime
         await NotifyAsync("{\"changed\":[\"waiting.timer\"]}");
         var blocks = await ReadBlocksAsync(reader, 1);
 
-        Assert.Equal("id: 1\ndata: {\"changed\":[\"waiting.timer\"]}", blocks[0]);
+        Assert.Equal("id: 1\ndata: {\"changed\":[\"waiting.timer\"],\"version\":1}", blocks[0]);
+    }
+
+    // ---- /api/state ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task The_state_is_served_from_the_provider_as_json_and_never_cached()
+    {
+        var json = "{\"version\":7,\"match\":{}}";
+        await using var server = await OverlayServer.StartAsync(new OverlayServerOptions { Port = 0, StateProvider = () => json });
+
+        var response = await _http.GetAsync(server.BaseUrl + "/api/state");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType!.MediaType);
+        Assert.Equal(json, await response.Content.ReadAsStringAsync());
+        Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
+    }
+
+    [Fact]
+    public async Task The_provider_is_asked_for_every_request_so_the_latest_state_is_served()
+    {
+        var version = 0;
+        await using var server = await OverlayServer.StartAsync(new OverlayServerOptions { Port = 0, StateProvider = () => $"{{\"version\":{++version}}}" });
+
+        var first = await _http.GetStringAsync(server.BaseUrl + "/api/state");
+        var second = await _http.GetStringAsync(server.BaseUrl + "/api/state");
+
+        Assert.Equal(("{\"version\":1}", "{\"version\":2}"), (first, second));
+    }
+
+    [Fact]
+    public async Task Without_a_state_there_is_nothing_to_serve_yet()
+    {
+        var response = await _http.GetAsync(Url("/api/state")); // this fixture's server has no provider
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 
     [Fact]

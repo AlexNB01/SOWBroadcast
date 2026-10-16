@@ -15,6 +15,13 @@ public static class SampleState
                 .Concat(Enumerable.Range(0, Limits.PlayersPerTeam).Select(_ => new Player())).Take(Limits.PlayersPerTeam).ToArray(),
         };
 
+        // Pictures from the test fixtures when they are there (a development checkout), so the overlays show logos too.
+        string? Fixture(string name)
+        {
+            var path = Path.Combine(SowBroadcast.Core.Storage.AppPaths.ContentRoot, "src", "SowBroadcast.Tests", "Fixtures", "logos", name);
+            return File.Exists(path) ? path : null;
+        }
+
         var maps = AppState.DefaultMaps().ToArray();
         maps[0] = maps[0] with { Map = "Busan", T1 = 2, T2 = 1, Completed = true, Pick = Picks.Team1, T1Ban = "Ana", T2Ban = "Ashe" };
         maps[1] = maps[1] with { Map = "Circuit Royal", Pick = Picks.Team2, T1Ban = "Echo", T2Ban = "Genji" };
@@ -36,7 +43,7 @@ public static class SampleState
                 : r)
             .ToArray();
 
-        return AppState.CreateDefault() with
+        var sample = AppState.CreateDefault() with
         {
             Standings = new StandingsSettings
             {
@@ -65,10 +72,16 @@ public static class SampleState
             Maps = maps,
             General = new GeneralSettings
             {
+                OverlayLogoPath = Fixture("overlay.png"), TransitionLogoPath = Fixture("overlay.png"),
                 MapsCount = 3, Host = "Host H", Caster1 = "Caster One @casterone", Caster2 = "Caster Two",
                 StatusText = "Synthetic Cup – Match 1",
             },
             Waiting = new WaitingSettings { TimerSeconds = 300, Socials = new Dictionary<string, string> { ["twitch"] = "SuomiOW" } },
+        };
+        return sample with
+        {
+            Team1 = sample.Team1 with { LogoPath = Fixture("team1.png") },
+            Team2 = sample.Team2 with { LogoPath = Fixture("team2.png") },
         };
     }
 }

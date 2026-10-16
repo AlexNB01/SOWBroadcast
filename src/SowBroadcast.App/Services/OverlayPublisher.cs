@@ -22,11 +22,9 @@ public enum PublishScope
     /// <summary>Update (Bracket): the bracket file.</summary>
     Bracket,
 
-    /// <summary>A timer command (start, pause, reset, adjust): the countdown files, announced as <c>waiting.timer</c> at once.</summary>
+    /// <summary>A timer command (start, pause, reset, adjust, run out): announced as <c>waiting.timer</c> at once. A running countdown
+    /// carries its end time, so the overlays count down by themselves and nothing is sent each second.</summary>
     Timer,
-
-    /// <summary>The running clock: the countdown files only, nothing is announced (the overlays read them on their own).</summary>
-    TimerTick,
 }
 
 /// <summary>Sends state to the overlays: writes the files, works out what changed and tells connected overlays.</summary>
@@ -50,13 +48,27 @@ public sealed class OverlayPublisher : IOverlayPublisher
     private readonly ScoreboardExporter _exporter;
     private readonly EventHub _hub;
     private readonly HashSet<string> _pendingAssetKeys = new();
+    private readonly OverlayStateHolder? _state;
+    private readonly Func<long> _nowMs;
     private AppState? _lastPublished;
 
-    public OverlayPublisher(ScoreboardExporter exporter, EventHub hub, string? baseUrl)
+    public OverlayPublisher(ScoreboardExporter exporter, EventHub hub, string? baseUrl, OverlayStateHolder? state = null, Func<long>? nowMs = null)
     {
         _exporter = exporter;
         _hub = hub;
         BaseUrl = baseUrl;
+        _state = state;
+        _nowMs = nowMs ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    }
+
+    /// <summary>
+    /// Rebuilds the state the overlays fetch. It is set <i>before</i> the event that announces it, so an overlay that reacts to the
+    /// event never gets an older state; the event after this one will have <c>version + 1</c>.
+    /// </summary>
+    private void UpdateState(bool willAnnounce)
+    {
+        if (_state is null || _lastPublished is null) return;
+        _state.Json = OverlayStateJson.Build(_lastPublished, _exporter, _hub.LastId + (willAnnounce ? 1 : 0), _nowMs());
     }
 
     public string? BaseUrl { get; }
@@ -69,6 +81,7 @@ public sealed class OverlayPublisher : IOverlayPublisher
         var keys = StateDiff.ChangedKeys(_lastPublished, derived).Concat(_pendingAssetKeys).Distinct().ToArray();
         _pendingAssetKeys.Clear();
         _lastPublished = derived;
+        UpdateState(keys.Length > 0);
         _hub.Publish(keys);
         return new PublishResult(keys, written);
     }
@@ -91,7 +104,8 @@ public sealed class OverlayPublisher : IOverlayPublisher
         }
 
         if (scope == PublishScope.Timer && !keys.Contains("waiting.timer")) keys.Add("waiting.timer");
-        if (scope != PublishScope.TimerTick) _hub.Publish(keys);
+        UpdateState(keys.Count > 0);
+        _hub.Publish(keys);
         return new PublishResult(keys, written);
     }
 
@@ -137,12 +151,16 @@ public sealed class OverlayPublisher : IOverlayPublisher
         PublishScope.Waiting => last with { Waiting = now.Waiting },
         PublishScope.Standings => last with { Standings = now.Standings },
         PublishScope.Bracket => last with { Bracket = now.Bracket },
-        _ => last with { Waiting = last.Waiting with { TimerSeconds = now.Waiting.TimerSeconds, TimerRunning = now.Waiting.TimerRunning } },
+        _ => last with { Waiting = last.Waiting with { TimerSeconds = now.Waiting.TimerSeconds, TimerRunning = now.Waiting.TimerRunning, TimerEndsAtMs = now.Waiting.TimerEndsAtMs } },
     };
 
     public void MarkAssetsChanged(AssetCategory category) => _pendingAssetKeys.Add("assets." + category.Key());
 
-    public void AnnounceReplay() => _hub.Publish(new[] { "replay" });
+    public void AnnounceReplay()
+    {
+        UpdateState(willAnnounce: true);
+        _hub.Publish(new[] { "replay" });
+    }
 }
 
 /// <summary>Used when the local server could not start: files are still written so OBS text sources keep working.</summary>

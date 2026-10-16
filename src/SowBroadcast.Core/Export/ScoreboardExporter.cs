@@ -25,15 +25,26 @@ public sealed class ScoreboardExporter
     private readonly string _root;
     private readonly ILogoConverter _logos;
     private readonly string? _defaultVideosDir;
+    private readonly bool _legacyFiles;
+    private IReadOnlyList<string> _videos = Array.Empty<string>();
 
     /// <param name="scoreboardRoot">The <c>Scoreboard</c> folder.</param>
     /// <param name="defaultVideosDir">Folder used for the waiting-screen videos when none is chosen.</param>
-    public ScoreboardExporter(string scoreboardRoot, ILogoConverter logos, string? defaultVideosDir = null)
+    /// <param name="legacyFiles">
+    /// Also write the flat text and JSON files of the old overlay contract (CLAUDE.md chapter 6). The overlays now read <c>/api/state</c>,
+    /// so the program leaves this off; what is always written is what has to be a file: team and general logos, the caster/host text files
+    /// for OBS text sources and the waiting playlist videos. The golden tests switch it on to keep comparing with the legacy app.
+    /// </param>
+    public ScoreboardExporter(string scoreboardRoot, ILogoConverter logos, string? defaultVideosDir = null, bool legacyFiles = true)
     {
         _root = Path.GetFullPath(scoreboardRoot);
         _logos = logos;
         _defaultVideosDir = defaultVideosDir;
+        _legacyFiles = legacyFiles;
     }
+
+    /// <summary>The waiting-screen playlist as of the last export (file names in <c>Waiting/Playlist</c>).</summary>
+    public IReadOnlyList<string> Videos => _videos;
 
     public string Root => _root;
 
@@ -58,6 +69,7 @@ public sealed class ScoreboardExporter
         WriteTeam("T1", state.Team1, written);
         WriteTeam("T2", state.Team2, written);
 
+        if (!_legacyFiles) return;
         Write("Match/CurrentMap.txt", state.CurrentMap?.ToString(CultureInfo.InvariantCulture) ?? "", written);
 
         foreach (var map in state.Maps.Where(m => m.Index > 0))
@@ -79,6 +91,9 @@ public sealed class ScoreboardExporter
 
     private void WriteTeam(string prefix, Team team, List<string> written)
     {
+        WriteLogo(team.LogoPath, $"Match/{prefix}Logo.png", written);
+        if (!_legacyFiles) return;
+
         Write($"Match/{prefix}Name.txt", team.Name, written);
         Write($"Match/{prefix}Score.txt", team.Score.ToString(CultureInfo.InvariantCulture), written);
         Write($"Match/{prefix}Color.txt", team.ColorHex, written);
@@ -95,8 +110,6 @@ public sealed class ScoreboardExporter
             Write($"Match/{prefix}P{i + 1}Role.txt", p.Role.Trim(), written);
             Write($"Match/{prefix}P{i + 1}Hero.txt", p.Hero.Trim(), written);
         }
-
-        WriteLogo(team.LogoPath, $"Match/{prefix}Logo.png", written);
     }
 
     // ---- General -----------------------------------------------------------------------------------------
@@ -107,25 +120,34 @@ public sealed class ScoreboardExporter
         Write("General/host.txt", g.Host, written);
         Write("General/caster1.txt", g.Caster1, written);
         Write("General/caster2.txt", g.Caster2, written);
-        // maps.html reads first_to.txt as the number of maps to show, so it holds the series length.
-        Write("General/first_to.txt", g.MapsCount.ToString(CultureInfo.InvariantCulture), written);
+        if (_legacyFiles)
+        {
+            // maps.html read first_to.txt as the number of maps to show, so it holds the series length.
+            Write("General/first_to.txt", g.MapsCount.ToString(CultureInfo.InvariantCulture), written);
 
-        var colors = new StringBuilder();
-        foreach (var (key, value) in g.Colors) colors.Append(key).Append('=').Append(value).Append("\r\n");
-        Write("General/colors.txt", colors.ToString(), written);
+            var colors = new StringBuilder();
+            foreach (var (key, value) in g.Colors) colors.Append(key).Append('=').Append(value).Append("\r\n");
+            Write("General/colors.txt", colors.ToString(), written);
+        }
 
         WriteLogo(g.OverlayLogoPath, "General/OverlayLogo.png", written);
         WriteLogo(g.TransitionLogoPath, "General/TransitionLogo.png", written);
     }
 
-    public void ExportStatus(AppState state, List<string> written) =>
-        Write("Match/status.txt", state.General.StatusText.Trim(), written);
+    public void ExportStatus(AppState state, List<string> written)
+    {
+        if (_legacyFiles) Write("Match/status.txt", state.General.StatusText.Trim(), written);
+    }
 
     // ---- Waiting -----------------------------------------------------------------------------------------
 
     public void ExportWaiting(AppState state, List<string> written)
     {
         var w = state.Waiting;
+        var videos = SyncPlaylist(w.VideosDir);
+        _videos = videos;
+        if (!_legacyFiles) return;
+
         Write("Waiting/text_starting.txt", Fallback(w.TextStarting, "STARTING SOON!"), written);
         Write("Waiting/text_brb.txt", Fallback(w.TextBrb, "BE RIGHT BACK!"), written);
         Write("Waiting/text_end.txt", Fallback(w.TextEnd, "THANK YOU FOR WATCHING"), written);
@@ -135,15 +157,14 @@ public sealed class ScoreboardExporter
         Write("Waiting/ticker_override.txt", w.TickerOverride, written);
         Write("Waiting/ticker_use_override.txt", useOverride ? "1" : "0", written);
         Write("Waiting/socials.json", PythonStyleJson(w.Socials), written);
-
-        var videos = SyncPlaylist(w.VideosDir);
         Write("Waiting/videos.txt", string.Join("\r\n", videos) + (videos.Count > 0 ? "\r\n" : ""), written);
         Write("Waiting/videos_dir.txt", "", written);
     }
 
-    /// <summary>Only the countdown files (what the timer commands and the running clock write).</summary>
+    /// <summary>Only the countdown files of the legacy contract (the overlays now count down from <c>/api/state</c>).</summary>
     public void ExportTimer(AppState state, List<string> written)
     {
+        if (!_legacyFiles) return;
         Write("Waiting/timer_seconds.txt", state.Waiting.TimerSeconds.ToString(CultureInfo.InvariantCulture), written);
         Write("Waiting/timer_running.txt", state.Waiting.TimerRunning ? "1" : "0", written);
     }
@@ -188,6 +209,13 @@ public sealed class ScoreboardExporter
 
     public void ExportStandings(AppState state, List<string> written)
     {
+        if (!_legacyFiles) return;
+        WriteJsonWithStamp("Standings/standings.json", "Standings/updated_at.txt", BuildStandingsJson(state), written);
+    }
+
+    /// <summary>The standings as the overlay shows them (ranks filled in, logo paths relative to the Scoreboard folder).</summary>
+    public JsonObject BuildStandingsJson(AppState state)
+    {
         var s = state.Standings;
         var groups = s.Groups.Count > 0
             ? s.Groups
@@ -215,7 +243,7 @@ public sealed class ScoreboardExporter
             }).ToArray()),
             ["display_group"] = displayGroup,
         };
-        WriteJsonWithStamp("Standings/standings.json", "Standings/updated_at.txt", payload, written);
+        return payload;
     }
 
     private JsonArray RowsJson(IReadOnlyList<StandingsRow> rows) =>
@@ -267,6 +295,13 @@ public sealed class ScoreboardExporter
 
     public void ExportBracket(AppState state, List<string> written)
     {
+        if (!_legacyFiles) return;
+        WriteJsonWithStamp("Bracket/bracket.json", "Bracket/updated_at.txt", BuildBracketJson(state), written);
+    }
+
+    /// <summary>The bracket as the overlay shows it.</summary>
+    public JsonObject BuildBracketJson(AppState state)
+    {
         var b = state.Bracket;
         var payload = new JsonObject
         {
@@ -290,7 +325,7 @@ public sealed class ScoreboardExporter
             }).ToArray()),
             ["double_elim_view"] = b.DoubleElimView,
         };
-        WriteJsonWithStamp("Bracket/bracket.json", "Bracket/updated_at.txt", payload, written);
+        return payload;
     }
 
     private JsonObject TeamRefJson(TeamRef team) => new()

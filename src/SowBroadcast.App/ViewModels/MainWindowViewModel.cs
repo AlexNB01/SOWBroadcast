@@ -32,7 +32,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         string? teamsFolder = null, string? logoFolder = null, string? broadcastLogoFolder = null,
         string? defaultVideosDir = null, Func<long>? clock = null, string? standingsLogoFolder = null,
         ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null,
-        LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null)
+        LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null, Func<long>? epochMs = null)
     {
         _assets = assets;
         _dialogs = dialogs;
@@ -45,7 +45,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         var picker = images ?? new NoImagePicker();
         Match = new MatchViewModel(assets, picker, logoFolder);
         General = new GeneralViewModel(picker, broadcastLogoFolder);
-        Waiting = new WaitingViewModel(dialogs, defaultVideosDir, clock);
+        Waiting = new WaitingViewModel(dialogs, defaultVideosDir, clock, epochMs);
         Standings = new StandingsViewModel(picker, standingsLogoFolder);
         Bracket = new BracketViewModel(picker, standingsLogoFolder,
             () => StandingsOperations.TeamsFromStandings(Standings.ApplyTo(State).Standings), teamPicker, messages, matchIds);
@@ -55,8 +55,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         Waiting.Edited += () => MarkUnsent("waiting");
         Standings.Edited += () => MarkUnsent("standings");
         Bracket.Edited += () => MarkUnsent("bracket");
-        Waiting.TimerCommanded += () => PublishTimer(announce: true);
-        Waiting.TimerTicked += () => PublishTimer(announce: false);
+        Waiting.TimerCommanded += PublishTimer;
         State = AppState.CreateDefault();
         Version = AppInfo.Version;
     }
@@ -252,15 +251,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         Autosave();
     }
 
-    /// <summary>A countdown command goes out at once; the running clock only refreshes the timer files.</summary>
-    private void PublishTimer(bool announce)
+    /// <summary>A countdown command goes out at once (a running countdown with its end time, so nothing follows each second).</summary>
+    private void PublishTimer()
     {
         _collecting = true;
         try { State = Waiting.ApplyTimerTo(State); }
         finally { _collecting = false; }
         try
         {
-            _publisher.PublishPart(State, announce ? PublishScope.Timer : PublishScope.TimerTick);
+            _publisher.PublishPart(State, PublishScope.Timer);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

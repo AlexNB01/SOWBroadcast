@@ -297,9 +297,10 @@ public sealed class MainWindowViewModelTests : IDisposable
     // ---- General and Waiting tabs ------------------------------------------------------------------------
 
     private long _now;
+    private long _epoch = 1_760_000_000_000;
 
     private MainWindowViewModel CreateWithClock() =>
-        new(_dialogs, _dialogs, _publisher, _autosave, defaultVideosDir: Path.Combine(_dir, "Highlights"), clock: () => _now);
+        new(_dialogs, _dialogs, _publisher, _autosave, defaultVideosDir: Path.Combine(_dir, "Highlights"), clock: () => _now, epochMs: () => _epoch);
 
     [Fact]
     public void Update_general_publishes_only_that_part_and_leaves_other_unsent_changes_marked()
@@ -373,29 +374,54 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public void The_running_clock_refreshes_the_files_each_second_and_announces_when_it_runs_out()
+    public void A_running_countdown_carries_its_end_time_and_sends_nothing_while_it_counts()
     {
+        _epoch = 1_760_000_000_000;
         var vm = CreateWithClock();
         vm.Waiting.AdjustTimerCommand.Execute("30");
         vm.Waiting.AdjustTimerCommand.Execute("-25"); // 5 s
         vm.Waiting.StartTimerCommand.Execute(null);
+
+        var started = _publisher.Parts[^1].State.Waiting;
+        Assert.True(started.TimerRunning);
+        Assert.Equal(1_760_000_005_000, started.TimerEndsAtMs);   // the overlays count down to this themselves
         _publisher.Parts.Clear();
 
-        vm.Waiting.Tick(); // same second: nothing
-        Assert.Empty(_publisher.Parts);
-
         _now = 1_000;
+        _epoch += 1_000;
         vm.Waiting.Tick();
-        var tick = Assert.Single(_publisher.Parts);
-        Assert.Equal(PublishScope.TimerTick, tick.Scope);
-        Assert.Equal(4, tick.State.Waiting.TimerSeconds);
+        Assert.Empty(_publisher.Parts);                           // no write or message each second
+        Assert.Equal("00:04", vm.Waiting.TimerText);
+    }
+
+    [Fact]
+    public void When_the_countdown_runs_out_the_stop_is_announced()
+    {
+        var vm = CreateWithClock();
+        vm.Waiting.AdjustTimerCommand.Execute("5");
+        vm.Waiting.StartTimerCommand.Execute(null);
+        _publisher.Parts.Clear();
 
         _now = 5_000;
         vm.Waiting.Tick();
-        var end = _publisher.Parts[^1];
+
+        var end = Assert.Single(_publisher.Parts);
         Assert.Equal(PublishScope.Timer, end.Scope);
-        Assert.Equal((0, false), (end.State.Waiting.TimerSeconds, end.State.Waiting.TimerRunning));
+        Assert.Equal((0, false, 0L), (end.State.Waiting.TimerSeconds, end.State.Waiting.TimerRunning, end.State.Waiting.TimerEndsAtMs));
         Assert.False(vm.Waiting.IsRunning);
+    }
+
+    [Fact]
+    public void A_paused_or_stopped_countdown_has_no_end_time()
+    {
+        var vm = CreateWithClock();
+        vm.Waiting.AdjustTimerCommand.Execute("60");
+        vm.Waiting.StartTimerCommand.Execute(null);
+
+        vm.Waiting.PauseTimerCommand.Execute(null);
+
+        var paused = _publisher.Parts[^1].State.Waiting;
+        Assert.Equal((false, 0L, 60), (paused.TimerRunning, paused.TimerEndsAtMs, paused.TimerSeconds));
     }
 
     [Fact]

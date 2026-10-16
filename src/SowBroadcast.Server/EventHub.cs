@@ -3,10 +3,13 @@ using System.Threading.Channels;
 
 namespace SowBroadcast.Server;
 
-/// <summary>One "these overlay data keys changed" message. The payload matches the legacy <c>/events</c> format.</summary>
+/// <summary>
+/// One "these overlay data keys changed" message: <c>{"changed":[...],"version":n}</c>. The version is the event id, which is also the
+/// <c>version</c> of the <c>/api/state</c> the overlay should fetch next (CLAUDE.md EHD-2).
+/// </summary>
 public sealed record OverlayEvent(long Id, IReadOnlyList<string> Changed)
 {
-    public string Payload => JsonSerializer.Serialize(new { changed = Changed });
+    public string Payload => JsonSerializer.Serialize(new { changed = Changed, version = Id });
 }
 
 /// <summary>

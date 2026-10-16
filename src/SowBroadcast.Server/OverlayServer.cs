@@ -28,6 +28,9 @@ public sealed class OverlayServerOptions
     /// <summary>Required in the <c>X-SOWB-Token</c> header of <c>POST /notify</c>.</summary>
     public string NotifyToken { get; init; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 
+    /// <summary>The body of <c>GET /api/state</c> (the overlay state JSON); called for every request, so it should return a cached string.</summary>
+    public Func<string>? StateProvider { get; init; }
+
     public IReadOnlyList<string> FullRefreshKeys { get; init; } = Array.Empty<string>();
     public TimeSpan KeepAliveInterval { get; init; } = TimeSpan.FromSeconds(15);
     public int MaxNotifyBodyBytes { get; init; } = 64 * 1024;
@@ -101,6 +104,17 @@ public sealed class OverlayServer : IAsyncDisposable
         });
 
         app.MapGet("/events", (HttpContext context) => StreamEvents(context, hub, options));
+        app.MapGet("/api/state", async (HttpContext context) =>
+        {
+            var json = options.StateProvider?.Invoke();
+            if (string.IsNullOrEmpty(json))
+            {
+                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                return;
+            }
+            context.Response.ContentType = "application/json; charset=utf-8";
+            await context.Response.WriteAsync(json);
+        });
         app.MapPost("/notify", (HttpContext context) => Notify(context, hub, options));
 
         foreach (var (prefix, folders) in options.StaticFolders)
