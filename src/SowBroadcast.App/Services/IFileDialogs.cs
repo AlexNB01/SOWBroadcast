@@ -34,4 +34,7 @@ public interface IMessages
 {
     Task ShowErrorAsync(string title, string message);
     Task ShowInfoAsync(string title, string message);
+
+    /// <summary>Asks a yes/no question; false when the user says no or the surface cannot ask.</summary>
+    Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(false);
 }

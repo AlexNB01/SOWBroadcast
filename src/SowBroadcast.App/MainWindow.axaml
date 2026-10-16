@@ -64,6 +64,8 @@
       </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Header="_About SOW Broadcast…" Click="OnAbout" />
+        <MenuItem Header="Check for _updates…" Click="OnCheckUpdates" />
+        <MenuItem x:Name="UpdateStartupItem" Header="Check for updates when the program _starts" ToggleType="CheckBox" Click="OnUpdateStartupToggled" />
         <Separator />
         <MenuItem Header="Open _log folder" Click="OnOpenLogs" />
         <MenuItem Header="Open _data folder" Click="OnOpenData" />

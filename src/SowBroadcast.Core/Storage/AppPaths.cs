@@ -29,6 +29,9 @@ public static class AppPaths
     /// <summary>Hotkeys and the token of the local control interface (belongs to the computer, not to a match).</summary>
     public static string ControlSettingsPath => Path.Combine(DataRoot, "control.json");
 
+    /// <summary>Small preferences of the program (check for updates at startup).</summary>
+    public static string AppSettingsPath => Path.Combine(DataRoot, "app-settings.json");
+
     /// <summary>The colours picked last (the colour picker's "recent" row).</summary>
     public static string RecentColoursPath => Path.Combine(DataRoot, "recent-colours.json");
 

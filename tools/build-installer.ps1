@@ -7,6 +7,14 @@
     The installer puts the program in %LOCALAPPDATA%\SuomiOW.SOWBroadcast (no administrator rights); the user's data
     (autosave, generated overlay files, logs) lives separately in %LOCALAPPDATA%\SOWBroadcast and survives updates and uninstalling.
 
+    Smaller installer: the shipped pictures are copied and tools/optimize-assets.py shrinks the copies (drops pictures the manifest does not
+    list, shrinks oversized full-body hero pictures, recompresses PNGs losslessly). The repository's own pictures are never changed. It runs when
+    Python with Pillow is available (otherwise a warning says the installer is bigger); -NoOptimize skips it.
+
+    Code signing: pass -SignParams with the signtool arguments of your certificate, for example
+    -SignParams '/f cert.pfx /p password /fd sha256 /tr http://timestamp.digicert.com /td sha256'. The program, its libraries and the installer are
+    signed by Velopack (needs signtool from the Windows SDK on the path). Without it the installer is unsigned and Windows SmartScreen warns.
+
     The music library is not part of the installer (size and licence): with -MusicZip a SOWBroadcast-Music.zip is made from the Music folder
     of the repository, to be unpacked into the data folder's Music folder.
 
@@ -16,7 +24,9 @@
 #>
 param(
     [switch] $MusicZip,
-    [switch] $NoPack
+    [switch] $NoPack,
+    [switch] $NoOptimize,
+    [string] $SignParams = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,6 +58,18 @@ foreach ($folder in 'Heroes', 'HeroesBody', 'Maps', 'Gametypes', 'Roles', 'Gener
 $manifest = Join-Path $root 'Scoreboard\manifest.json'
 if (-not (Test-Path $manifest)) { throw "Missing $manifest (run tools/make-manifest.py)" }
 Copy-Item $manifest (Join-Path $publish 'Scoreboard\manifest.json')
+# Smaller pictures (see the description). Failing here is not fatal: the installer is just bigger.
+if (-not $NoOptimize) {
+    $python = Get-Command python -ErrorAction SilentlyContinue
+    $hasPillow = $python -and ((& python -c "import PIL; print('ok')" 2>$null) -eq 'ok')
+    if ($hasPillow) {
+        & python (Join-Path $PSScriptRoot 'optimize-assets.py') (Join-Path $publish 'Scoreboard')
+        if ($LASTEXITCODE -ne 0) { Write-Warning 'optimize-assets.py failed; the installer keeps the full-size pictures.' }
+    }
+    else {
+        Write-Warning 'Python with Pillow was not found, so the pictures are not shrunk (pip install pillow). The installer will be bigger.'
+    }
+}
 # Generated name lists are rebuilt by the program; only the catalogues (index.json) are shipped.
 Get-ChildItem (Join-Path $publish 'Scoreboard') -Recurse -Filter 'index.txt' | Remove-Item -Force
 
@@ -62,8 +84,10 @@ if (-not (Test-Path $vpk)) {
 }
 
 if (Test-Path $releases) { Remove-Item $releases -Recurse -Force }
-& $vpk pack --packId 'SuomiOW.SOWBroadcast' --packVersion $version --packDir $publish --mainExe 'SOWBroadcast.exe' `
-    --packTitle 'SOW Broadcast' --runtime win-x64 --packAuthors 'Suomi OW ry' --icon (Join-Path $root 'src\SowBroadcast.App\app.ico') --outputDir $releases
+$packArguments = @('pack', '--packId', 'SuomiOW.SOWBroadcast', '--packVersion', $version, '--packDir', $publish, '--mainExe', 'SOWBroadcast.exe',
+    '--packTitle', 'SOW Broadcast', '--runtime', 'win-x64', '--packAuthors', 'Suomi OW ry', '--icon', (Join-Path $root 'src\SowBroadcast.App\app.ico'), '--outputDir', $releases)
+if ($SignParams) { $packArguments += @('--signParams', $SignParams) }
+& $vpk @packArguments
 if ($LASTEXITCODE -ne 0) { throw 'vpk pack failed.' }
 
 if ($MusicZip) {

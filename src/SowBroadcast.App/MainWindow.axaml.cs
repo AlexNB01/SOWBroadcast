@@ -24,6 +24,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     private bool _skipAutosave;
     private readonly AppServices _services;
     private readonly GlobalHotkeys _hotkeys = new();
+    private readonly AppSettings _appSettings = AppSettings.Load(AppPaths.AppSettingsPath);
+    private readonly UpdateService _updates = new(new VelopackUpdater(AppInfo.Repository), AppInfo.Version);
     private readonly SowBroadcast.Integrations.Obs.ObsController _obsController = new();
     private Views.ObsWindow? _obsWindow;
     private Dictionary<HotkeyGesture, string> _windowKeys = new();
@@ -49,6 +51,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             library: teamLibrary,
             profiles: new SowBroadcast.Core.Profiles.ProfileStore(Path.Combine(AppPaths.DataRoot, "Profiles")));
         DataContext = _viewModel;
+        UpdateStartupItem.IsChecked = _appSettings.CheckForUpdatesAtStartup;
         _viewModel.UseAutomation(_services.ControlSettings.Automation);
         StartObs();
         StartControl();
@@ -83,6 +86,10 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             _viewModel.PublishStartup();
             await _viewModel.RestoreLinkAsync();
             _ = _viewModel.Obs?.ConnectAtStartupAsync();   // quietly: OBS may not be running yet
+            if (SowBroadcast.Core.Diagnostics.CrashReports.TakePending(AppLog.Folder) is { } crash)
+                await ShowInfoAsync("The program closed unexpectedly last time",
+                    $"A report was saved:\n{crash}\n\nYour match was saved as far as the autosave goes. Send the report to whoever looks after the program (Help > Open log folder).");
+            if (_appSettings.CheckForUpdatesAtStartup) _ = CheckForUpdatesQuietlyAsync();
             if (_services.StartupError is { } error)
                 await ShowErrorAsync("Overlay server could not start",
                     error + "\nOverlay files are still written, but browser overlays will not update.");
@@ -180,6 +187,83 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         _viewModel.StatusText = result.Message;
         if (result.Ok) await ShowInfoAsync("Hero and map list", result.Message);
         else await ShowErrorAsync("Hero and map list", result.Message);
+    }
+
+    // ---- updates (EHD-15) --------------------------------------------------------------------------------
+
+    private async void OnCheckUpdates(object? sender, RoutedEventArgs e)
+    {
+        _viewModel.StatusText = "Checking for updates…";
+        var result = await _updates.CheckAsync();
+        _viewModel.StatusText = result.Message;
+        switch (result.Status)
+        {
+            case UpdateCheckStatus.Available when result.Offer is { } offer:
+                if (!await ConfirmAsync("Update available",
+                        result.Message + "\n\nThe program closes and starts again in the new version. Do not update during a broadcast. Install now?")) return;
+                _viewModel.Autosave();
+                _viewModel.ArchiveOnClose();
+                _viewModel.StatusText = "Downloading the update… 0 %";
+                var problem = await _updates.InstallAsync(offer, percent => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = $"Downloading the update… {percent} %"));
+                if (problem is not null)
+                {
+                    _viewModel.StatusText = problem;
+                    await ShowErrorAsync("Update", problem);
+                }
+                break;
+            case UpdateCheckStatus.Failed:
+                await ShowErrorAsync("Update", result.Message);
+                break;
+            default:
+                await ShowInfoAsync("Update", result.Message);
+                break;
+        }
+    }
+
+    // At startup: no dialog, only a line in the status bar (the producer may be busy setting up a show).
+    private async Task CheckForUpdatesQuietlyAsync()
+    {
+        var result = await _updates.CheckAsync();
+        if (result.Status == UpdateCheckStatus.Available)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = result.Message + " Help > Check for updates installs it.");
+    }
+
+    private void OnUpdateStartupToggled(object? sender, RoutedEventArgs e)
+    {
+        _appSettings.CheckForUpdatesAtStartup = UpdateStartupItem.IsChecked == true;
+        try { _appSettings.Save(AppPaths.AppSettingsPath); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _viewModel.StatusText = $"The setting could not be saved: {ex.Message}"; }
+    }
+
+    public async Task<bool> ConfirmAsync(string title, string message)
+    {
+        var answer = false;
+        var yes = new Button { Content = "Yes", MinWidth = 88 };
+        var no = new Button { Content = "No", MinWidth = 88 };
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 480,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            ShowInTaskbar = false,
+            Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 16,
+                Children =
+                {
+                    new TextBlock { Text = title, Classes = { "h2" } },
+                    new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right, Children = { no, yes } },
+                },
+            },
+        };
+        yes.Click += (_, _) => { answer = true; dialog.Close(); };
+        no.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
+        return answer;
     }
 
     private async void OnProfiles(object? sender, RoutedEventArgs e) =>

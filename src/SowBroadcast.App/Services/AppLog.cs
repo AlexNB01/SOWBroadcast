@@ -26,7 +26,15 @@ public static class AppLog
             Log.Logger = Serilog.Core.Logger.None; // the program works without a log
         }
 
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception (terminating: {Terminating})", e.IsTerminating);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception (terminating: {Terminating})", e.IsTerminating);
+            // A report the next start shows: the version, the system and the error.
+            var report = SowBroadcast.Core.Diagnostics.CrashReports.Write(Folder, e.ExceptionObject as Exception, AppInfo.Version,
+                Environment.OSVersion.ToString(), DateTime.Now, e.IsTerminating);
+            if (report is not null) Log.Fatal("Crash report written: {Report}", report);
+            Log.CloseAndFlush();
+        };
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             Log.Error(e.Exception, "Unobserved task exception");
