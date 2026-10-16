@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SowBroadcast.App.ViewModels"
+             x:Class="SowBroadcast.App.Views.LinkBar"
+             x:DataType="vm:LinkViewModel">
+
+  <!-- The short form of the tournament link for the Standings and Bracket tabs (the same link as on the Match tab). -->
+  <Border Classes="card" Padding="14,10">
+    <StackPanel Spacing="8">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+        <TextBlock Classes="label" VerticalAlignment="Center" Text="SOWDRAFT TOURNAMENT" />
+        <TextBox Grid.Column="1" Text="{Binding TournamentUrl}" IsEnabled="{Binding CanLink}"
+                 Watermark="Paste the SOWDraft tournament link (e.g. https://…/tournament/…)" />
+        <Button Grid.Column="2" Content="Link" IsEnabled="{Binding CanLink}" Command="{Binding LinkCommand}" />
+        <Button Grid.Column="3" Content="Unlink" IsEnabled="{Binding IsLinked}" Command="{Binding UnlinkCommand}" />
+      </Grid>
+      <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding StatusText}" />
+      <TextBlock Foreground="{DynamicResource SowBladeBrush}" Text="This tab shows the tournament's data while linked. Unlink to edit it by hand."
+                 IsVisible="{Binding IsTournamentLinked}" />
+    </StackPanel>
+  </Border>
+</UserControl>

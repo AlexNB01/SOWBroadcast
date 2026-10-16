@@ -8,6 +8,8 @@
              x:DataType="vm:MainWindowViewModel">
 
   <DockPanel Margin="0,12,0,0">
+    <views:LinkPanel DockPanel.Dock="Top" DataContext="{Binding Link}" Margin="0,0,0,10" />
+
     <!-- Format bar: how many maps and players are shown (hidden data is kept) -->
     <Border DockPanel.Dock="Top" Classes="card" Padding="14,8" Margin="0,0,0,10">
       <StackPanel Orientation="Horizontal" Spacing="12">

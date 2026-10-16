@@ -1,6 +1,7 @@
 using SowBroadcast.Core.Assets;
 using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Storage;
+using SowBroadcast.Integrations.Link;
 using SowBroadcast.Server;
 
 namespace SowBroadcast.App.Services;
@@ -10,16 +11,27 @@ public sealed class AppServices : IAsyncDisposable
 {
     private readonly OverlayServer? _server;
 
-    private AppServices(IOverlayPublisher publisher, AssetService assets, OverlayServer? server, string? startupError)
+    private readonly HttpFetcher _http;
+
+    private AppServices(IOverlayPublisher publisher, AssetService assets, OverlayServer? server, string? startupError, HttpFetcher http)
     {
         Publisher = publisher;
         Assets = assets;
+        _http = http;
+        Link = new LinkService(http, () => new SocketIoConnection());
+        Logos = new LogoCache(Path.Combine(AppPaths.ScoreboardDir, "TeamLogos"), http);
         _server = server;
         StartupError = startupError;
         assets.Changed += publisher.MarkAssetsChanged;
     }
 
     public IOverlayPublisher Publisher { get; }
+
+    /// <summary>The SOWDraft connection.</summary>
+    public LinkService Link { get; }
+
+    /// <summary>Team logos downloaded from SOWDraft (served to the overlays with the rest of the Scoreboard folder).</summary>
+    public LogoCache Logos { get; }
 
     /// <summary>Heroes, maps and game modes.</summary>
     public AssetService Assets { get; }
@@ -55,6 +67,7 @@ public sealed class AppServices : IAsyncDisposable
             folders["/Scoreboard/" + asset] = new[] { userFolder, Path.Combine(content, "Scoreboard", asset) };
         }
 
+        var http = new HttpFetcher(typeof(AppServices).Assembly.GetName().Version?.ToString(3) ?? "3.0.0");
         var assets = new AssetService(AppPaths.ScoreboardDir, new[] { Path.Combine(content, "Scoreboard") });
         assets.Load();
 
@@ -67,16 +80,18 @@ public sealed class AppServices : IAsyncDisposable
         try
         {
             var server = Task.Run(() => OverlayServer.StartAsync(options)).GetAwaiter().GetResult();
-            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl), assets, server, null);
+            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl), assets, server, null, http);
         }
         catch (IOException ex)
         {
-            return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message);
+            return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message, http);
         }
     }
 
     public async ValueTask DisposeAsync()
     {
+        await Link.DisposeAsync();
+        _http.Dispose();
         if (_server is not null) await _server.DisposeAsync();
     }
 }

@@ -37,6 +37,16 @@
         <GradientStop Color="#0F356B" Offset="1" />
       </LinearGradientBrush>
 
+      <!-- Expander (the advanced link section): quiet header, lion when hovered -->
+      <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Transparent" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="{StaticResource SowLion}" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent" />
+      <SolidColorBrush x:Key="ExpanderContentBackground" Color="Transparent" />
+      <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent" />
+
       <!-- Accent colours that Fluent derives selection and checked states from -->
       <Color x:Key="SystemAccentColor">#134380</Color>
       <Color x:Key="SystemAccentColorDark1">#0F356B</Color>

@@ -33,7 +33,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         Directory.CreateDirectory(broadcastLogoFolder);
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
             _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir,
-            standingsLogoFolder: teamsFolder, teamPicker: this);
+            standingsLogoFolder: teamsFolder, teamPicker: this,
+            linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
         DataContext = _viewModel;
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
@@ -51,6 +52,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         {
             await _viewModel.LoadAutosaveAsync();
             _viewModel.PublishStartup();
+            await _viewModel.RestoreLinkAsync();
             if (_services.StartupError is { } error)
                 await ShowErrorAsync("Overlay server could not start",
                     error + "\nOverlay files are still written, but browser overlays will not update.");
@@ -138,6 +140,19 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             {
                 await Task.Delay(400); // after the autosave restore
                 _viewModel.LoadSampleCommand.Execute(null);
+            }
+            var linkArg = Array.IndexOf(args, "--link");
+            if (linkArg >= 0 && linkArg + 1 < args.Length)
+            {
+                // `--link <tournament url> [--select-live]` links a tournament (and its live match) before the picture is taken.
+                _viewModel.Link.TournamentUrl = args[linkArg + 1];
+                await _viewModel.Link.LinkCommand.ExecuteAsync(null);
+                await Task.Delay(1500);
+                if (args.Contains("--select-live") && _viewModel.Link.Matches.FirstOrDefault(m => m.IsLive) is { } live)
+                {
+                    _viewModel.Link.SelectedMatch = live;
+                    await Task.Delay(2500);
+                }
             }
             if (args.Contains("--open-colour"))
             {

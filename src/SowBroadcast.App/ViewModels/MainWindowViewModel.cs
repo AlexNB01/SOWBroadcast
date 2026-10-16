@@ -9,10 +9,11 @@ using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Match;
 using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Storage;
+using SowBroadcast.Integrations.Link;
 
 namespace SowBroadcast.App.ViewModels;
 
-public sealed partial class MainWindowViewModel : ObservableObject
+public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
 {
     private readonly IFileDialogs _dialogs;
     private readonly IMessages _messages;
@@ -21,6 +22,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ILogoConverter _logos;
     private readonly string? _teamsFolder;
     private readonly HashSet<string> _unsentSources = new();
+    private readonly object _autosaveLock = new();
+    private readonly AssetService? _assets;
     private string? _currentSavePath;
     private bool _collecting;
 
@@ -28,8 +31,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         AssetService? assets = null, IImagePicker? images = null, ILogoConverter? logos = null,
         string? teamsFolder = null, string? logoFolder = null, string? broadcastLogoFolder = null,
         string? defaultVideosDir = null, Func<long>? clock = null, string? standingsLogoFolder = null,
-        ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null)
+        ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null,
+        LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null)
     {
+        _assets = assets;
         _dialogs = dialogs;
         _messages = messages;
         _publisher = publisher;
@@ -44,6 +49,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Standings = new StandingsViewModel(picker, standingsLogoFolder);
         Bracket = new BracketViewModel(picker, standingsLogoFolder,
             () => StandingsOperations.TeamsFromStandings(Standings.ApplyTo(State).Standings), teamPicker, messages, matchIds);
+        Link = new LinkViewModel(linkService ?? UnavailableLink(), logoCache, this, messages, uiPost ?? (action => action()));
         Match.Edited += () => MarkUnsent("match");
         General.Edited += () => MarkUnsent("general");
         Waiting.Edited += () => MarkUnsent("waiting");
@@ -69,6 +75,43 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>The Waiting Screen tab (videos, countdown, texts, ticker, socials).</summary>
     public WaitingViewModel Waiting { get; }
 
+    /// <summary>The SOWDraft link (tournament, match list, sides, status).</summary>
+    public LinkViewModel Link { get; }
+
+    /// <summary>Connects again with the link the last session saved (EHD-5).</summary>
+    public Task RestoreLinkAsync() => Link.RestoreAsync(State.Link);
+
+    // A link that cannot work (tests and tools that do not need one): every attempt ends in an error message.
+    private static LinkService UnavailableLink() => new(new NoHttp(), () => throw new InvalidOperationException("Linking is not available."));
+
+    private sealed class NoHttp : IHttpFetcher
+    {
+        public Task<HttpResult> GetAsync(Uri url, int maxBytes, CancellationToken cancellation) =>
+            Task.FromResult(new HttpResult(0, Array.Empty<byte>(), null, "Linking is not available."));
+    }
+
+    // ---- ILinkHost ---------------------------------------------------------------------------------------
+
+    AppState ILinkHost.CollectState()
+    {
+        CollectTabs();
+        return State;
+    }
+
+    IReadOnlyList<string> ILinkHost.MapNames => _assets?.Names(AssetCategory.Maps) ?? Array.Empty<string>();
+
+    void ILinkHost.ApplyLinked(AppState state)
+    {
+        _collecting = true;
+        try { State = state; }
+        finally { _collecting = false; }
+        Match.Load(state);
+        Standings.Load(state);
+        Bracket.Load(state);
+        TryPublish(updateStatus: false);
+        Autosave();
+    }
+
     /// <summary>The Standings tab (groups, tables, display group).</summary>
     public StandingsViewModel Standings { get; }
 
@@ -78,7 +121,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private AppState _state;
     [ObservableProperty] private string _statusText = "Ready";
     [ObservableProperty] private bool _hasUnsentChanges;
-    [ObservableProperty] private string _linkStatus = "Not linked";
 
     public string? CurrentSavePath => _currentSavePath;
 
@@ -241,6 +283,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SwapTeams()
     {
+        if (Link.IsLinked)
+        {
+            // The teams come from SOWDraft: swapping them means choosing the other sides, which writes everything again.
+            Link.FlipSides();
+            StatusText = "Sides swapped";
+            return;
+        }
         CollectTabs();
         State = MatchOperations.Swap(State);
         AfterLocalChange("Teams swapped (not published yet)");
@@ -252,6 +301,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CollectTabs();
         State = MatchOperations.Reset(State);
         AfterLocalChange("Match reset (not published yet)");
+        if (Link.IsLinked) Link.Reapply(clearReceived: true);   // a linked match is filled in again at once
     }
 
     private void AfterLocalChange(string status)
@@ -374,7 +424,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CollectTabs();
         try
         {
-            StateStore.Save(_autosavePath, State);
+            lock (_autosaveLock) StateStore.Save(_autosavePath, State);
         }
         catch (IOException ex)
         {

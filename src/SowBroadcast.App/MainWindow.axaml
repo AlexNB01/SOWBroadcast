@@ -54,7 +54,7 @@
             <TextBlock Text="Unsent changes" FontWeight="SemiBold" />
           </Border>
           <Border Classes="pill">
-            <TextBlock Text="{Binding LinkStatus}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Link.PillText}" FontWeight="SemiBold" />
           </Border>
         </StackPanel>
       </Grid>
