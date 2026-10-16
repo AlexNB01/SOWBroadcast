@@ -1,0 +1,106 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SowBroadcast.App.ViewModels"
+        x:Class="SowBroadcast.App.Views.ObsWindow"
+        x:DataType="vm:ObsViewModel"
+        Title="OBS"
+        Icon="avares://SOWBroadcast/Assets/Brand/app-icon-256.png"
+        Width="760" Height="760" MinWidth="560" MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="16">
+    <TextBlock DockPanel.Dock="Bottom" Classes="muted" Text="{Binding Message}" TextWrapping="Wrap" MinHeight="20" Margin="0,10,0,0" />
+
+    <ScrollViewer>
+      <StackPanel Spacing="14">
+
+        <Border Classes="card" Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="CONNECTION" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="In OBS: Tools > WebSocket Server Settings, switch the server on (the default port is 4455) and set a password." />
+            <Grid ColumnDefinitions="*,150,*" ColumnSpacing="8" IsEnabled="{Binding CanEditConnection}">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Classes="label" Text="HOST" />
+                <TextBox Text="{Binding Host}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Classes="label" Text="PORT" />
+                <NumericUpDown Minimum="1" Maximum="65535" FormatString="0" Value="{Binding Port}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="2">
+                <TextBlock Classes="label" Text="PASSWORD" />
+                <TextBox Text="{Binding Password}" PasswordChar="•" />
+              </StackPanel>
+            </Grid>
+            <CheckBox IsChecked="{Binding AutoConnect}" Content="Connect to OBS when the program starts" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="primary" Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanEditConnection}" />
+              <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
+              <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="10,0,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" Padding="14" IsEnabled="{Binding IsConnected}">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="SCENES" />
+            <ItemsControl ItemsSource="{Binding Scenes}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ObsSceneItem">
+                  <Button Content="{Binding Name}" Tag="{Binding Name}" Classes.primary="{Binding IsCurrent}" Click="OnSceneClick" Margin="0,0,8,8" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="muted" Text="The highlighted scene is on air. A Stream Deck can switch scenes over HTTP: /api/control/obs.scene?name=Scene name (see Hotkeys, remote control and automation)." TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" Padding="14" IsEnabled="{Binding IsConnected}">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="REPLAY" />
+            <TextBlock Text="{Binding ReplayText}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Start replay buffer" Command="{Binding StartReplayBufferCommand}" />
+              <Button Content="Stop" Command="{Binding StopReplayBufferCommand}" />
+              <Button Classes="primary" Content="Save replay now" Command="{Binding SaveReplayCommand}" />
+            </StackPanel>
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="The clip OBS saves is picked up from the replay folder and put in the playlist of the replay overlay." />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="GO-LIVE CHECK" />
+            <Button Content="Run the check" Command="{Binding CheckCommand}" IsEnabled="{Binding IsConnected}" HorizontalAlignment="Left" />
+            <ItemsControl ItemsSource="{Binding CheckResults}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CheckItem">
+                  <Grid ColumnDefinitions="28,150,*" Margin="0,3">
+                    <TextBlock Grid.Column="0" Text="{Binding Glyph}" FontWeight="Bold" />
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="2" Text="{Binding Detail}" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="cardTitle" Text="SCENE COLLECTION" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Writes the 18 scenes of the program for this installation (this computer's address and folders, no camera or NDI names). Import the file in OBS with Scene Collection > Import, then pick your NDI senders and camera." />
+            <Button Content="Export scene collection…" Command="{Binding ExportCollectionCommand}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

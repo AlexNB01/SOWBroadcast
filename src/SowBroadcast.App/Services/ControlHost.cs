@@ -16,18 +16,18 @@ public sealed class ControlHost
 
     private readonly MainWindowViewModel _match;
     private readonly ControlSettings _settings;
-    private readonly Func<Func<ControlReply>, Task<ControlReply>> _onUiThread;
+    private readonly Func<Func<Task<ControlReply>>, Task<ControlReply>> _onUiThread;
 
-    /// <param name="onUiThread">Runs a function on the UI thread (tests run it inline).</param>
-    public ControlHost(MainWindowViewModel match, ControlSettings settings, Func<Func<ControlReply>, Task<ControlReply>>? onUiThread = null)
+    /// <param name="onUiThread">Runs a function on the UI thread and returns its result (tests run it inline).</param>
+    public ControlHost(MainWindowViewModel match, ControlSettings settings, Func<Func<Task<ControlReply>>, Task<ControlReply>>? onUiThread = null)
     {
         _match = match;
         _settings = settings;
-        _onUiThread = onUiThread ?? (work => Task.FromResult(work()));
+        _onUiThread = onUiThread ?? (work => work());
     }
 
     public Task<ControlReply> HandleAsync(string command, IReadOnlyDictionary<string, string> arguments) =>
-        _onUiThread(() => string.IsNullOrEmpty(command) ? List() : Run(command, arguments));
+        _onUiThread(async () => string.IsNullOrEmpty(command) ? List() : await RunAsync(command, arguments));
 
     private ControlReply List()
     {
@@ -35,9 +35,9 @@ public sealed class ControlHost
         return new ControlReply(200, JsonSerializer.Serialize(new { commands, state = Describe(_match.ControlSnapshot(), null) }, Json));
     }
 
-    private ControlReply Run(string command, IReadOnlyDictionary<string, string> arguments)
+    private async Task<ControlReply> RunAsync(string command, IReadOnlyDictionary<string, string> arguments)
     {
-        var outcome = _match.RunControl(command);
+        var outcome = await _match.RunControlAsync(command, arguments);
         if (ControlCatalog.Find(command) is null)
             return new ControlReply(404, JsonSerializer.Serialize(Describe(outcome, command), Json));
 

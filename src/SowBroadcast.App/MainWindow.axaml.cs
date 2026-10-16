@@ -7,6 +7,7 @@ using SowBroadcast.App.ViewModels;
 using SowBroadcast.App.Views;
 using SowBroadcast.Core.Assets;
 using SowBroadcast.Core.Control;
+using SowBroadcast.Integrations.Obs;
 using SowBroadcast.Core.Export;
 using SowBroadcast.Core.Storage;
 
@@ -23,6 +24,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     private bool _skipAutosave;
     private readonly AppServices _services;
     private readonly GlobalHotkeys _hotkeys = new();
+    private readonly SowBroadcast.Integrations.Obs.ObsController _obsController = new();
+    private Views.ObsWindow? _obsWindow;
     private Dictionary<HotkeyGesture, string> _windowKeys = new();
 
     public MainWindow()
@@ -46,6 +49,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             profiles: new SowBroadcast.Core.Profiles.ProfileStore(Path.Combine(AppPaths.DataRoot, "Profiles")));
         DataContext = _viewModel;
         _viewModel.UseAutomation(_services.ControlSettings.Automation);
+        StartObs();
         StartControl();
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
@@ -77,6 +81,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             await _viewModel.LoadAutosaveAsync();
             _viewModel.PublishStartup();
             await _viewModel.RestoreLinkAsync();
+            _ = _viewModel.Obs?.ConnectAtStartupAsync();   // quietly: OBS may not be running yet
             if (_services.StartupError is { } error)
                 await ShowErrorAsync("Overlay server could not start",
                     error + "\nOverlay files are still written, but browser overlays will not update.");
@@ -84,6 +89,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         Closing += (_, _) =>
         {
             _hotkeys.Dispose();
+            _obsController.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
             if (!_skipAutosave)
             {
                 _viewModel.Autosave();
@@ -132,10 +138,10 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     {
         // The HTTP interface and the hotkeys run the same commands, on the UI thread.
         var host = new ControlHost(_viewModel, _services.ControlSettings,
-            work => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(work).GetTask());
+            work => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(work));
         _services.ControlGateway.Handler = host.HandleAsync;
 
-        _hotkeys.Pressed += id => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.RunControl(id));
+        _hotkeys.Pressed += id => Avalonia.Threading.Dispatcher.UIThread.Post(async () => await _viewModel.RunControlAsync(id));
         AddHandler(KeyDownEvent, OnControlKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         ApplyHotkeys();
     }
@@ -162,7 +168,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         if (Views.ControlSettingsWindow.GestureOf(e.Key, e.KeyModifiers) is { } gesture && _windowKeys.TryGetValue(gesture, out var id))
         {
             e.Handled = true;
-            _viewModel.RunControl(id);
+            _ = _viewModel.RunControlAsync(id);
         }
     }
 
@@ -180,6 +186,51 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
 
     private async void OnTeamLibrary(object? sender, RoutedEventArgs e) =>
         await new Views.TeamLibraryWindow(new TeamLibraryViewModel(_viewModel)).ShowDialog(this);
+
+    // ---- OBS (EHD-6) -------------------------------------------------------------------------------------
+
+    private void StartObs()
+    {
+        var replayFolder = Path.Combine(AppPaths.ScoreboardDir, "Replay");
+        ChecklistInput Checklist()
+        {
+            var pages = Directory.Exists(Path.Combine(AppPaths.ContentRoot, "HTML"))
+                ? Directory.GetFiles(Path.Combine(AppPaths.ContentRoot, "HTML"), "*.html").Select(Path.GetFileName).Where(n => n is not null).Select(n => n!).ToArray()
+                : Array.Empty<string>();
+            return new ChecklistInput(_services.Publisher.BaseUrl, SowBroadcast.Core.Obs.ObsSceneCollection.SceneNames(), pages, replayFolder);
+        }
+
+        var obs = new ObsViewModel(_obsController, SowBroadcast.Core.Obs.ObsSettings.Load(AppPaths.ObsSettingsPath), AppPaths.ObsSettingsPath, new DpapiProtector(),
+            Checklist, () => _services.Publisher.BaseUrl, AppPaths.ContentRoot, AppPaths.DataRoot,
+            action => Avalonia.Threading.Dispatcher.UIThread.Post(action), PickSaveJsonAsync);
+        obs.Said += text => _viewModel.StatusText = text;
+        _viewModel.Obs = obs;
+    }
+
+    private async Task<string?> PickSaveJsonAsync(string title, string suggestedName)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "json",
+            FileTypeChoices = new[] { new FilePickerFileType("JSON") { Patterns = new[] { "*.json" } } },
+        });
+        return file?.TryGetLocalPath();
+    }
+
+    private void OnObsPanel(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel.Obs is not { } obs) return;
+        if (_obsWindow is { IsVisible: true })
+        {
+            _obsWindow.Activate();
+            return;
+        }
+        // Not a dialog: the producer keeps it open next to the main window during the show.
+        _obsWindow = new Views.ObsWindow(obs);
+        _obsWindow.Show(this);
+    }
 
     private async void OnRestoreMatch(object? sender, RoutedEventArgs e)
     {
@@ -241,6 +292,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
                 {
                     "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
                     "about" => new AboutWindow(),
+                    "obs" => new ObsWindow(_viewModel.Obs!),
                     "profiles" => new ProfilesWindow(new ProfilesViewModel(_viewModel)),
                     "library" => new TeamLibraryWindow(new TeamLibraryViewModel(_viewModel)),
                     "restore" => new RestoreMatchWindow(new RestoreMatchViewModel(_viewModel.ArchivedMatches())),

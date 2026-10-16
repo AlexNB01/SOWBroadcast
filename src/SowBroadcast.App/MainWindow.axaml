@@ -34,6 +34,7 @@
         <MenuItem Header="_Update hero and map list…" Click="OnUpdateAssetList" />
       </MenuItem>
       <MenuItem Header="C_ontrol">
+        <MenuItem Header="_OBS panel…" Click="OnObsPanel" />
         <MenuItem Header="_Hotkeys, remote control and automation…" Click="OnControlSettings" />
       </MenuItem>
       <MenuItem x:Name="DebugMenu" Header="_Debug" IsVisible="False">

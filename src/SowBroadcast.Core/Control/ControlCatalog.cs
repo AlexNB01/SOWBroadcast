@@ -25,6 +25,12 @@ public static class ControlCatalog
     public const string Update = "update";
     public const string Undo = "undo";
     public const string Redo = "redo";
+    public const string ObsScene = "obs.scene";
+    public const string ObsReplaySave = "obs.replay.save";
+    public const string ObsReplayToggle = "obs.replay.toggle";
+
+    /// <summary>The commands that talk to OBS (they answer after OBS did, so they run asynchronously).</summary>
+    public static bool IsObs(string id) => id.StartsWith("obs.", StringComparison.OrdinalIgnoreCase);
 
     // Defaults are Ctrl+Alt+F-keys (and Ctrl+Alt+Z / Y for undo / redo): nothing else on Windows uses them, and they work while OBS or the game has the focus.
     public static IReadOnlyList<ControlCommandInfo> All { get; } = new ControlCommandInfo[]
@@ -40,6 +46,9 @@ public static class ControlCatalog
         new(Update, "Update (send to the overlays)", "Ctrl+Alt+F9"),
         new(Undo, "Undo the last change", "Ctrl+Alt+Z"),
         new(Redo, "Redo", "Ctrl+Alt+Y"),
+        new(ObsReplaySave, "OBS: save the replay now", "Ctrl+Alt+R"),
+        new(ObsReplayToggle, "OBS: replay buffer start / stop", null),
+        new(ObsScene, "OBS: switch scene (over HTTP: ?name=Scene name)", null),
         new(MapTeam1Up, "Current map: team 1 +1", null),
         new(MapTeam1Down, "Current map: team 1 −1", null),
         new(MapTeam2Up, "Current map: team 2 +1", null),

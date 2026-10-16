@@ -19,6 +19,31 @@ public sealed partial class MainWindowViewModel
         Bracket.AutomationAllowed = () => !Link.IsTournamentLinked;   // linked: the tournament fills (and locks) the bracket
     }
 
+    /// <summary>The OBS panel (null when the program runs without one).</summary>
+    public ObsViewModel? Obs { get; set; }
+
+    /// <summary>
+    /// Like <see cref="RunControl"/>, and also runs the commands that talk to OBS, which answer after OBS did.
+    /// <paramref name="arguments"/> are the query values of an HTTP call (<c>name</c> for <c>obs.scene</c>). Call on the UI thread.
+    /// </summary>
+    public async Task<ControlOutcome> RunControlAsync(string id, IReadOnlyDictionary<string, string>? arguments = null)
+    {
+        if (!ControlCatalog.IsObs(id) || ControlCatalog.Find(id) is not { } known) return RunControl(id);
+
+        FlushHistory();
+        (bool Ok, string Message) result;
+        if (Obs is null) result = (false, "OBS is not available.");
+        else if (known.Id == ControlCatalog.ObsReplaySave) result = await Obs.SaveReplayNowAsync();
+        else if (known.Id == ControlCatalog.ObsReplayToggle) result = await Obs.ToggleReplayBufferAsync();
+        else
+        {
+            var name = arguments is not null && arguments.TryGetValue("name", out var given) ? given : "";
+            result = name.Length == 0 ? (false, "Say which scene: ?name=Scene name") : await Obs.SwitchToSceneAsync(name);
+        }
+        StatusText = result.Ok ? result.Message : $"Control: {result.Message}";
+        return Describe(result.Ok, result.Message);
+    }
+
     /// <summary>Runs the command <paramref name="id"/> (a <see cref="ControlCatalog"/> id). Must be called on the UI thread.</summary>
     public ControlOutcome RunControl(string id)
     {

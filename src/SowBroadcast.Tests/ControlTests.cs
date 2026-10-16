@@ -68,7 +68,7 @@ public sealed class ControlSettingsTests : IDisposable
 
         var active = settings.ActiveBindings();
 
-        Assert.Equal(11, active.Count);
+        Assert.Equal(12, active.Count);
         Assert.Equal(active.Count, active.Select(a => a.Gesture).Distinct().Count());
         Assert.Empty(settings.Problems());
         Assert.Equal("Ctrl+Alt+F1", settings.GestureFor(ControlCatalog.Team1ScoreUp));
