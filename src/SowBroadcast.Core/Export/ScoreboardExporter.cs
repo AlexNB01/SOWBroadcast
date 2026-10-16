@@ -129,7 +129,7 @@ public sealed class ScoreboardExporter
         Write("Waiting/text_starting.txt", Fallback(w.TextStarting, "STARTING SOON!"), written);
         Write("Waiting/text_brb.txt", Fallback(w.TextBrb, "BE RIGHT BACK!"), written);
         Write("Waiting/text_end.txt", Fallback(w.TextEnd, "THANK YOU FOR WATCHING"), written);
-        Write("Waiting/timer_seconds.txt", w.TimerSeconds.ToString(CultureInfo.InvariantCulture), written);
+        ExportTimer(state, written);
 
         var useOverride = w.TickerOverrideEnabled && w.TickerOverride.Trim().Length > 0;
         Write("Waiting/ticker_override.txt", w.TickerOverride, written);
@@ -139,7 +139,13 @@ public sealed class ScoreboardExporter
         var videos = SyncPlaylist(w.VideosDir);
         Write("Waiting/videos.txt", string.Join("\r\n", videos) + (videos.Count > 0 ? "\r\n" : ""), written);
         Write("Waiting/videos_dir.txt", "", written);
-        Write("Waiting/timer_running.txt", w.TimerRunning ? "1" : "0", written);
+    }
+
+    /// <summary>Only the countdown files (what the timer commands and the running clock write).</summary>
+    public void ExportTimer(AppState state, List<string> written)
+    {
+        Write("Waiting/timer_seconds.txt", state.Waiting.TimerSeconds.ToString(CultureInfo.InvariantCulture), written);
+        Write("Waiting/timer_running.txt", state.Waiting.TimerRunning ? "1" : "0", written);
     }
 
     /// <summary>Mirrors the chosen video folder into <c>Waiting/Playlist</c> and returns the file names.</summary>

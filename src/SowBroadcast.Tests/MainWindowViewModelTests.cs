@@ -294,6 +294,243 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Single(_dialogs.Errors);
     }
 
+    // ---- General and Waiting tabs ------------------------------------------------------------------------
+
+    private long _now;
+
+    private MainWindowViewModel CreateWithClock() =>
+        new(_dialogs, _dialogs, _publisher, _autosave, defaultVideosDir: Path.Combine(_dir, "Highlights"), clock: () => _now);
+
+    [Fact]
+    public void Update_general_publishes_only_that_part_and_leaves_other_unsent_changes_marked()
+    {
+        var vm = CreateWithClock();
+        vm.Match.Team1.Name = "Typed";
+        vm.General.Host = "  Host  ";
+        vm.General.StatusText = "Cup";
+
+        vm.UpdateGeneralCommand.Execute(null);
+
+        var (state, scope) = Assert.Single(_publisher.Parts);
+        Assert.Equal(PublishScope.General, scope);
+        Assert.Equal("Host", state.General.Host);
+        Assert.Equal("Cup", state.General.StatusText);
+        Assert.Empty(_publisher.Published);
+        Assert.True(vm.HasUnsentChanges); // the Match tab still has changes the overlays do not
+        Assert.Equal("Host", StateStore.Load(_autosave).General.Host);
+
+        vm.UpdateMatchCommand.Execute(null);
+        Assert.False(vm.HasUnsentChanges);
+    }
+
+    [Fact]
+    public void The_marker_clears_when_the_last_tab_with_changes_is_updated()
+    {
+        var vm = CreateWithClock();
+        vm.General.Caster1 = "Caster";
+        Assert.True(vm.HasUnsentChanges);
+
+        vm.UpdateGeneralCommand.Execute(null);
+
+        Assert.False(vm.HasUnsentChanges);
+    }
+
+    [Fact]
+    public void Update_waiting_normalises_the_socials_and_fills_empty_texts_with_the_defaults()
+    {
+        var vm = CreateWithClock();
+        vm.Waiting.Socials.Single(s => s.Kind == "twitch").Text = "https://www.twitch.tv/SuomiOW?x=1";
+        vm.Waiting.Socials.Single(s => s.Kind == "discord").Text = "discord.gg/abc";
+        vm.Waiting.TextBrb = "   ";
+        vm.Waiting.TickerOverride = " custom ";
+        vm.Waiting.TickerOverrideEnabled = true;
+
+        vm.UpdateWaitingCommand.Execute(null);
+
+        var (state, scope) = Assert.Single(_publisher.Parts);
+        Assert.Equal(PublishScope.Waiting, scope);
+        Assert.Equal(new Dictionary<string, string> { ["twitch"] = "SuomiOW", ["discord"] = "abc" }, state.Waiting.Socials);
+        Assert.Equal("BE RIGHT BACK!", state.Waiting.TextBrb);
+        Assert.Equal("custom", state.Waiting.TickerOverride);
+        Assert.True(state.Waiting.TickerOverrideEnabled);
+    }
+
+    [Fact]
+    public void Timer_commands_reach_the_overlays_at_once_and_are_not_unsent_changes()
+    {
+        var vm = CreateWithClock();
+
+        vm.Waiting.AdjustTimerCommand.Execute("60");
+        vm.Waiting.StartTimerCommand.Execute(null);
+
+        Assert.False(vm.HasUnsentChanges);
+        Assert.Equal(2, _publisher.Parts.Count);
+        Assert.All(_publisher.Parts, p => Assert.Equal(PublishScope.Timer, p.Scope));
+        var running = _publisher.Parts[1].State.Waiting;
+        Assert.Equal(60, running.TimerSeconds);
+        Assert.True(running.TimerRunning);
+        Assert.Equal("01:00", vm.Waiting.TimerText);
+    }
+
+    [Fact]
+    public void The_running_clock_refreshes_the_files_each_second_and_announces_when_it_runs_out()
+    {
+        var vm = CreateWithClock();
+        vm.Waiting.AdjustTimerCommand.Execute("30");
+        vm.Waiting.AdjustTimerCommand.Execute("-25"); // 5 s
+        vm.Waiting.StartTimerCommand.Execute(null);
+        _publisher.Parts.Clear();
+
+        vm.Waiting.Tick(); // same second: nothing
+        Assert.Empty(_publisher.Parts);
+
+        _now = 1_000;
+        vm.Waiting.Tick();
+        var tick = Assert.Single(_publisher.Parts);
+        Assert.Equal(PublishScope.TimerTick, tick.Scope);
+        Assert.Equal(4, tick.State.Waiting.TimerSeconds);
+
+        _now = 5_000;
+        vm.Waiting.Tick();
+        var end = _publisher.Parts[^1];
+        Assert.Equal(PublishScope.Timer, end.Scope);
+        Assert.Equal((0, false), (end.State.Waiting.TimerSeconds, end.State.Waiting.TimerRunning));
+        Assert.False(vm.Waiting.IsRunning);
+    }
+
+    [Fact]
+    public void Pausing_a_stopped_timer_sends_nothing()
+    {
+        var vm = CreateWithClock();
+
+        vm.Waiting.PauseTimerCommand.Execute(null);
+
+        Assert.Empty(_publisher.Parts);
+    }
+
+    [Fact]
+    public void Swapping_teams_does_not_disturb_a_running_countdown()
+    {
+        var vm = CreateWithClock();
+        vm.Waiting.AdjustTimerCommand.Execute("120");
+        vm.Waiting.StartTimerCommand.Execute(null);
+
+        vm.SwapTeamsCommand.Execute(null);
+        vm.ResetMatchCommand.Execute(null);
+
+        Assert.True(vm.Waiting.IsRunning);
+        Assert.True(vm.Waiting.Timer.IsRunning);
+    }
+
+    [Fact]
+    public void Reset_general_keeps_the_match_format_marks_unsent_and_sends_nothing()
+    {
+        var vm = CreateWithClock();
+        vm.Match.MapsCount = 3;
+        vm.General.Host = "Host";
+        vm.General.Colours[0].Hex = "#123456";
+        vm.HasUnsentChanges = false;
+
+        vm.ResetGeneralCommand.Execute(null);
+
+        Assert.Equal("", vm.General.Host);
+        Assert.Equal("#FFFFFF", vm.General.Colours[0].Hex);
+        Assert.Equal(3, vm.Match.MapsCount);
+        Assert.True(vm.HasUnsentChanges);
+        Assert.Empty(_publisher.Parts);
+        Assert.Equal(3, StateStore.Load(_autosave).General.MapsCount);
+    }
+
+    [Fact]
+    public void Reset_waiting_restores_the_defaults_but_keeps_the_socials()
+    {
+        var vm = CreateWithClock();
+        vm.Waiting.Socials.Single(s => s.Kind == "twitch").Text = "SuomiOW";
+        vm.Waiting.TextStarting = "Soon";
+        vm.Waiting.TickerOverride = "x";
+        vm.Waiting.TickerOverrideEnabled = true;
+        vm.Waiting.VideosDir = "C:\\Videos";
+        vm.Waiting.UseDefaultVideos = false;
+        vm.Waiting.AdjustTimerCommand.Execute("60");
+        vm.Waiting.StartTimerCommand.Execute(null);
+        _publisher.Parts.Clear();
+
+        vm.ResetWaitingCommand.Execute(null);
+
+        Assert.Equal("STARTING SOON!", vm.Waiting.TextStarting);
+        Assert.Equal("THANK YOU FOR WATCHING", vm.Waiting.TextEnd);
+        Assert.True(vm.Waiting.UseDefaultVideos);
+        Assert.Equal("", vm.Waiting.VideosDir);
+        Assert.False(vm.Waiting.TickerOverrideEnabled);
+        Assert.Equal("SuomiOW", vm.Waiting.Socials.Single(s => s.Kind == "twitch").Text);
+        Assert.False(vm.Waiting.IsRunning);
+        Assert.Equal("01:00", vm.Waiting.TimerText);
+        // The tab reset sends nothing, but a countdown it stopped is stopped for the overlays too.
+        var part = Assert.Single(_publisher.Parts);
+        Assert.Equal(PublishScope.Timer, part.Scope);
+        Assert.False(part.State.Waiting.TimerRunning);
+    }
+
+    [Fact]
+    public async Task Browsing_for_a_video_folder_switches_off_the_default_and_the_default_clears_the_path()
+    {
+        var vm = CreateWithClock();
+        _dialogs.FolderResult = Path.Combine(_dir, "Clips");
+
+        await vm.Waiting.BrowseVideosCommand.ExecuteAsync(null);
+
+        Assert.False(vm.Waiting.UseDefaultVideos);
+        Assert.Equal(Path.Combine(_dir, "Clips"), vm.Waiting.VideosFolderText);
+        Assert.Equal(Path.Combine(_dir, "Clips"), vm.Waiting.ApplyTo(vm.State).Waiting.VideosDir);
+
+        vm.Waiting.UseDefaultVideos = true;
+        Assert.Equal("", vm.Waiting.VideosDir);
+        Assert.Equal(Path.Combine(_dir, "Highlights"), vm.Waiting.VideosFolderText);
+        Assert.Equal("", vm.Waiting.ApplyTo(vm.State).Waiting.VideosDir);
+    }
+
+    [Fact]
+    public async Task The_tabs_survive_a_restart_and_a_saved_countdown_comes_back_stopped()
+    {
+        var vm = CreateWithClock();
+        vm.General.Caster2 = "Caster";
+        vm.General.Colours[2].Hex = "#abcdef";
+        vm.Waiting.TextEnd = "Bye";
+        vm.Waiting.Socials.Single(s => s.Kind == "web").Text = "https://suomiow.fi/x";
+        vm.Waiting.AdjustTimerCommand.Execute("90");
+        vm.Waiting.StartTimerCommand.Execute(null);
+        vm.Autosave();
+
+        var again = CreateWithClock();
+        await again.LoadAutosaveAsync();
+
+        Assert.Equal("Caster", again.General.Caster2);
+        Assert.Equal("#abcdef", again.General.Colours[2].Hex);
+        Assert.Equal("Bye", again.Waiting.TextEnd);
+        Assert.Equal("suomiow.fi", again.Waiting.Socials.Single(s => s.Kind == "web").Text);
+        Assert.Equal("01:30", again.Waiting.TimerText);
+        Assert.False(again.Waiting.IsRunning);
+    }
+
+    [Fact]
+    public async Task Loading_a_file_shows_the_general_and_waiting_settings_without_marking_them_edited()
+    {
+        var source = Path.Combine(_dir, "other.json");
+        StateStore.Save(source, AppState.CreateDefault() with
+        {
+            General = new GeneralSettings { Host = "Loaded host" },
+            Waiting = new WaitingSettings { TextStarting = "Loaded text" },
+        });
+        _dialogs.OpenResult = source;
+        var vm = CreateWithClock();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal("Loaded host", vm.General.Host);
+        Assert.Equal("Loaded text", vm.Waiting.TextStarting);
+        Assert.Empty(_publisher.Parts);
+    }
+
     private sealed class FakePublisher : IOverlayPublisher
     {
         public string? BaseUrl => "http://127.0.0.1:8324";
@@ -303,6 +540,14 @@ public sealed class MainWindowViewModelTests : IDisposable
         {
             Published.Add(state);
             return new PublishResult(new[] { "maps" }, Array.Empty<string>());
+        }
+
+        public List<(AppState State, PublishScope Scope)> Parts { get; } = new();
+
+        public PublishResult PublishPart(AppState state, PublishScope scope)
+        {
+            Parts.Add((state, scope));
+            return new PublishResult(new[] { "part" }, Array.Empty<string>());
         }
 
         public void MarkAssetsChanged(SowBroadcast.Core.Assets.AssetCategory category) { }
@@ -326,6 +571,10 @@ public sealed class MainWindowViewModelTests : IDisposable
         public string? TeamOpenResult { get; set; }
         public string? TeamSaveResult { get; set; }
         public string? LastSuggestedTeamName { get; private set; }
+
+        public string? FolderResult { get; set; }
+
+        public Task<string?> PickFolderAsync(string title, string? initialDirectory) => Task.FromResult(FolderResult);
 
         public Task<string?> PickOpenTeamFileAsync(string? initialDirectory) => Task.FromResult(TeamOpenResult);
 

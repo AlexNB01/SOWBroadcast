@@ -7,11 +7,30 @@ namespace SowBroadcast.App.Services;
 
 public sealed record PublishResult(IReadOnlyList<string> ChangedKeys, IReadOnlyList<string> WrittenFiles);
 
+/// <summary>What a partial publish writes and announces.</summary>
+public enum PublishScope
+{
+    /// <summary>Update (General): the general files and the status text.</summary>
+    General,
+
+    /// <summary>Update (Waiting): the waiting-screen files and the status text.</summary>
+    Waiting,
+
+    /// <summary>A timer command (start, pause, reset, adjust): the countdown files, announced as <c>waiting.timer</c> at once.</summary>
+    Timer,
+
+    /// <summary>The running clock: the countdown files only, nothing is announced (the overlays read them on their own).</summary>
+    TimerTick,
+}
+
 /// <summary>Sends state to the overlays: writes the files, works out what changed and tells connected overlays.</summary>
 public interface IOverlayPublisher
 {
     string? BaseUrl { get; }
     PublishResult Publish(AppState state);
+
+    /// <summary>Publishes one part of the state. The rest of what was last published stays as it was, so later diffs stay right.</summary>
+    PublishResult PublishPart(AppState state, PublishScope scope);
 
     /// <summary>Asset edits are written to disk at once but only announced to overlays with the next Update.</summary>
     void MarkAssetsChanged(AssetCategory category);
@@ -45,6 +64,63 @@ public sealed class OverlayPublisher : IOverlayPublisher
         return new PublishResult(keys, written);
     }
 
+    public PublishResult PublishPart(AppState state, PublishScope scope)
+    {
+        var derived = StateDerivations.Apply(state);
+        var written = WritePart(_exporter, derived, scope);
+
+        List<string> keys;
+        if (_lastPublished is null)
+        {
+            keys = StateDiff.AllKeys.Where(k => InScope(scope, k)).ToList();
+        }
+        else
+        {
+            var candidate = Merge(_lastPublished, derived, scope);
+            keys = StateDiff.ChangedKeys(_lastPublished, candidate).Where(k => InScope(scope, k)).ToList();
+            _lastPublished = candidate;
+        }
+
+        if (scope == PublishScope.Timer && !keys.Contains("waiting.timer")) keys.Add("waiting.timer");
+        if (scope != PublishScope.TimerTick) _hub.Publish(keys);
+        return new PublishResult(keys, written);
+    }
+
+    internal static List<string> WritePart(ScoreboardExporter exporter, AppState derived, PublishScope scope)
+    {
+        var written = new List<string>();
+        switch (scope)
+        {
+            case PublishScope.General:
+                exporter.ExportGeneral(derived, written);
+                exporter.ExportStatus(derived, written);
+                break;
+            case PublishScope.Waiting:
+                exporter.ExportWaiting(derived, written);
+                exporter.ExportStatus(derived, written);
+                break;
+            default:
+                exporter.ExportTimer(derived, written);
+                break;
+        }
+        return written;
+    }
+
+    private static bool InScope(PublishScope scope, string key) => scope switch
+    {
+        PublishScope.General => key.StartsWith("general.", StringComparison.Ordinal),
+        PublishScope.Waiting => key.StartsWith("waiting.", StringComparison.Ordinal) || key == "matchtext",
+        _ => key == "waiting.timer",
+    };
+
+    /// <summary>The last published state with only the published part replaced.</summary>
+    private static AppState Merge(AppState last, AppState now, PublishScope scope) => scope switch
+    {
+        PublishScope.General => last with { General = now.General },
+        PublishScope.Waiting => last with { Waiting = now.Waiting },
+        _ => last with { Waiting = last.Waiting with { TimerSeconds = now.Waiting.TimerSeconds, TimerRunning = now.Waiting.TimerRunning } },
+    };
+
     public void MarkAssetsChanged(AssetCategory category) => _pendingAssetKeys.Add("assets." + category.Key());
 }
 
@@ -57,6 +133,9 @@ public sealed class FileOnlyPublisher : IOverlayPublisher
 
     public PublishResult Publish(AppState state) =>
         new(Array.Empty<string>(), _exporter.ExportAll(StateDerivations.Apply(state)));
+
+    public PublishResult PublishPart(AppState state, PublishScope scope) =>
+        new(Array.Empty<string>(), OverlayPublisher.WritePart(_exporter, StateDerivations.Apply(state), scope));
 
     public void MarkAssetsChanged(AssetCategory category) { }
 }

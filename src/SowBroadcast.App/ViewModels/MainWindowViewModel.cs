@@ -18,12 +18,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly string _autosavePath;
     private readonly ILogoConverter _logos;
     private readonly string? _teamsFolder;
+    private readonly HashSet<string> _unsentSources = new();
     private string? _currentSavePath;
     private bool _collecting;
 
     public MainWindowViewModel(IFileDialogs dialogs, IMessages messages, IOverlayPublisher publisher, string autosavePath,
         AssetService? assets = null, IImagePicker? images = null, ILogoConverter? logos = null,
-        string? teamsFolder = null, string? logoFolder = null)
+        string? teamsFolder = null, string? logoFolder = null, string? broadcastLogoFolder = null,
+        string? defaultVideosDir = null, Func<long>? clock = null)
     {
         _dialogs = dialogs;
         _messages = messages;
@@ -32,8 +34,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _logos = logos ?? new SkiaLogoConverter();
         _teamsFolder = teamsFolder;
         ServerStatus = publisher.BaseUrl is null ? "Overlay server unavailable" : $"Overlays: {publisher.BaseUrl}";
-        Match = new MatchViewModel(assets, images ?? new NoImagePicker(), logoFolder);
-        Match.Edited += () => HasUnsentChanges = true;
+        var picker = images ?? new NoImagePicker();
+        Match = new MatchViewModel(assets, picker, logoFolder);
+        General = new GeneralViewModel(picker, broadcastLogoFolder);
+        Waiting = new WaitingViewModel(dialogs, defaultVideosDir, clock);
+        Match.Edited += () => MarkUnsent("match");
+        General.Edited += () => MarkUnsent("general");
+        Waiting.Edited += () => MarkUnsent("waiting");
+        Waiting.TimerCommanded += () => PublishTimer(announce: true);
+        Waiting.TimerTicked += () => PublishTimer(announce: false);
         State = AppState.CreateDefault();
         Version = typeof(MainWindowViewModel).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "3.0.0";
@@ -46,6 +55,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>The Match tab (team panels, map cards, format bar).</summary>
     public MatchViewModel Match { get; }
 
+    /// <summary>The General tab (casters, logos, status text, overlay colours).</summary>
+    public GeneralViewModel General { get; }
+
+    /// <summary>The Waiting Screen tab (videos, countdown, texts, ticker, socials).</summary>
+    public WaitingViewModel Waiting { get; }
+
     [ObservableProperty] private AppState _state;
     [ObservableProperty] private string _statusText = "Ready";
     [ObservableProperty] private bool _hasUnsentChanges;
@@ -53,18 +68,113 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public string? CurrentSavePath => _currentSavePath;
 
-    // A state set from outside (load, restore, swap) is shown on the Match tab; collecting the tab back into the state is not.
+    // A state set from outside (swap, reset, import) is shown on the Match tab; collecting the tabs back into the state is not.
+    // General and Waiting are only reloaded by ShowState (loading a whole state), so a running countdown is never disturbed.
     partial void OnStateChanged(AppState value)
     {
         if (!_collecting) Match.Load(value);
     }
 
-    /// <summary>Takes what is on the Match tab into <see cref="State"/>.</summary>
-    public void CollectMatch()
+    partial void OnHasUnsentChangesChanged(bool value)
+    {
+        if (!value) _unsentSources.Clear();
+    }
+
+    /// <summary>Notes that <paramref name="source"/> (a tab, assets, a loaded file) has changes the overlays do not have yet.</summary>
+    public void MarkUnsent(string source)
+    {
+        _unsentSources.Add(source);
+        HasUnsentChanges = true;
+    }
+
+    private void ClearUnsent(string source)
+    {
+        _unsentSources.Remove(source);
+        HasUnsentChanges = _unsentSources.Count > 0;
+    }
+
+    /// <summary>Takes what is on the Match, General and Waiting tabs into <see cref="State"/>.</summary>
+    public void CollectTabs()
     {
         _collecting = true;
-        try { State = Match.ApplyTo(State); }
+        try { State = Waiting.ApplyTo(General.ApplyTo(Match.ApplyTo(State))); }
         finally { _collecting = false; }
+    }
+
+    /// <summary>Shows a whole state on every tab (a loaded file, the restored autosave).</summary>
+    private void ShowState(AppState state)
+    {
+        State = state;
+        General.Load(state);
+        Waiting.Load(state);
+    }
+
+    // ---- General and Waiting tab actions -----------------------------------------------------------------
+
+    [RelayCommand]
+    private void UpdateGeneral()
+    {
+        CollectTabs();
+        PublishPart(PublishScope.General, "general", "General");
+    }
+
+    [RelayCommand]
+    private void UpdateWaiting()
+    {
+        CollectTabs();
+        PublishPart(PublishScope.Waiting, "waiting", "Waiting screen");
+    }
+
+    private void PublishPart(PublishScope scope, string source, string name)
+    {
+        try
+        {
+            var result = _publisher.PublishPart(State, scope);
+            ClearUnsent(source);
+            StatusText = result.ChangedKeys.Count == 0
+                ? $"{name}: overlays are up to date"
+                : $"{name} published: {string.Join(", ", result.ChangedKeys)}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = $"Could not write overlay files: {ex.Message}";
+            return;
+        }
+        Autosave();
+    }
+
+    [RelayCommand]
+    private void ResetGeneral()
+    {
+        General.Reset();
+        MarkUnsent("general");
+        StatusText = "General tab reset (not published yet)";
+        Autosave();
+    }
+
+    [RelayCommand]
+    private void ResetWaiting()
+    {
+        Waiting.ResetTab();
+        MarkUnsent("waiting");
+        StatusText = "Waiting screen tab reset (not published yet)";
+        Autosave();
+    }
+
+    /// <summary>A countdown command goes out at once; the running clock only refreshes the timer files.</summary>
+    private void PublishTimer(bool announce)
+    {
+        _collecting = true;
+        try { State = Waiting.ApplyTimerTo(State); }
+        finally { _collecting = false; }
+        try
+        {
+            _publisher.PublishPart(State, announce ? PublishScope.Timer : PublishScope.TimerTick);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = $"Could not write timer files: {ex.Message}";
+        }
     }
 
     // ---- Match tab actions -------------------------------------------------------------------------------
@@ -73,7 +183,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void UpdateMatch()
     {
-        CollectMatch();
+        CollectTabs();
         TryPublish(updateStatus: true);
         Autosave();
     }
@@ -81,7 +191,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SwapTeams()
     {
-        CollectMatch();
+        CollectTabs();
         State = MatchOperations.Swap(State);
         AfterLocalChange("Teams swapped (not published yet)");
     }
@@ -89,14 +199,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ResetMatch()
     {
-        CollectMatch();
+        CollectTabs();
         State = MatchOperations.Reset(State);
         AfterLocalChange("Match reset (not published yet)");
     }
 
     private void AfterLocalChange(string status)
     {
-        HasUnsentChanges = true;
+        MarkUnsent("match");
         StatusText = status;
         Autosave();
     }
@@ -115,7 +225,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task ExportAsync(int slot)
     {
-        CollectMatch();
+        CollectTabs();
         var team = (slot == 1 ? State.Team1 : State.Team2) with { Score = 0, BannedHero = "" };
         var path = await _dialogs.PickSaveTeamFileAsync(_teamsFolder, TeamFile.SuggestedFileName(team));
         if (path is null) return;
@@ -135,7 +245,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var path = await _dialogs.PickOpenTeamFileAsync(_teamsFolder);
         if (path is null) return;
-        CollectMatch();
+        CollectTabs();
         var current = slot == 1 ? State.Team1 : State.Team2;
         Team imported;
         try
@@ -164,7 +274,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             var loaded = StateStore.LoadWithRecovery(_autosavePath);
             if (loaded is not null)
             {
-                State = loaded;
+                ShowState(loaded);
                 StatusText = $"Restored autosave from {_autosavePath}";
             }
         }
@@ -183,11 +293,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void TryPublish(bool updateStatus)
     {
-        CollectMatch();
+        CollectTabs();
         try
         {
             var result = _publisher.Publish(State);
-            HasUnsentChanges = false;
+            HasUnsentChanges = false; // clears every source
             if (updateStatus)
                 StatusText = result.ChangedKeys.Count == 0
                     ? "Overlays are up to date"
@@ -203,15 +313,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void LoadSample()
     {
-        State = SampleState.Create();
-        HasUnsentChanges = true;
+        ShowState(SampleState.Create());
+        MarkUnsent("file");
         StatusText = "Loaded the sample match (not published yet)";
     }
 #endif
 
     public void Autosave()
     {
-        CollectMatch();
+        CollectTabs();
         try
         {
             StateStore.Save(_autosavePath, State);
@@ -233,7 +343,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (path is null) return;
         try
         {
-            State = StateStore.Load(path);
+            ShowState(StateStore.Load(path));
         }
         catch (StateLoadException ex)
         {
@@ -241,7 +351,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
         _currentSavePath = path;
-        HasUnsentChanges = true;
+        MarkUnsent("file");
         Autosave();
         StatusText = $"Loaded {Path.GetFileName(path)}";
     }
@@ -269,7 +379,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task WriteAsync(string path)
     {
-        CollectMatch();
+        CollectTabs();
         try
         {
             StateStore.Save(path, State);

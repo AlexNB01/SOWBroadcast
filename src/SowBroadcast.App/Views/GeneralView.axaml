@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SowBroadcast.App.ViewModels"
+             xmlns:controls="using:SowBroadcast.App.Controls"
+             xmlns:conv="using:SowBroadcast.App.Converters"
+             x:Class="SowBroadcast.App.Views.GeneralView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <DockPanel Margin="0,12,0,0">
+    <!-- Update (General) is the one primary button of this view -->
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
+      <Button Content="Reset this tab" Command="{Binding ResetGeneralCommand}" />
+      <Button Classes="primary" Content="Update (General)" MinWidth="160" Command="{Binding UpdateGeneralCommand}" />
+    </StackPanel>
+
+    <ScrollViewer>
+      <StackPanel Spacing="12" Margin="0,0,12,0">
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="CASTERS &amp; HOST" /></Border>
+            <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="12">
+              <TextBlock Classes="label" VerticalAlignment="Center" Text="HOST NAME" />
+              <TextBox Grid.Column="1" Text="{Binding General.Host}" />
+              <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="CASTER 1" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding General.Caster1}" />
+              <TextBlock Grid.Row="2" Classes="label" VerticalAlignment="Center" Text="CASTER 2" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding General.Caster2}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="LOGOS" /></Border>
+            <Grid ColumnDefinitions="120,200,Auto" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+              <TextBlock Classes="label" VerticalAlignment="Center" Text="OVERLAY LOGO" />
+              <Border Grid.Column="1" Classes="card" Height="80" Padding="6" ClipToBounds="True">
+                <Image Source="{Binding General.OverlayLogoPath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=400}"
+                       Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+              </Border>
+              <Button Grid.Column="2" VerticalAlignment="Center" Content="Load overlay logo…" Command="{Binding General.LoadOverlayLogoCommand}" />
+
+              <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="TRANSITION LOGO" />
+              <Border Grid.Row="1" Grid.Column="1" Classes="card" Height="80" Padding="6" ClipToBounds="True">
+                <Image Source="{Binding General.TransitionLogoPath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=400}"
+                       Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+              </Border>
+              <Button Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Content="Load transition logo…" Command="{Binding General.LoadTransitionLogoCommand}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="STATUS TEXT" /></Border>
+            <TextBox Text="{Binding General.StatusText}" Watermark="Tournament name here" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="OVERLAY COLOURS" /></Border>
+            <ItemsControl ItemsSource="{Binding General.Colours}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:OverlayColourViewModel">
+                  <Grid ColumnDefinitions="110,*,180" ColumnSpacing="12">
+                    <TextBlock Classes="label" VerticalAlignment="Center" Text="{Binding Title}" />
+                    <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding Description}" />
+                    <controls:ColorField Grid.Column="2" Hex="{Binding Hex}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

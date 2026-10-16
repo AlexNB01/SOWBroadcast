@@ -25,6 +25,13 @@
       <SolidColorBrush x:Key="SowLineBrush" Color="{StaticResource SowLine}" />
       <SolidColorBrush x:Key="SowLineSoftBrush" Color="{StaticResource SowLineSoft}" />
       <SolidColorBrush x:Key="SowFrostDisabledBrush" Color="{StaticResource SowFrostDisabled}" />
+      <!-- Functional colours outside the palette (accepted exception KYS-3): countdown Start green, Pause slate, Reset grey -->
+      <SolidColorBrush x:Key="SowStartBrush" Color="#1E8449" />
+      <SolidColorBrush x:Key="SowStartHoverBrush" Color="#27AE60" />
+      <SolidColorBrush x:Key="SowPauseBrush" Color="#2C3E50" />
+      <SolidColorBrush x:Key="SowPauseHoverBrush" Color="#3E5871" />
+      <SolidColorBrush x:Key="SowResetBrush" Color="#5D6D7E" />
+      <SolidColorBrush x:Key="SowResetHoverBrush" Color="#7F8C9A" />
       <LinearGradientBrush x:Key="SowGradientBrush" StartPoint="0%,0%" EndPoint="0%,100%">
         <GradientStop Color="#1E8AB9" Offset="0" />
         <GradientStop Color="#0F356B" Offset="1" />

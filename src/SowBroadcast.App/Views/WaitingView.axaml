@@ -1,0 +1,116 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SowBroadcast.App.ViewModels"
+             x:Class="SowBroadcast.App.Views.WaitingView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <DockPanel Margin="0,12,0,0">
+    <!-- Update (Waiting) is the one primary button of this view -->
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
+      <Button Content="Reset this tab" Command="{Binding ResetWaitingCommand}" />
+      <Button Classes="primary" Content="Update (Waiting)" MinWidth="170" Command="{Binding UpdateWaitingCommand}" />
+    </StackPanel>
+
+    <ScrollViewer>
+      <StackPanel Spacing="12" Margin="0,0,12,0">
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="WAITING VIDEOS (FOLDER)" /></Border>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding Waiting.VideosFolderText}" IsReadOnly="True" IsEnabled="{Binding !Waiting.UseDefaultVideos}"
+                       Watermark="Select a folder that contains videos" />
+              <Button Grid.Column="1" Content="Browse…" Command="{Binding Waiting.BrowseVideosCommand}" />
+            </Grid>
+            <CheckBox Content="Use the default folder (Highlights)" IsChecked="{Binding Waiting.UseDefaultVideos}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="COUNTDOWN" /></Border>
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="20" HorizontalAlignment="Center">
+              <StackPanel Spacing="4" VerticalAlignment="Center">
+                <Button Content="− 30s" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="-30" />
+                <Button Content="− 1m" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="-60" />
+                <Button Content="− 3m" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="-180" />
+                <Button Content="− 5m" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="-300" />
+              </StackPanel>
+
+              <StackPanel Grid.Column="1" Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <!-- The one large teal surface of the app: the most important number -->
+                <Border Background="{DynamicResource SowBladeBrush}" CornerRadius="6" Padding="28,6">
+                  <TextBlock Classes="result" FontSize="64" HorizontalAlignment="Center" Foreground="{DynamicResource SowNightBrush}"
+                             Text="{Binding Waiting.TimerText}" />
+                </Border>
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                  <Button Classes="start" Width="48" Height="40" ToolTip.Tip="Start" Command="{Binding Waiting.StartTimerCommand}">
+                    <Path Data="M 0,0 L 12,7 L 0,14 Z" Fill="White" />
+                  </Button>
+                  <Button Classes="pause" Width="48" Height="40" ToolTip.Tip="Pause" Command="{Binding Waiting.PauseTimerCommand}">
+                    <Rectangle Width="12" Height="12" Fill="White" />
+                  </Button>
+                  <Button Classes="reset" Width="48" Height="40" ToolTip.Tip="Reset to the preset" Command="{Binding Waiting.ResetTimerCommand}">
+                    <TextBlock Text="↺" FontFamily="Segoe UI Symbol" FontSize="20" Foreground="White" />
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+
+              <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+                <Button Content="+ 30s" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="30" />
+                <Button Content="+ 1m" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="60" />
+                <Button Content="+ 3m" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="180" />
+                <Button Content="+ 5m" MinWidth="86" Command="{Binding Waiting.AdjustTimerCommand}" CommandParameter="300" />
+              </StackPanel>
+            </Grid>
+            <TextBlock Classes="muted" HorizontalAlignment="Center" Text="Timer buttons act on the overlays immediately." />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="ON-SCREEN TEXTS" /></Border>
+            <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="12">
+              <TextBlock Classes="label" VerticalAlignment="Center" Text="STARTING SOON" />
+              <TextBox Grid.Column="1" Text="{Binding Waiting.TextStarting}" Watermark="STARTING SOON!" />
+              <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="BE RIGHT BACK" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Waiting.TextBrb}" Watermark="BE RIGHT BACK!" />
+              <TextBlock Grid.Row="2" Classes="label" VerticalAlignment="Center" Text="END SCREEN" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Waiting.TextEnd}" Watermark="THANK YOU FOR WATCHING" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="TICKER OVERRIDE" /></Border>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <TextBox Text="{Binding Waiting.TickerOverride}" IsEnabled="{Binding Waiting.TickerOverrideEnabled}" Watermark="Custom ticker text…" />
+              <CheckBox Grid.Column="1" Content="Overwrite default ticker text" IsChecked="{Binding Waiting.TickerOverrideEnabled}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="SOCIALS" /></Border>
+            <ItemsControl ItemsSource="{Binding Waiting.Socials}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SocialFieldViewModel">
+                  <Grid ColumnDefinitions="170,*" ColumnSpacing="12">
+                    <TextBlock Classes="label" VerticalAlignment="Center" Text="{Binding Label}" />
+                    <TextBox Grid.Column="1" Text="{Binding Text}" Watermark="{Binding Placeholder}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

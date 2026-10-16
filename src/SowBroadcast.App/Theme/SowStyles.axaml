@@ -90,6 +90,26 @@
     <Setter Property="Opacity" Value="0.7" />
   </Style>
 
+  <!-- Countdown transport buttons: functional colours (Start green, Pause slate, Reset grey) -->
+  <Style Selector="Button.start /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowStartBrush}" />
+  </Style>
+  <Style Selector="Button.start:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowStartHoverBrush}" />
+  </Style>
+  <Style Selector="Button.pause /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowPauseBrush}" />
+  </Style>
+  <Style Selector="Button.pause:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowPauseHoverBrush}" />
+  </Style>
+  <Style Selector="Button.reset /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowResetBrush}" />
+  </Style>
+  <Style Selector="Button.reset:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SowResetHoverBrush}" />
+  </Style>
+
   <!-- Combo-like button used by SearchableComboBox -->
   <Style Selector="Button.comboLike">
     <Setter Property="Background" Value="{DynamicResource SowShadowBrush}" />

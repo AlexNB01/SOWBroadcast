@@ -11,6 +11,9 @@ public interface IFileDialogs
 
     /// <summary>Teams menu: where to export a team.</summary>
     Task<string?> PickSaveTeamFileAsync(string? initialDirectory, string suggestedName);
+
+    /// <summary>Picks a folder (the waiting-screen videos).</summary>
+    Task<string?> PickFolderAsync(string title, string? initialDirectory);
 }
 
 /// <summary>Picks one image file (png, jpg, jpeg or webp).</summary>

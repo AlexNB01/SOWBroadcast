@@ -27,12 +27,19 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
         _services = AppServices.Start();
         var teamsFolder = Path.Combine(AppPaths.ScoreboardDir, "Teams");
         var logoFolder = Path.Combine(AppPaths.ScoreboardDir, "Temp", "Team Logos");
+        var broadcastLogoFolder = Path.Combine(AppPaths.ScoreboardDir, "Temp", "Broadcast Logos");
         Directory.CreateDirectory(teamsFolder);
         Directory.CreateDirectory(logoFolder);
+        Directory.CreateDirectory(broadcastLogoFolder);
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
-            _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder);
+            _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir);
         DataContext = _viewModel;
-        _services.Assets.Changed += _ => _viewModel.HasUnsentChanges = true;
+        _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
+
+        // The countdown counts on a monotonic clock; this only refreshes what is shown (and the timer files) a few times a second.
+        var clock = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        clock.Tick += (_, _) => _viewModel.Waiting.Tick();
+        clock.Start();
 #if DEBUG
         ThemeTab.IsVisible = true;
         DebugMenu.IsVisible = true;
@@ -237,6 +244,17 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages
             SuggestedStartLocation = await StartFolderAsync(initialDirectory),
         });
         return file?.TryGetLocalPath();
+    }
+
+    public async Task<string?> PickFolderAsync(string title, string? initialDirectory)
+    {
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            SuggestedStartLocation = await StartFolderAsync(initialDirectory),
+        });
+        return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
     }
 
     private async Task<IStorageFolder?> StartFolderAsync(string? directory) =>

@@ -75,10 +75,10 @@
         <views:MatchView />
       </TabItem>
       <TabItem Header="GENERAL">
-        <views:Placeholder Title="General" Milestone="M4" />
+        <views:GeneralView />
       </TabItem>
       <TabItem Header="WAITING SCREEN">
-        <views:Placeholder Title="Waiting screen" Milestone="M4" />
+        <views:WaitingView />
       </TabItem>
       <TabItem Header="STANDINGS">
         <views:Placeholder Title="Standings" Milestone="M5" />
