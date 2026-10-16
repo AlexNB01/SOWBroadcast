@@ -651,6 +651,10 @@ public sealed class MainWindowViewModelTests : IDisposable
         }
 
         public void MarkAssetsChanged(SowBroadcast.Core.Assets.AssetCategory category) { }
+
+        public int ReplayAnnouncements { get; private set; }
+
+        public void AnnounceReplay() => ReplayAnnouncements++;
     }
 
     private sealed class FakeDialogs : IFileDialogs, IMessages

@@ -323,6 +323,10 @@ public sealed class LinkIntegrationTests : IAsyncLifetime, IDisposable
         public PublishResult PublishPart(AppState state, PublishScope scope) => new(Array.Empty<string>(), Array.Empty<string>());
         public void MarkAssetsChanged(AssetCategory category) { }
 
+        public int ReplayAnnouncements { get; private set; }
+
+        public void AnnounceReplay() => ReplayAnnouncements++;
+
         public Task<string?> PickOpenStateFileAsync(string? initialDirectory) => Task.FromResult<string?>(null);
         public Task<string?> PickSaveStateFileAsync(string? initialDirectory, string suggestedName) => Task.FromResult<string?>(null);
         public Task<string?> PickOpenTeamFileAsync(string? initialDirectory) => Task.FromResult<string?>(null);

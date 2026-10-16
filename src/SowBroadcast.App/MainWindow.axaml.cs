@@ -38,6 +38,14 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         DataContext = _viewModel;
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
+        _services.Replay.ReplayReady += name => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = $"Replay clip saved: {name}");
+        _services.Replay.Problem += message => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = message);
+        try { _services.Replay.Start(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            _viewModel.StatusText = $"The replay folder cannot be watched: {ex.Message}";
+        }
+
         // The countdown counts on a monotonic clock; this only refreshes what is shown (and the timer files) a few times a second.
         var clock = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         clock.Tick += (_, _) => _viewModel.Waiting.Tick();

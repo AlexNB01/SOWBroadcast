@@ -38,6 +38,9 @@ public interface IOverlayPublisher
     /// <summary>Publishes one part of the state. The rest of what was last published stays as it was, so later diffs stay right.</summary>
     PublishResult PublishPart(AppState state, PublishScope scope);
 
+    /// <summary>A new replay clip is in the playlist: tell the overlays (the files were written by the replay watcher).</summary>
+    void AnnounceReplay();
+
     /// <summary>Asset edits are written to disk at once but only announced to overlays with the next Update.</summary>
     void MarkAssetsChanged(AssetCategory category);
 }
@@ -138,6 +141,8 @@ public sealed class OverlayPublisher : IOverlayPublisher
     };
 
     public void MarkAssetsChanged(AssetCategory category) => _pendingAssetKeys.Add("assets." + category.Key());
+
+    public void AnnounceReplay() => _hub.Publish(new[] { "replay" });
 }
 
 /// <summary>Used when the local server could not start: files are still written so OBS text sources keep working.</summary>
@@ -154,4 +159,6 @@ public sealed class FileOnlyPublisher : IOverlayPublisher
         new(Array.Empty<string>(), OverlayPublisher.WritePart(_exporter, StateDerivations.Apply(state), scope));
 
     public void MarkAssetsChanged(AssetCategory category) { }
+
+    public void AnnounceReplay() { }
 }

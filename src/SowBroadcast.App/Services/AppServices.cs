@@ -1,5 +1,6 @@
 using SowBroadcast.Core.Assets;
 using SowBroadcast.Core.Export;
+using SowBroadcast.Core.Replay;
 using SowBroadcast.Core.Storage;
 using SowBroadcast.Integrations.Link;
 using SowBroadcast.Server;
@@ -19,6 +20,8 @@ public sealed class AppServices : IAsyncDisposable
         Assets = assets;
         _http = http;
         Link = new LinkService(http, () => new SocketIoConnection());
+        Replay = new ReplayWatcher(Path.Combine(AppPaths.ScoreboardDir, "Replay"));
+        Replay.ReplayReady += _ => Publisher.AnnounceReplay();
         Logos = new LogoCache(Path.Combine(AppPaths.ScoreboardDir, "TeamLogos"), http);
         _server = server;
         StartupError = startupError;
@@ -26,6 +29,9 @@ public sealed class AppServices : IAsyncDisposable
     }
 
     public IOverlayPublisher Publisher { get; }
+
+    /// <summary>Takes the clips OBS' replay buffer saves into the playlist the replay overlay plays.</summary>
+    public ReplayWatcher Replay { get; }
 
     /// <summary>The SOWDraft connection.</summary>
     public LinkService Link { get; }
@@ -90,6 +96,7 @@ public sealed class AppServices : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        Replay.Dispose();
         await Link.DisposeAsync();
         _http.Dispose();
         if (_server is not null) await _server.DisposeAsync();
