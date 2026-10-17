@@ -292,7 +292,9 @@
     return 1800;
   }
 
-  function applyStagger(){
+  // Entry (scene shown): the cards fade in one after another after the stinger delay.
+  // Live update (live=true): the new cards are simply there at once, no delay and no blink.
+  function applyStagger(live){
     const base = getStingerStartMs();
     const step = 150;
     const nodes = [
@@ -301,6 +303,8 @@
     ];
     nodes.forEach((el, i) => {
       if(!el) return;
+      if(live){ el.style.animation = "none"; el.style.opacity = "1"; return; }
+      el.style.opacity = "";
       const delay = base + i * step;
       el.style.animation = "none";
       void el.offsetWidth;
@@ -308,7 +312,7 @@
     });
   }
 
-  async function render(){
+  async function render(live){
     await applyColors();
     await upTeamHead();
     const players=await fetchPlayers();
@@ -354,7 +358,7 @@
     }else{
       subsEl.style.display="none";
     }
-    applyStagger();
+    applyStagger(live);
   }
 
   function startSSE(){
@@ -363,7 +367,7 @@
       es.onmessage=async ev=>{
         try{
           const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
-          if(ch.some(k=>k.startsWith(TEAM.toLowerCase() + ".") || k==="general.colors")) await render();
+          if(ch.some(k=>k.startsWith(TEAM.toLowerCase() + ".") || k==="general.colors")) await render(true);
         }catch{}
       };
     }catch{}
