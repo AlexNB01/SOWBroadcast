@@ -114,6 +114,33 @@ public sealed class LinkIntegrationTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task Without_a_match_in_play_the_next_matches_come_first_and_the_finished_ones_after_them_newest_first()
+    {
+        _vm.Link.TournamentUrl = TournamentUrl;
+        await _vm.Link.LinkCommand.ExecuteAsync(null);
+
+        var ids = _vm.Link.Matches.Select(m => m.Id).Where(id => id is not null).ToArray();
+
+        var completed = ids.Where(id => id is "m1" or "m2" or "m3").ToArray();
+        Assert.Equal(new[] { "m1", "m3", "m2" }, completed);                      // m1 has a time; then the later round first
+        Assert.True(Array.IndexOf(ids, "m4") < Array.IndexOf(ids, "m1"));          // pending before finished
+    }
+
+    [Fact]
+    public async Task While_a_match_is_in_play_the_finished_ones_are_hidden_and_the_match_in_play_is_first()
+    {
+        _http.Set(Root, 200, LinkFixtures.LegacyTournament().Replace("\"winner_team_id\": \"d\", \"status\": \"pending\"", "\"winner_team_id\": \"d\", \"status\": \"in_progress\""));
+        _vm.Link.TournamentUrl = TournamentUrl;
+        await _vm.Link.LinkCommand.ExecuteAsync(null);
+
+        var matches = _vm.Link.Matches.Where(m => m.Id is not null).ToArray();
+
+        Assert.Equal("m4", matches[0].Id);
+        Assert.DoesNotContain(matches, m => m.Label.EndsWith("completed"));
+        Assert.NotEmpty(matches.Skip(1));                                          // the pending ones are still there
+    }
+
+    [Fact]
     public async Task Choosing_a_match_fills_the_match_tab_and_sends_it_to_the_overlays_at_once()
     {
         _vm.Link.TournamentUrl = TournamentUrl;
