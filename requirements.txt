@@ -1,2 +1,0 @@
-PyQt5>=5.15
-python-socketio[client]>=5.11

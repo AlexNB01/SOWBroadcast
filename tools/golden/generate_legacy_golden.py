@@ -3,7 +3,8 @@
 Runs the old app headless (Qt offscreen) against a synthetic state, then records what its
 exporters write and which change keys its diff reports. The C# rewrite must reproduce these
 files (see src/SowBroadcast.Tests/GoldenTests.cs). Re-run only when the legacy contract
-is deliberately re-captured:
+is deliberately re-captured. The legacy app was removed from the working tree; check out the git tag
+`legacy-python-app` (a worktree is enough) and run this script from there, with PyQt5 and python-socketio installed:
 
     python tools/golden/generate_legacy_golden.py
 
