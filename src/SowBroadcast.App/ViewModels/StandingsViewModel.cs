@@ -210,8 +210,22 @@ public sealed partial class StandingsViewModel : EditableObject
         DisplayOptions.Add(AllOption);
         _selectedDisplay = AllOption;
         ShowGroups(new[] { NewGroup() });
-        Groups.CollectionChanged += (_, _) => RaiseEdited();
+        Groups.CollectionChanged += (_, _) => { RaiseEdited(); OnPropertyChanged(nameof(GroupColumns)); };
     }
+
+    /// <summary>Set by the view: true when the window is wide enough for two group tables side by side.</summary>
+    public bool WideLayout
+    {
+        get => _wideLayout;
+        set { if (SetProperty(ref _wideLayout, value)) OnPropertyChanged(nameof(GroupColumns)); }
+    }
+
+    private bool _wideLayout;
+
+    /// <summary>Groups sit side by side when there are two or more and the window is wide (otherwise one column).</summary>
+    public int GroupColumns => Groups.Count >= 2 && WideLayout ? 2 : 1;
+
+    protected override bool IsDerived(string? propertyName) => propertyName is nameof(GroupColumns) or nameof(WideLayout);
 
     public ObservableCollection<StandingsGroupViewModel> Groups { get; } = new();
     public ObservableCollection<DisplayOption> DisplayOptions { get; } = new();

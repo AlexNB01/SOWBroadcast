@@ -16,60 +16,65 @@
     <ScrollViewer>
       <StackPanel Spacing="12" Margin="0,0,12,0">
 
-        <Border Classes="card">
-          <StackPanel Spacing="10">
-            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="CASTERS &amp; HOST" /></Border>
-            <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="12">
-              <TextBlock Classes="label" VerticalAlignment="Center" Text="HOST NAME" />
-              <TextBox Grid.Column="1" Text="{Binding General.Host}" />
-              <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="CASTER 1" />
-              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding General.Caster1}" />
-              <TextBlock Grid.Row="2" Classes="label" VerticalAlignment="Center" Text="CASTER 2" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding General.Caster2}" />
-            </Grid>
+        <!-- Two columns: people and status text on the left, the logos on the right -->
+        <Grid ColumnDefinitions="*,12,*">
+          <StackPanel Spacing="12">
+            <Border Classes="card" Padding="14,10">
+              <StackPanel Spacing="8">
+                <Border Classes="cardTitle"><TextBlock Classes="h2" Text="CASTERS &amp; HOST" /></Border>
+                <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="12">
+                  <TextBlock Classes="label" VerticalAlignment="Center" Text="HOST NAME" />
+                  <TextBox Grid.Column="1" Text="{Binding General.Host}" />
+                  <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="CASTER 1" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding General.Caster1}" />
+                  <TextBlock Grid.Row="2" Classes="label" VerticalAlignment="Center" Text="CASTER 2" />
+                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding General.Caster2}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="14,10">
+              <StackPanel Spacing="8">
+                <Border Classes="cardTitle"><TextBlock Classes="h2" Text="STATUS TEXT" /></Border>
+                <TextBox Text="{Binding General.StatusText}" Watermark="Tournament name here" />
+              </StackPanel>
+            </Border>
           </StackPanel>
-        </Border>
 
-        <Border Classes="card">
-          <StackPanel Spacing="10">
-            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="LOGOS" /></Border>
-            <Grid ColumnDefinitions="120,200,Auto" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="12">
-              <TextBlock Classes="label" VerticalAlignment="Center" Text="OVERLAY LOGO" />
-              <Border Grid.Column="1" Classes="card" Height="80" Padding="6" ClipToBounds="True">
-                <Image Source="{Binding General.OverlayLogoPath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=400}"
-                       Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
-              </Border>
-              <Button Grid.Column="2" VerticalAlignment="Center" Content="Load overlay logo…" Command="{Binding General.LoadOverlayLogoCommand}" />
+          <Border Grid.Column="2" Classes="card" Padding="14,10">
+            <StackPanel Spacing="8">
+              <Border Classes="cardTitle"><TextBlock Classes="h2" Text="LOGOS" /></Border>
+              <Grid ColumnDefinitions="120,160,Auto" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="12">
+                <TextBlock Classes="label" VerticalAlignment="Center" Text="OVERLAY LOGO" />
+                <Border Grid.Column="1" Classes="card" Height="64" Padding="4" ClipToBounds="True">
+                  <Image Source="{Binding General.OverlayLogoPath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=320}"
+                         Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                </Border>
+                <Button Grid.Column="2" VerticalAlignment="Center" Content="Load overlay logo…" Command="{Binding General.LoadOverlayLogoCommand}" />
 
-              <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="TRANSITION LOGO" />
-              <Border Grid.Row="1" Grid.Column="1" Classes="card" Height="80" Padding="6" ClipToBounds="True">
-                <Image Source="{Binding General.TransitionLogoPath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=400}"
-                       Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
-              </Border>
-              <Button Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Content="Load transition logo…" Command="{Binding General.LoadTransitionLogoCommand}" />
-            </Grid>
-          </StackPanel>
-        </Border>
+                <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="TRANSITION LOGO" />
+                <Border Grid.Row="1" Grid.Column="1" Classes="card" Height="64" Padding="4" ClipToBounds="True">
+                  <Image Source="{Binding General.TransitionLogoPath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=320}"
+                         Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                </Border>
+                <Button Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Content="Load transition logo…" Command="{Binding General.LoadTransitionLogoCommand}" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </Grid>
 
-        <Border Classes="card">
-          <StackPanel Spacing="10">
-            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="STATUS TEXT" /></Border>
-            <TextBox Text="{Binding General.StatusText}" Watermark="Tournament name here" />
-          </StackPanel>
-        </Border>
-
-        <Border Classes="card">
-          <StackPanel Spacing="10">
+        <Border Classes="card" Padding="14,10">
+          <StackPanel Spacing="8">
             <Border Classes="cardTitle"><TextBlock Classes="h2" Text="OVERLAY COLOURS" /></Border>
             <ItemsControl ItemsSource="{Binding General.Colours}">
               <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:OverlayColourViewModel">
-                  <Grid ColumnDefinitions="110,*,180" ColumnSpacing="12">
+                  <Grid ColumnDefinitions="90,*,170" ColumnSpacing="10" Margin="0,0,16,6">
                     <TextBlock Classes="label" VerticalAlignment="Center" Text="{Binding Title}" />
-                    <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding Description}" />
+                    <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="12" Text="{Binding Description}" />
                     <controls:ColorField Grid.Column="2" Hex="{Binding Hex}" />
                   </Grid>
                 </DataTemplate>

@@ -630,3 +630,31 @@ public sealed class StandingsBracketExportTests : IDisposable
         public Task ShowInfoAsync(string title, string message) => Task.CompletedTask;
     }
 }
+
+public sealed class StandingsLayoutTests
+{
+    private sealed class NoPicker : IImagePicker
+    {
+        public Task<string?> PickImageAsync(string title, string? initialDirectory = null) => Task.FromResult<string?>(null);
+    }
+
+    [Fact]
+    public void Groups_sit_side_by_side_only_with_two_groups_and_a_wide_window_and_the_choice_is_not_an_edit()
+    {
+        var standings = new StandingsViewModel(new NoPicker(), null);
+        var edits = 0;
+        standings.Edited += () => edits++;
+
+        standings.WideLayout = true;
+        Assert.Equal(1, standings.GroupColumns);          // one group: the whole width
+
+        standings.AddGroupCommand.Execute(null);
+        var afterAdd = edits;
+        Assert.Equal(2, standings.GroupColumns);
+
+        standings.WideLayout = false;
+        Assert.Equal(1, standings.GroupColumns);          // narrow window: one column
+
+        Assert.Equal(afterAdd, edits);                    // changing the layout does not mark the tab as edited
+    }
+}

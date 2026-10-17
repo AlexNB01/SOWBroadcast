@@ -17,107 +17,105 @@
       <Button Classes="primary" Content="Update (Bracket)" MinWidth="160" Command="{Binding UpdateBracketCommand}" />
     </StackPanel>
 
-    <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,10">
-      <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="12">
-        <TextBlock Classes="label" VerticalAlignment="Center" Text="TITLE" />
-        <TextBox Grid.Column="1" Text="{Binding Bracket.Title}" />
-        <TextBlock Grid.Column="2" Classes="label" VerticalAlignment="Center" Text="STAGE" />
-        <TextBox Grid.Column="3" Text="{Binding Bracket.Stage}" />
-      </Grid>
-    </Border>
-
-    <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,10">
-      <Grid ColumnDefinitions="Auto,380,Auto,Auto,Auto" ColumnSpacing="12">
-        <TextBlock Classes="label" VerticalAlignment="Center" Text="TEMPLATE" />
-        <controls:SearchableComboBox Grid.Column="1" ItemsSource="{Binding Bracket.TemplateNames}" SelectedItem="{Binding Bracket.SelectedTemplate}" />
-        <Button Grid.Column="2" Content="Load Template" Command="{Binding Bracket.LoadTemplateCommand}" />
-        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" IsVisible="{Binding Bracket.ShowDoubleView}">
+    <!-- Title, stage and template in one flowing row -->
+    <Border DockPanel.Dock="Top" Classes="card" Padding="12,8" Margin="0,0,0,10">
+      <WrapPanel ItemSpacing="16" LineSpacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="label" VerticalAlignment="Center" Text="TITLE" />
+          <TextBox Width="220" Text="{Binding Bracket.Title}" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="label" VerticalAlignment="Center" Text="STAGE" />
+          <TextBox Width="220" Text="{Binding Bracket.Stage}" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="label" VerticalAlignment="Center" Text="TEMPLATE" />
+          <controls:SearchableComboBox Width="300" ItemsSource="{Binding Bracket.TemplateNames}" SelectedItem="{Binding Bracket.SelectedTemplate}" />
+          <Button Content="Load Template" Command="{Binding Bracket.LoadTemplateCommand}" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Bracket.ShowDoubleView}">
           <TextBlock Classes="label" VerticalAlignment="Center" Text="DOUBLE ELIM VIEW" />
-          <ComboBox MinWidth="170" ItemsSource="{Binding Bracket.DoubleViewNames}" SelectedItem="{Binding Bracket.DoubleView}" />
+          <ComboBox MinWidth="150" ItemsSource="{Binding Bracket.DoubleViewNames}" SelectedItem="{Binding Bracket.DoubleView}" />
         </StackPanel>
-        <CheckBox Grid.Column="4" Content="Bronze match" IsChecked="{Binding Bracket.BronzeEnabled}" IsVisible="{Binding Bracket.ShowBronze}" />
-      </Grid>
+        <CheckBox VerticalAlignment="Center" Content="Bronze match" IsChecked="{Binding Bracket.BronzeEnabled}" IsVisible="{Binding Bracket.ShowBronze}" />
+      </WrapPanel>
     </Border>
 
-    <Grid ColumnDefinitions="310,12,*">
-      <!-- Team list -->
-      <Border Classes="card" Padding="12">
-        <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Classes="h2" Margin="0,0,0,8" Text="TEAMS" />
-          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0" HorizontalAlignment="Right">
-            <Button Content="Import from Standings" Command="{Binding Bracket.ImportFromStandingsCommand}" />
-            <Button Content="Clear" Command="{Binding Bracket.ClearTeamsCommand}" />
-          </StackPanel>
-          <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding Bracket.Teams}" Margin="0,0,10,0">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:BracketTeamRowViewModel">
-                  <Grid ColumnDefinitions="22,*,Auto" ColumnSpacing="6">
-                    <TextBlock Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding Number}" />
-                    <TextBox Grid.Column="1" Text="{Binding Name}" Watermark="Team name" />
-                    <Button Grid.Column="2" Content="…" Padding="10,0" Command="{Binding BrowseLogoCommand}" ToolTip.Tip="Browse for a logo" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
-        </DockPanel>
-      </Border>
+    <!-- The 16 team names as a grid of four columns -->
+    <Border DockPanel.Dock="Top" Classes="card" Padding="12,8" Margin="0,0,0,10">
+      <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <TextBlock Classes="h2" VerticalAlignment="Center" Text="TEAMS" />
+          <Button Grid.Column="1" Content="Import from Standings" Command="{Binding Bracket.ImportFromStandingsCommand}" />
+          <Button Grid.Column="2" Content="Clear" Command="{Binding Bracket.ClearTeamsCommand}" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Bracket.Teams}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:BracketTeamRowViewModel">
+              <Grid ColumnDefinitions="24,*,Auto" ColumnSpacing="6" Margin="0,0,12,4">
+                <TextBlock Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding Number}" />
+                <TextBox Grid.Column="1" Text="{Binding Name}" Watermark="Team name" />
+                <Button Grid.Column="2" Content="…" Padding="10,0" Command="{Binding BrowseLogoCommand}" ToolTip.Tip="Browse for a logo" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
 
-      <!-- Matches -->
-      <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Auto">
-        <StackPanel Spacing="12" Margin="0,0,12,12">
-          <TextBlock Classes="muted" IsVisible="{Binding !Bracket.HasRounds}" Text="No bracket loaded. Select a template to begin." />
-          <ItemsControl ItemsSource="{Binding Bracket.Sections}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:BracketSectionViewModel">
-                <Border Classes="card" Padding="14">
-                  <StackPanel Spacing="10">
-                    <Border Classes="cardTitle"><TextBlock Classes="h2" Text="{Binding Title}" /></Border>
-                    <ItemsControl ItemsSource="{Binding Rounds}">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="18" /></ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:BracketRoundViewModel">
-                          <StackPanel Width="270" Spacing="8">
-                            <TextBlock Classes="label" Text="{Binding Name}" />
-                            <ItemsControl ItemsSource="{Binding Matches}">
-                              <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
-                              </ItemsControl.ItemsPanel>
-                              <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:BracketMatchViewModel">
-                                  <Border Background="{DynamicResource SowNightBrush}" BorderBrush="{DynamicResource SowLineSoftBrush}"
-                                          BorderThickness="1" CornerRadius="4" Padding="8">
-                                    <Grid ColumnDefinitions="*,70" RowDefinitions="Auto,Auto" RowSpacing="6" ColumnSpacing="6">
-                                      <controls:SearchableComboBox ItemsSource="{Binding TeamNames}" SelectedItem="{Binding Team1}" NoneText="— Team —" />
-                                      <NumericUpDown Grid.Column="1" MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Score1}" />
-                                      <controls:SearchableComboBox Grid.Row="1" ItemsSource="{Binding TeamNames}" SelectedItem="{Binding Team2}" NoneText="— Team —" />
-                                      <NumericUpDown Grid.Row="1" Grid.Column="1" MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Score2}" />
-                                    </Grid>
-                                  </Border>
-                                </DataTemplate>
-                              </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                          </StackPanel>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </ScrollViewer>
-    </Grid>
+    <!-- Matches: the sections (upper, lower, grand final) flow side by side -->
+    <ScrollViewer>
+      <StackPanel Spacing="8" Margin="0,0,12,12">
+        <TextBlock Classes="muted" IsVisible="{Binding !Bracket.HasRounds}" Text="No bracket loaded. Select a template to begin." />
+        <ItemsControl ItemsSource="{Binding Bracket.Sections}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:BracketSectionViewModel">
+              <Border Classes="card" Padding="12,10">
+                <StackPanel Spacing="8">
+                  <Border Classes="cardTitle"><TextBlock Classes="h2" Text="{Binding Title}" /></Border>
+                  <ItemsControl ItemsSource="{Binding Rounds}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="14" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:BracketRoundViewModel">
+                        <StackPanel Width="224" Spacing="6">
+                          <TextBlock Classes="label" Text="{Binding Name}" />
+                          <ItemsControl ItemsSource="{Binding Matches}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:BracketMatchViewModel">
+                                <Border Background="{DynamicResource SowNightBrush}" BorderBrush="{DynamicResource SowLineSoftBrush}"
+                                        BorderThickness="1" CornerRadius="4" Padding="6">
+                                  <Grid ColumnDefinitions="*,56" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6">
+                                    <controls:SearchableComboBox ItemsSource="{Binding TeamNames}" SelectedItem="{Binding Team1}" NoneText="— Team —" />
+                                    <NumericUpDown Grid.Column="1" MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Score1}" />
+                                    <controls:SearchableComboBox Grid.Row="1" ItemsSource="{Binding TeamNames}" SelectedItem="{Binding Team2}" NoneText="— Team —" />
+                                    <NumericUpDown Grid.Row="1" Grid.Column="1" MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Score2}" />
+                                  </Grid>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
   </DockPanel>
   </DockPanel>
 </UserControl>

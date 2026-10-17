@@ -17,35 +17,31 @@
       <Button Classes="primary" Content="Update + sort" MinWidth="150" Command="{Binding UpdateStandingsCommand}" />
     </StackPanel>
 
-    <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,10">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,260" ColumnSpacing="14">
+    <!-- One row: add a group, which group the overlay shows, title and subtitle -->
+    <Border DockPanel.Dock="Top" Classes="card" Padding="12,8" Margin="0,0,0,10">
+      <Grid ColumnDefinitions="Auto,Auto,220,Auto,*,Auto,*" ColumnSpacing="10">
         <Button Content="Add Group" Command="{Binding Standings.AddGroupCommand}" />
-        <TextBlock Grid.Column="2" Classes="label" VerticalAlignment="Center" Text="SHOW IN STANDINGS.HTML" />
-        <ComboBox Grid.Column="3" HorizontalAlignment="Stretch" ItemsSource="{Binding Standings.DisplayOptions}" SelectedItem="{Binding Standings.SelectedDisplay}">
+        <TextBlock Grid.Column="1" Classes="label" VerticalAlignment="Center" Text="SHOW IN STANDINGS.HTML" />
+        <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Standings.DisplayOptions}" SelectedItem="{Binding Standings.SelectedDisplay}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:DisplayOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-      </Grid>
-    </Border>
-
-    <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,10">
-      <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="12">
-        <TextBlock Classes="label" VerticalAlignment="Center" Text="TITLE" />
-        <TextBox Grid.Column="1" Text="{Binding Standings.Title}" />
-        <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="SUBTITLE / GROUP" />
-        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Standings.Subtitle}" />
+        <TextBlock Grid.Column="3" Classes="label" VerticalAlignment="Center" Margin="10,0,0,0" Text="TITLE" />
+        <TextBox Grid.Column="4" Text="{Binding Standings.Title}" />
+        <TextBlock Grid.Column="5" Classes="label" VerticalAlignment="Center" Text="SUBTITLE / GROUP" />
+        <TextBox Grid.Column="6" Text="{Binding Standings.Subtitle}" />
       </Grid>
     </Border>
 
     <ScrollViewer>
       <ItemsControl ItemsSource="{Binding Standings.Groups}" Margin="0,0,12,0">
         <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+          <ItemsPanelTemplate><UniformGrid Columns="{Binding Standings.GroupColumns}" /></ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:StandingsGroupViewModel">
-            <Border Classes="card" Padding="14">
+            <Border Classes="card" Padding="12,10" Margin="0,0,10,10">
               <StackPanel Spacing="10">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                   <TextBlock Classes="label" VerticalAlignment="Center" Text="NAME" />
@@ -54,7 +50,7 @@
                 </Grid>
 
                 <!-- Column headers -->
-                <Grid ColumnDefinitions="64,*,80,64,64,72,80,150,*,36" ColumnSpacing="6" Margin="0,4,0,0">
+                <Grid ColumnDefinitions="52,2*,70,52,52,60,64,110,1.4*,32" ColumnSpacing="6" Margin="0,4,0,0">
                   <TextBlock Classes="label" Text="RANK" />
                   <TextBlock Grid.Column="1" Classes="label" Text="TEAM" />
                   <TextBlock Grid.Column="2" Classes="label" Text="ABBR" />
@@ -72,7 +68,7 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:StandingsRowViewModel">
-                      <Grid ColumnDefinitions="64,*,80,64,64,72,80,150,*,36" ColumnSpacing="6">
+                      <Grid ColumnDefinitions="52,2*,70,52,52,60,64,110,1.4*,32" ColumnSpacing="6">
                         <NumericUpDown MinWidth="0" ShowButtonSpinner="False" Minimum="0" Maximum="99" FormatString="0" Value="{Binding Rank}" />
                         <TextBox Grid.Column="1" Text="{Binding TeamName}" Watermark="Team name" />
                         <TextBox Grid.Column="2" Text="{Binding Abbr}" MaxLength="6" />
