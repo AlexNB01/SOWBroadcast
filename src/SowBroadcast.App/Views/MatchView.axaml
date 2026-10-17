@@ -37,12 +37,12 @@
 
         <ItemsControl ItemsSource="{Binding Match.Maps}">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate>
+            <ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MapCardViewModel">
-              <Border Classes="card" Padding="10" Margin="0,0,10,10" IsVisible="{Binding IsShown}">
-                <StackPanel Spacing="8">
+              <Border Classes="card" Padding="8" Margin="0,0,8,8" IsVisible="{Binding IsShown}">
+                <StackPanel Spacing="6">
                   <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                     <Border Classes="cardTitle"><TextBlock Classes="h2" Text="{Binding Label}" /></Border>
                     <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding PickOptions}" SelectedItem="{Binding SelectedPick}">
@@ -52,10 +52,10 @@
                     </ComboBox>
                   </Grid>
 
-                  <Border Width="176" Height="99" ClipToBounds="True" CornerRadius="4" Background="{DynamicResource SowNightBrush}">
+                  <Border Width="128" Height="72" ClipToBounds="True" CornerRadius="4" Background="{DynamicResource SowNightBrush}">
                     <Panel>
                       <TextBlock Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" Text="TBA" />
-                      <Image Source="{Binding MapImagePath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=352}"
+                      <Image Source="{Binding MapImagePath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=256}"
                              Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
                     </Panel>
                   </Border>

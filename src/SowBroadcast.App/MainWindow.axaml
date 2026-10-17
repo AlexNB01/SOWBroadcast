@@ -87,29 +87,6 @@
       </MenuItem>
     </Menu>
 
-    <!-- Header band: brand gradient (top to bottom), Tunnus mark, title -->
-    <Border DockPanel.Dock="Top" Classes="header" Padding="18,12">
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <Image Grid.Column="0" Width="44" Height="44" Margin="0,0,14,0" RenderOptions.BitmapInterpolationMode="HighQuality"
-               Source="avares://SOWBroadcast/Assets/Brand/tunnus-512.png" />
-        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-          <TextBlock Classes="h1" Text="SOW BROADCAST" />
-          <TextBlock Classes="muted" Foreground="{DynamicResource SowWhiteBrush}" Opacity="0.85" Text="Suomi OW ry – broadcast control" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Border Classes="pill" IsVisible="{Binding HasUnsentChanges}">
-            <TextBlock Text="Unsent changes" FontWeight="SemiBold" />
-          </Border>
-          <Border Classes="pill" IsVisible="{Binding HasActiveProfile}">
-            <TextBlock Text="{Binding ActiveProfileName, StringFormat='Profile: {0}'}" FontWeight="SemiBold" />
-          </Border>
-          <Border Classes="pill">
-            <TextBlock Text="{Binding Link.PillText}" FontWeight="SemiBold" />
-          </Border>
-        </StackPanel>
-      </Grid>
-    </Border>
-
     <Border DockPanel.Dock="Bottom" Classes="statusbar">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Grid.Column="0" Classes="muted" Text="{Binding StatusText}" VerticalAlignment="Center" />
@@ -120,7 +97,9 @@
       </Grid>
     </Border>
 
-    <TabControl x:Name="Tabs" Margin="14,10,14,10">
+    <!-- The status pills share the tab row (no banner above, the space goes to the content) -->
+    <Grid Margin="14,6,14,10">
+    <TabControl x:Name="Tabs">
       <TabItem Header="MATCH">
         <views:MatchView />
       </TabItem>
@@ -140,5 +119,17 @@
         <views:ThemePreview x:Name="ThemeView" />
       </TabItem>
     </TabControl>
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,0,0">
+      <Border Classes="pill" IsVisible="{Binding HasUnsentChanges}">
+        <TextBlock Text="Unsent changes" FontWeight="SemiBold" />
+      </Border>
+      <Border Classes="pill" IsVisible="{Binding HasActiveProfile}">
+        <TextBlock Text="{Binding ActiveProfileName, StringFormat='Profile: {0}'}" FontWeight="SemiBold" />
+      </Border>
+      <Border Classes="pill">
+        <TextBlock Text="{Binding Link.PillText}" FontWeight="SemiBold" />
+      </Border>
+    </StackPanel>
+    </Grid>
   </DockPanel>
 </Window>
