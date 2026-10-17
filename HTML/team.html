@@ -292,9 +292,7 @@
     return 1800;
   }
 
-  // Entry (scene shown): the cards fade in one after another after the stinger delay.
-  // Live update (live=true): the new cards are simply there at once, no delay and no blink.
-  function applyStagger(live){
+  function applyStagger(){
     const base = getStingerStartMs();
     const step = 150;
     const nodes = [
@@ -303,8 +301,6 @@
     ];
     nodes.forEach((el, i) => {
       if(!el) return;
-      if(live){ el.style.animation = "none"; el.style.opacity = "1"; return; }
-      el.style.opacity = "";
       const delay = base + i * step;
       el.style.animation = "none";
       void el.offsetWidth;
@@ -312,7 +308,7 @@
     });
   }
 
-  async function render(live){
+  async function render(){
     await applyColors();
     await upTeamHead();
     const players=await fetchPlayers();
@@ -359,16 +355,16 @@
     }else{
       subsEl.style.display="none";
     }
-    applyStagger(live);
+    applyStagger();
   }
 
-  let rendering = false, pending = null;   // pending: null, or {live} for the one render still to do
-  async function renderQueued(live){
-    if(rendering){ pending = { live: live && (pending ? pending.live : true) }; return; }
+  let rendering = false, pending = false;   // one render at a time; updates that arrive meanwhile become one follow-up render
+  async function renderQueued(){
+    if(rendering){ pending = true; return; }
     rendering = true;
     try{
-      await render(live);
-      while(pending){ const next = pending; pending = null; await render(next.live); }
+      await render();
+      while(pending){ pending = false; await render(); }
     }finally{ rendering = false; }
   }
 
@@ -378,13 +374,13 @@
       es.onmessage=async ev=>{
         try{
           const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
-          if(ch.some(k=>k.startsWith(TEAM.toLowerCase() + ".") || k==="general.colors")) await renderQueued(true);
+          if(ch.some(k=>k.startsWith(TEAM.toLowerCase() + ".") || k==="general.colors")) await renderQueued();
         }catch{}
       };
     }catch{}
   }
 
-  (async()=>{ await renderQueued(false); startSSE(); })();
+  (async()=>{ await renderQueued(); startSSE(); })();
 
 function setOverlayVisible(v){
   if(v) applyStagger();
