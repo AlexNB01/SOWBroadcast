@@ -54,7 +54,6 @@ public static class ObsSceneCollection
         var template = LoadTemplate();
         var sources = template["sources"]!.AsArray();
         var groups = template["groups"]!.AsArray();
-        var general = Path.Combine(dataDir, "Scoreboard", "General");
 
         // The webcam belongs to one machine: it goes, together with the scene items that show it.
         var dropped = sources.Where(s => s!["id"]!.GetValue<string>() == "dshow_input").Select(s => s!["name"]!.GetValue<string>()).ToHashSet();
@@ -69,23 +68,19 @@ public static class ObsSceneCollection
                     settings["width"] = 1920;
                     settings["height"] = 1080;
                     break;
-                case "text_gdiplus":
-                    settings["file"] = Slash(Path.Combine(general, Path.GetFileName(settings["file"]!.GetValue<string>().Replace('\\', '/'))));
-                    break;
                 case "ndi_source":
                     settings["ndi_source_name"] = "";
                     break;
                 case "vlc_source":
                     foreach (var entry in settings["playlist"]!.AsArray()) entry!["value"] = WindowsPath(installDir) + "\\Music";
                     break;
-                case "image_source":
-                    settings["file"] = Slash(Path.Combine(installDir, "HTML", "assets", "imagemask", Path.GetFileName(settings["file"]!.GetValue<string>().Replace('\\', '/'))));
-                    break;
             }
         }
 
         for (var i = sources.Count - 1; i >= 0; i--)
             if (dropped.Contains(sources[i]!["name"]!.GetValue<string>())) sources.RemoveAt(i);
+
+        ApplyCameraLayout(sources, groups);
 
         var known = sources.Concat(groups).Select(s => s!["name"]!.GetValue<string>()).ToHashSet();
         foreach (var container in sources.Concat(groups).Select(c => c!.AsObject()))
@@ -116,6 +111,144 @@ public static class ObsSceneCollection
         foreach (var entry in result["scene_order"]!.AsArray()) entry!["name"] = Rename(entry["name"]!.GetValue<string>());
         return result.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }
+
+    // ---- cameras ------------------------------------------------------------------------------------------
+    // The camera scenes ("=> Caster 1 NDI Framing", ...) hold nothing but the NDI source, stretched over the whole canvas, so a camera is a
+    // full 16:9 picture wherever it is used. The scenes that use them (single camera, duo row, trio row) place and crop that picture
+    // into the camera windows of their overlay pages. The pages are 1920x1080 CSS pixels shown at 4/3 on the 2560x1440 canvas the collection
+    // is made for (the base resolution of the producers' OBS profiles; the browser sources are scaled by 4/3 for the same reason).
+
+    private const double CanvasWidth = 2560, CanvasHeight = 1440;
+    private const double PageScale = CanvasWidth / 1920.0;
+
+    // The camera scene and the NDI source it shows. The old collection had no source for caster 2 at all: it is made like caster 1's.
+    private static readonly (string Scene, string Source)[] FramingScenes =
+    {
+        ("=> Host NDI Framing", "HostNDI"), ("=> Caster 1 NDI Framing", "Caster1NDI"), ("=> Caster 2 NDI Framing", "Caster2NDI"),
+    };
+
+    private const string NewNdiSourceId = "7f3c2a10-5d1e-4c6b-9a8e-2b4d6f8a0c13";
+
+    /// <summary>One camera window of an overlay page, in the page's CSS pixels (the part of a frame above its name plate).</summary>
+    internal readonly record struct Window(double X, double Y, double Width, double Height);
+
+    // duorow.html: .duo (top 220, height 750) centres two .frame boxes of 848x549 with a 48 gap; the .plate (72) at the bottom of each frame
+    // is opaque, so the camera is the 848x477 above it (exactly 16:9). Left to right: caster 1, caster 2.
+    internal static IReadOnlyList<Window> DuoWindows() => Row(2, 848, 549, 72, 48, 220, 750);
+
+    // triorow.html: .trio (top 220, height 770) centres three .frame boxes of 596x505 with a 36 gap and a 64 plate. Left to right in the
+    // page: caster 1, host, caster 2.
+    internal static IReadOnlyList<Window> TrioWindows() => Row(3, 596, 505, 64, 36, 220, 770);
+
+    private static IReadOnlyList<Window> Row(int count, double frameWidth, double frameHeight, double plate, double gap, double areaTop, double areaHeight)
+    {
+        var left = (1920 - (count * frameWidth + (count - 1) * gap)) / 2;
+        var top = areaTop + (areaHeight - frameHeight) / 2;
+        return Enumerable.Range(0, count).Select(i => new Window(left + i * (frameWidth + gap), top, frameWidth, frameHeight - plate)).ToArray();
+    }
+
+    private static void ApplyCameraLayout(JsonArray sources, JsonArray groups)
+    {
+        JsonObject? Scene(string name) => sources.Select(s => s!.AsObject()).FirstOrDefault(s => s["id"]!.GetValue<string>() == "scene" && s["name"]!.GetValue<string>() == name);
+
+        EnsureNdiSources(sources);
+        var kinds = sources.ToDictionary(s => s!["name"]!.GetValue<string>(), s => s!["id"]!.GetValue<string>());
+
+        // The camera scenes: the NDI source only (no frame group, name text or mask), covering the canvas.
+        foreach (var (name, _) in FramingScenes)
+        {
+            if (Scene(name) is not { } scene) continue;
+            var items = scene["settings"]!["items"]!.AsArray();
+            for (var i = items.Count - 1; i >= 0; i--)
+                if (!kinds.TryGetValue(items[i]!["name"]!.GetValue<string>(), out var kind) || kind != "ndi_source") items.RemoveAt(i);
+            foreach (var item in items.Select(i => i!.AsObject()))
+                Place(item, 0, 0, 1, 0, covering: true);
+        }
+        groups.Clear();
+
+        // What only the removed frames used (name texts, the camera mask) goes too.
+        var used = sources.Where(s => s!["id"]!.GetValue<string>() == "scene")
+            .SelectMany(s => s!["settings"]!["items"]!.AsArray()).Select(i => i!["name"]!.GetValue<string>()).ToHashSet();
+        for (var i = sources.Count - 1; i >= 0; i--)
+            if (sources[i]!["id"]!.GetValue<string>() is "text_gdiplus" or "image_source" && !used.Contains(sources[i]!["name"]!.GetValue<string>())) sources.RemoveAt(i);
+
+        // Single camera: the whole picture.
+        PlaceCamera(Scene("Duo SingleCam"), "=> Caster 1 NDI Framing", new Window(0, 0, 1920, 1080));
+
+        var duo = DuoWindows();
+        PlaceCamera(Scene("DuoCam Row"), "=> Caster 1 NDI Framing", duo[0]);
+        PlaceCamera(Scene("DuoCam Row"), "=> Caster 2 NDI Framing", duo[1]);
+
+        var trio = TrioWindows();
+        PlaceCamera(Scene("TrioCam Row"), "=> Caster 1 NDI Framing", trio[0]);
+        PlaceCamera(Scene("TrioCam Row"), "=> Host NDI Framing", trio[1]);
+        PlaceCamera(Scene("TrioCam Row"), "=> Caster 2 NDI Framing", trio[2]);
+    }
+
+    // A camera scene without an NDI source (caster 2's) gets one, copied from another camera scene: the source, and its item in the scene.
+    private static void EnsureNdiSources(JsonArray sources)
+    {
+        JsonObject? Find(string name) => sources.Select(s => s!.AsObject()).FirstOrDefault(s => s["name"]!.GetValue<string>() == name);
+        var template = FramingScenes.Select(f => Find(f.Source)).FirstOrDefault(s => s is not null && s["id"]!.GetValue<string>() == "ndi_source");
+        if (template is null) return;
+
+        foreach (var (sceneName, sourceName) in FramingScenes)
+        {
+            var scene = Find(sceneName);
+            if (scene is null || scene["id"]!.GetValue<string>() != "scene") continue;
+            var items = scene["settings"]!["items"]!.AsArray();
+            if (items.Any(i => Find(i!["name"]!.GetValue<string>()) is { } s && s["id"]!.GetValue<string>() == "ndi_source")) continue;
+
+            var source = template.DeepClone().AsObject();
+            source["name"] = sourceName;
+            source["uuid"] = NewNdiSourceId;
+            sources.Add(source);
+
+            var donor = FramingScenes.Select(f => Find(f.Scene)).Where(s => s is not null && s != scene)
+                .SelectMany(s => s!["settings"]!["items"]!.AsArray()).Select(i => i!.AsObject())
+                .First(i => i["name"]!.GetValue<string>() == template["name"]!.GetValue<string>());
+            var item = donor.DeepClone().AsObject();
+            item["name"] = sourceName;
+            item["source_uuid"] = NewNdiSourceId;
+            item["id"] = items.Select(i => i!["id"]?.GetValue<int>() ?? 0).DefaultIfEmpty(0).Max() + 1;
+            items.Add(item);
+        }
+    }
+
+    // The camera scene's item in a parent scene: scaled so the 16:9 picture fills the window, and cropped left and right where the window is
+    // narrower than 16:9 (the picture covers the window, it is never squeezed).
+    private static void PlaceCamera(JsonObject? scene, string cameraScene, Window window)
+    {
+        if (scene is null) return;
+        var item = scene["settings"]!["items"]!.AsArray().Select(i => i!.AsObject()).FirstOrDefault(i => i["name"]!.GetValue<string>() == cameraScene)
+                   ?? throw new InvalidOperationException($"{scene["name"]} has no {cameraScene}.");
+        var width = window.Width * PageScale;
+        var height = window.Height * PageScale;
+        var scale = Math.Max(width / CanvasWidth, height / CanvasHeight);
+        var crop = (int)Math.Floor((CanvasWidth - width / scale) / 2);   // rounded down: the picture may overhang the window by a fraction of a pixel, never fall short
+        Place(item, window.X * PageScale, window.Y * PageScale, scale, crop, covering: false);
+    }
+
+    private static void Place(JsonObject item, double x, double y, double scale, int cropSides, bool covering)
+    {
+        const double unit = CanvasHeight / 2;   // the *_rel values are in half canvas heights from the canvas centre
+        item["scale_ref"] = Point(CanvasWidth, CanvasHeight);
+        item["pos"] = Point(x, y);
+        item["pos_rel"] = Point((x - CanvasWidth / 2) / unit, (y - CanvasHeight / 2) / unit);
+        item["scale"] = Point(scale, scale);
+        item["scale_rel"] = Point(scale, scale);
+        item["rot"] = 0.0;
+        item["crop_left"] = cropSides;
+        item["crop_right"] = cropSides;
+        item["crop_top"] = 0;
+        item["crop_bottom"] = 0;
+        item["bounds_type"] = covering ? 3 : 0;   // 3: fill the bounds, cropping what overflows
+        item["bounds_align"] = 0;
+        item["bounds"] = covering ? Point(CanvasWidth, CanvasHeight) : Point(0, 0);
+        item["bounds_rel"] = covering ? Point(CanvasWidth / unit, CanvasHeight / unit) : Point(0, 0);
+    }
+
+    private static JsonObject Point(double x, double y) => new() { ["x"] = x, ["y"] = y };
 
     /// <summary>Every browser source must point at a page that exists; nothing may carry an old absolute path or a device id. Empty when all is well.</summary>
     public static IReadOnlyList<string> Check(string collectionJson, IReadOnlyCollection<string> overlayPages)

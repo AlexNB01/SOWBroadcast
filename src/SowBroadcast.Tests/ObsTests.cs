@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -462,7 +463,7 @@ public sealed class ObsSceneCollectionTests
     [Fact]
     public void The_check_finds_a_source_with_an_old_page_or_a_leftover_path()
     {
-        var json = Build().Replace("waiting.html?mode=brb", "berightback.html").Replace("C:/Test/Data", "C:/SOWBroadcast");
+        var json = Build().Replace("waiting.html?mode=brb", "berightback.html").Replace("\"name\": \"SOW Broadcast\"", "\"name\": \"SOW Broadcast C:/SOWBroadcast\"");
 
         var problems = SowBroadcast.Core.Obs.ObsSceneCollection.Check(json, OverlayPages().Length == 0 ? new[] { "waiting.html" } : OverlayPages());
 
@@ -483,8 +484,6 @@ public sealed class ObsSceneCollectionTests
         Assert.Equal("http://127.0.0.1:8330/HTML/MapDraft.html", Setting("HTML MapDraft", "url"));
         Assert.Equal("http://127.0.0.1:8330/HTML/transition.html", Setting("HTML Transition Blank Screen", "url"));   // had a dead address
         Assert.Equal("1080", Setting("HTML Team 2 Roster", "height"));
-        Assert.Equal("C:/Test/Data/Scoreboard/General/caster1.txt", Setting("Caster1 Text", "file"));
-        Assert.Equal("C:/Test/Install/HTML/assets/imagemask/scalecamera.png", Setting("Scale", "file"));
         Assert.Equal("", Setting("Caster1NDI", "ndi_source_name"));
     }
 
@@ -503,6 +502,120 @@ public sealed class ObsSceneCollectionTests
         foreach (var scene in sources.Where(s => s.GetProperty("id").GetString() == "scene"))
             foreach (var item in scene.GetProperty("settings").GetProperty("items").EnumerateArray())
                 Assert.Contains(item.GetProperty("name").GetString(), all);
+    }
+
+    // ---- cameras ---------------------------------------------------------------------------------------------
+
+    private static JsonElement Scene(JsonElement root, string name) =>
+        root.GetProperty("sources").EnumerateArray().First(s => s.GetProperty("id").GetString() == "scene" && s.GetProperty("name").GetString() == name);
+
+    private static JsonElement Item(JsonElement root, string scene, string item) =>
+        Scene(root, scene).GetProperty("settings").GetProperty("items").EnumerateArray().First(i => i.GetProperty("name").GetString() == item);
+
+    private static double Number(JsonElement item, string property, string axis) => item.GetProperty(property).GetProperty(axis).GetDouble();
+
+    // The pages are read from the source tree (found from this file), so the test also works when the binaries are built elsewhere.
+    private static string HtmlFile(string name, [System.Runtime.CompilerServices.CallerFilePath] string self = "") =>
+        File.ReadAllText(Path.Combine(Path.GetDirectoryName(self)!, "..", "..", "HTML", name));
+
+    [Fact]
+    public void The_camera_scenes_hold_only_the_NDI_source_over_the_whole_canvas()
+    {
+        var root = JsonDocument.Parse(Build()).RootElement;
+
+        foreach (var (scene, ndi) in new[] { ("=> Host NDI Framing", "HostNDI"), ("=> Caster 1 NDI Framing", "Caster1NDI"), ("=> Caster 2 NDI Framing", "Caster2NDI") })
+        {
+            var item = Assert.Single(Scene(root, scene).GetProperty("settings").GetProperty("items").EnumerateArray());
+            Assert.Equal(ndi, item.GetProperty("name").GetString());
+            Assert.Equal(0, Number(item, "pos", "x"));
+            Assert.Equal(0, Number(item, "pos", "y"));
+            Assert.Equal(2560, Number(item, "bounds", "x"));
+            Assert.Equal(1440, Number(item, "bounds", "y"));
+            Assert.Equal(3, item.GetProperty("bounds_type").GetInt32());   // fills the canvas, cropping what overflows
+            Assert.Equal(0, item.GetProperty("crop_left").GetInt32());
+        }
+    }
+
+    [Fact]
+    public void The_frames_name_texts_and_the_camera_mask_are_gone()
+    {
+        var root = JsonDocument.Parse(Build()).RootElement;
+        var sources = root.GetProperty("sources").EnumerateArray().ToArray();
+
+        Assert.Empty(root.GetProperty("groups").EnumerateArray());
+        Assert.DoesNotContain(sources, s => s.GetProperty("id").GetString() is "text_gdiplus" or "image_source");
+        Assert.DoesNotContain(sources, s => s.GetProperty("name").GetString() is "Scale" or "Host Text" or "Caster1 Text" or "Caster2 Text");
+    }
+
+    [Fact]
+    public void The_single_camera_fills_the_whole_canvas()
+    {
+        var item = Item(JsonDocument.Parse(Build()).RootElement, "Duo SingleCam", "=> Caster 1 NDI Framing");
+
+        Assert.Equal(0, Number(item, "pos", "x"));
+        Assert.Equal(0, Number(item, "pos", "y"));
+        Assert.Equal(1, Number(item, "scale", "x"), 6);
+        Assert.Equal(0, item.GetProperty("crop_left").GetInt32());
+    }
+
+    // The camera windows come from the overlay pages: this reads the same numbers out of the page CSS and works out where the
+    // cameras belong, so a change to a page that is not followed here fails.
+    private static (double Left, double Top, double Width, double CameraHeight, double Step) PageRow(string page, string area, int count)
+    {
+        var css = HtmlFile(page);
+        double Css(string pattern) => double.Parse(Regex.Match(css, pattern).Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var areaTop = Css(@"\." + area + @"\s*\{\s*position:absolute;\s*left:0;\s*top:(\d+)px");
+        var areaHeight = Css(@"\." + area + @"\s*\{[^}]*?height:(\d+)px");
+        var gap = Css(@"\." + area + @"\s*\{[^}]*?gap:(\d+)px");
+        var frameWidth = Css(@"\.frame\s*\{\s*position:relative;\s*width:(\d+)px");
+        var frameHeight = Css(@"\.frame\s*\{\s*position:relative;\s*width:\d+px;\s*height:(\d+)px");
+        var plate = Css(@"\.plate\s*\{[^}]*?height:(\d+)px");
+        var left = (1920 - (count * frameWidth + (count - 1) * gap)) / 2;
+        return (left, areaTop + (areaHeight - frameHeight) / 2, frameWidth, frameHeight - plate, frameWidth + gap);
+    }
+
+    [Fact]
+    public void The_duo_cameras_sit_in_the_frames_of_the_duo_page_without_cropping()
+    {
+        var root = JsonDocument.Parse(Build()).RootElement;
+        var (left, top, width, height, step) = PageRow("duorow.html", "duo", 2);
+        var k = 2560 / 1920.0;
+
+        Assert.Equal(16.0 / 9, width / height, 3);   // a 16:9 window: the picture fits as it is
+        foreach (var (item, index) in new[] { ("=> Caster 1 NDI Framing", 0), ("=> Caster 2 NDI Framing", 1) })
+        {
+            var placed = Item(root, "DuoCam Row", item);
+            Assert.Equal((left + index * step) * k, Number(placed, "pos", "x"), 3);
+            Assert.Equal(top * k, Number(placed, "pos", "y"), 3);
+            Assert.Equal(width * k / 2560, Number(placed, "scale", "x"), 4);
+            Assert.Equal(0, placed.GetProperty("crop_left").GetInt32());
+        }
+    }
+
+    [Fact]
+    public void The_trio_cameras_follow_the_page_order_caster_1_host_caster_2_and_cover_their_windows()
+    {
+        var root = JsonDocument.Parse(Build()).RootElement;
+        var (left, top, width, height, step) = PageRow("triorow.html", "trio", 3);
+        var k = 2560 / 1920.0;
+
+        // the order of the name plates in the page
+        var page = HtmlFile("triorow.html");
+        Assert.True(page.IndexOf("id=\"caster1name\"", StringComparison.Ordinal) < page.IndexOf("id=\"hostname\"", StringComparison.Ordinal));
+        Assert.True(page.IndexOf("id=\"hostname\"", StringComparison.Ordinal) < page.IndexOf("id=\"caster2name\"", StringComparison.Ordinal));
+
+        var scale = Math.Max(width * k / 2560, height * k / 1440);
+        foreach (var (item, index) in new[] { ("=> Caster 1 NDI Framing", 0), ("=> Host NDI Framing", 1), ("=> Caster 2 NDI Framing", 2) })
+        {
+            var placed = Item(root, "TrioCam Row", item);
+            Assert.Equal((left + index * step) * k, Number(placed, "pos", "x"), 3);
+            Assert.Equal(top * k, Number(placed, "pos", "y"), 3);
+            Assert.Equal(scale, Number(placed, "scale", "x"), 4);
+            // the visible part of the picture is as wide as the window, and not a pixel too much is cut
+            var visibleWidth = (2560 - placed.GetProperty("crop_left").GetInt32() - placed.GetProperty("crop_right").GetInt32()) * scale;
+            Assert.InRange(visibleWidth - width * k, 0, 1.5);
+            Assert.Equal(height * k, 1440 * scale, 3);
+        }
     }
 
     [Fact]

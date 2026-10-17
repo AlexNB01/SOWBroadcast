@@ -209,7 +209,7 @@ public sealed class ObsViewModelTests : IDisposable
 
         var json = File.ReadAllText(_saveTarget);
         Assert.Contains("http://127.0.0.1:8324/HTML/scoreboard.html", json);
-        Assert.Contains("C:/Test/Data/Scoreboard/General/caster1.txt", json);
+        Assert.Contains("=> Caster 1 NDI Framing", json);
         Assert.Contains("Scene collection saved", vm.Message);
 
         File.Delete(_saveTarget);
