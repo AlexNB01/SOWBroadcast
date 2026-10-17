@@ -1,32 +1,36 @@
 <#
 .SYNOPSIS
-    Builds the SOW Broadcast installer (per-user, Velopack): publish, add the overlay files and the shipped images, pack.
+    Builds the SOW Broadcast installer (Inno Setup): publish, add the overlay files and the shipped images, pack.
 
 .DESCRIPTION
-    Output goes to artifacts\releases: Setup.exe (the installer), the .nupkg packages and RELEASES metadata for updates.
-    The installer puts the program in %LOCALAPPDATA%\SuomiOW.SOWBroadcast (no administrator rights); the user's data
-    (autosave, generated overlay files, logs) lives separately in %LOCALAPPDATA%\SOWBroadcast and survives updates and uninstalling.
+    Output goes to artifacts\installer: SOWBroadcast-Setup-<version>.exe and its checksum SOWBroadcast-Setup-<version>.exe.sha256
+    (what "Check for updates" in the program downloads and verifies).
+
+    The installer lets the user choose the folder (default C:\SOW Broadcast, no administrator rights needed). The program keeps its data
+    (autosave, generated overlay files, logs, settings) in the Data folder next to it. Uninstalling leaves Data in place.
+
+    Needs Inno Setup 6 (iscc.exe on the path or in its default folder; winget install JRSoftware.InnoSetup).
 
     Smaller installer: the shipped pictures are copied and tools/optimize-assets.py shrinks the copies (drops pictures the manifest does not
     list, shrinks oversized full-body hero pictures, recompresses PNGs losslessly). The repository's own pictures are never changed. It runs when
     Python with Pillow is available (otherwise a warning says the installer is bigger); -NoOptimize skips it.
 
-    Code signing: pass -SignParams with the signtool arguments of your certificate, for example
-    -SignParams '/f cert.pfx /p password /fd sha256 /tr http://timestamp.digicert.com /td sha256'. The program, its libraries and the installer are
-    signed by Velopack (needs signtool from the Windows SDK on the path). Without it the installer is unsigned and Windows SmartScreen warns.
+    Code signing: pass -SignTool with the full command Inno should run for each file, with $f for the file, for example
+    -SignTool 'signtool.exe sign /f cert.pfx /p password /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f'.
+    The installer and its uninstaller are signed (sign the program's own exe in the same way before this step if wanted). Without it the
+    installer is unsigned and Windows SmartScreen warns.
 
-    The music library is not part of the installer (size and licence): with -MusicZip a SOWBroadcast-Music.zip is made from the Music folder
-    of the repository, to be unpacked into the data folder's Music folder.
+    The music library (22 MB) is an optional component of the installer, taken from the Music folder of the repository; -NoMusic leaves it out.
 
 .EXAMPLE
     .\tools\build-installer.ps1
-    .\tools\build-installer.ps1 -MusicZip
+    .\tools\build-installer.ps1 -NoMusic
 #>
 param(
-    [switch] $MusicZip,
+    [switch] $NoMusic,
     [switch] $NoPack,
     [switch] $NoOptimize,
-    [string] $SignParams = ''
+    [string] $SignTool = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,7 +38,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'src\SowBroadcast.App\SowBroadcast.App.csproj'
 $artifacts = Join-Path $root 'artifacts'
 $publish = Join-Path $artifacts 'publish'
-$releases = Join-Path $artifacts 'releases'
+$output = Join-Path $artifacts 'installer'
 
 # The version lives in one place: <Version> in the project file.
 $version = (& dotnet msbuild $project -getProperty:Version -nologo).Trim()
@@ -75,28 +79,33 @@ Get-ChildItem (Join-Path $publish 'Scoreboard') -Recurse -Filter 'index.txt' | R
 
 if ($NoPack) { Write-Host "Published to $publish"; return }
 
-# vpk (the Velopack packer) is kept in a tool folder of its own, not installed globally.
-$toolDir = Join-Path $artifacts 'tools'
-$vpk = Join-Path $toolDir 'vpk.exe'
-if (-not (Test-Path $vpk)) {
-    & dotnet tool install vpk --tool-path $toolDir
-    if ($LASTEXITCODE -ne 0) { throw 'Could not install vpk.' }
+# Inno Setup's compiler: on the path, or in its default folders.
+$iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
+if (-not $iscc) {
+    $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe", "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe") |
+        Where-Object { Test-Path $_ } | Select-Object -First 1
 }
+if (-not $iscc) { throw 'Inno Setup 6 was not found (winget install JRSoftware.InnoSetup).' }
 
-if (Test-Path $releases) { Remove-Item $releases -Recurse -Force }
-$packArguments = @('pack', '--packId', 'SuomiOW.SOWBroadcast', '--packVersion', $version, '--packDir', $publish, '--mainExe', 'SOWBroadcast.exe',
-    '--packTitle', 'SOW Broadcast', '--runtime', 'win-x64', '--packAuthors', 'Suomi OW ry', '--icon', (Join-Path $root 'src\SowBroadcast.App\app.ico'), '--outputDir', $releases)
-if ($SignParams) { $packArguments += @('--signParams', $SignParams) }
-& $vpk @packArguments
-if ($LASTEXITCODE -ne 0) { throw 'vpk pack failed.' }
+if (Test-Path $output) { Remove-Item $output -Recurse -Force }
+New-Item -ItemType Directory -Force $output | Out-Null
 
-if ($MusicZip) {
-    $music = Join-Path $root 'Music'
-    if (-not (Test-Path $music)) { throw "No Music folder at $music" }
-    $zip = Join-Path $artifacts 'SOWBroadcast-Music.zip'
-    if (Test-Path $zip) { Remove-Item $zip -Force }
-    Compress-Archive -Path $music -DestinationPath $zip
-    Write-Host "Music pack: $zip"
+$arguments = @("/DAppVersion=$version", "/DPublishDir=$publish", "/DOutputDir=$output")
+$music = Join-Path $root 'Music'
+if (-not $NoMusic) {
+    if (Test-Path $music) { $arguments += "/DMusicDir=$music" }
+    else { Write-Warning "No Music folder at $music, so the installer has no music component." }
 }
+if ($SignTool) { $arguments += @("/Ssowsign=$SignTool", '/DSignToolName=sowsign') }
+$arguments += (Join-Path $PSScriptRoot 'installer\SOWBroadcast.iss')
 
-Write-Host "Done. Installer: $(Join-Path $releases 'SuomiOW.SOWBroadcast-win-Setup.exe')"
+& $iscc @arguments
+if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed.' }
+
+$setup = Join-Path $output "SOWBroadcast-Setup-$version.exe"
+if (-not (Test-Path $setup)) { throw "The installer was not produced: $setup" }
+# The program checks the download against this before it runs it.
+$hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText("$setup.sha256", "$hash  $(Split-Path -Leaf $setup)`n")
+
+Write-Host ("Done. Installer: {0} ({1:N0} MB)" -f $setup, ((Get-Item $setup).Length / 1MB))

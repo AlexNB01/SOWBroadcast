@@ -1,8 +1,10 @@
 namespace SowBroadcast.Core.Storage;
 
 /// <summary>
-/// Where the app keeps things. <c>SOWB_ROOT</c> (as in the legacy app) puts everything in one folder;
-/// otherwise generated data lives per user and the shipped overlay files live next to the program.
+/// Where the app keeps things. <c>SOWB_ROOT</c> (as in the legacy app) puts everything in one folder. Installed with the installer, the
+/// data lives in the <c>Data</c> folder next to the program (the installer creates it, so everything is in one place the user can find);
+/// a copy that has no such folder (a developer's build) keeps its data per user in <c>%LOCALAPPDATA%\SOWBroadcast</c>. The shipped
+/// overlay files live next to the program.
 /// </summary>
 public static class AppPaths
 {
@@ -19,7 +21,18 @@ public static class AppPaths
 
     /// <summary>Autosave, generated <c>Scoreboard/</c> files and user content (highlights, videos).</summary>
     public static string DataRoot =>
-        Override ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SOWBroadcast");
+        ResolveDataRoot(Override, AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+
+    /// <summary>The program's folder (where the installer put it).</summary>
+    public static string ProgramFolder => AppContext.BaseDirectory.TrimEnd('\\', '/');
+
+    /// <summary>The data folder for the given situation: the override, else <c>Data</c> next to the program when it exists, else per user.</summary>
+    public static string ResolveDataRoot(string? overridePath, string baseDirectory, string localAppData)
+    {
+        if (overridePath is not null) return overridePath;
+        var beside = Path.Combine(baseDirectory, "Data");
+        return Directory.Exists(beside) ? beside : Path.Combine(localAppData, "SOWBroadcast");
+    }
 
     /// <summary>Shipped, read-only files: <c>HTML/</c> overlays and the bundled <c>Scoreboard/</c> images.</summary>
     public static string ContentRoot => Override ?? FindContentRoot(AppContext.BaseDirectory);

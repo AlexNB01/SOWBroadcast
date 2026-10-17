@@ -68,6 +68,7 @@
         <MenuItem x:Name="UpdateStartupItem" Header="Check for updates when the program _starts" ToggleType="CheckBox" Click="OnUpdateStartupToggled" />
         <Separator />
         <MenuItem Header="Open _log folder" Click="OnOpenLogs" />
+        <MenuItem Header="Open _program folder" Click="OnOpenProgram" />
         <MenuItem Header="Open _data folder" Click="OnOpenData" />
       </MenuItem>
       <MenuItem Header="_Teams">

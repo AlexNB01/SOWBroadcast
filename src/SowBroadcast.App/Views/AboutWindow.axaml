@@ -20,6 +20,10 @@
       <TextBlock TextWrapping="Wrap" Text="Broadcast control for Suomi OW ry's Overwatch 2 streams." />
 
       <StackPanel Spacing="2">
+        <TextBlock Classes="label" Text="PROGRAM FOLDER" />
+        <TextBlock x:Name="ProgramText" Classes="muted" TextWrapping="Wrap" />
+      </StackPanel>
+      <StackPanel Spacing="2">
         <TextBlock Classes="label" Text="DATA FOLDER" />
         <TextBlock x:Name="DataText" Classes="muted" TextWrapping="Wrap" />
       </StackPanel>
@@ -29,6 +33,7 @@
       </StackPanel>
 
       <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,6,0,0">
+        <Button Content="Open program folder" Click="OnOpenProgram" />
         <Button Content="Open data folder" Click="OnOpenData" />
         <Button Content="Open log folder" Click="OnOpenLogs" />
         <Button Classes="primary" Content="Close" MinWidth="90" Click="OnClose" />

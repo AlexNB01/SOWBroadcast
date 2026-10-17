@@ -25,7 +25,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     private readonly AppServices _services;
     private readonly GlobalHotkeys _hotkeys = new();
     private readonly AppSettings _appSettings = AppSettings.Load(AppPaths.AppSettingsPath);
-    private readonly UpdateService _updates = new(new VelopackUpdater(AppInfo.Repository), AppInfo.Version);
+    private readonly UpdateService _updates = new(new InstallerUpdater(AppInfo.Repository, AppInfo.Version, AppPaths.ProgramFolder), AppInfo.Version);
     private readonly SowBroadcast.Integrations.Obs.ObsController _obsController = new();
     private Views.ObsWindow? _obsWindow;
     private Dictionary<HotkeyGesture, string> _windowKeys = new();
@@ -209,6 +209,12 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
                 {
                     _viewModel.StatusText = problem;
                     await ShowErrorAsync("Update", problem);
+                }
+                else
+                {
+                    // The installer is running: close the program so it can replace it (it starts the new version afterwards).
+                    _viewModel.StatusText = "Installing the update…";
+                    Close();
                 }
                 break;
             case UpdateCheckStatus.Failed:
@@ -462,6 +468,8 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     private async void OnAbout(object? sender, RoutedEventArgs e) => await new AboutWindow().ShowDialog(this);
 
     private void OnOpenLogs(object? sender, RoutedEventArgs e) => FolderOpener.Open(AppLog.Folder);
+
+    private void OnOpenProgram(object? sender, RoutedEventArgs e) => FolderOpener.Open(AppPaths.ProgramFolder);
 
     private void OnOpenData(object? sender, RoutedEventArgs e) => FolderOpener.Open(AppPaths.DataRoot);
 

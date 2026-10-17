@@ -1,5 +1,3 @@
-using Velopack;
-using Velopack.Sources;
 
 namespace SowBroadcast.App.Services;
 
@@ -17,32 +15,8 @@ public interface IAppUpdater
 
     Task DownloadAsync(UpdateOffer offer, Action<int> progress, CancellationToken cancellation);
 
-    /// <summary>Closes the program, installs the downloaded version and starts it again.</summary>
+    /// <summary>Starts the installer of the downloaded version; the caller then closes the program (the installer replaces it and starts it again).</summary>
     void ApplyAndRestart(UpdateOffer offer);
-}
-
-/// <summary>Velopack over the releases of the project's GitHub repository (the releases the installer script publishes).</summary>
-public sealed class VelopackUpdater : IAppUpdater
-{
-    private readonly UpdateManager _manager;
-
-    public VelopackUpdater(string repository)
-    {
-        _manager = new UpdateManager(new GithubSource($"https://github.com/{repository}", null, false));
-    }
-
-    public bool IsInstalled => _manager.IsInstalled;
-
-    public async Task<UpdateOffer?> CheckAsync(CancellationToken cancellation)
-    {
-        var info = await _manager.CheckForUpdatesAsync().ConfigureAwait(false);
-        return info is null ? null : new UpdateOffer(info.TargetFullRelease.Version.ToString(), info.TargetFullRelease.Size, info);
-    }
-
-    public Task DownloadAsync(UpdateOffer offer, Action<int> progress, CancellationToken cancellation) =>
-        _manager.DownloadUpdatesAsync((UpdateInfo)offer.Handle, progress, cancellation);
-
-    public void ApplyAndRestart(UpdateOffer offer) => _manager.ApplyUpdatesAndRestart((UpdateInfo)offer.Handle);
 }
 
 public enum UpdateCheckStatus { NotInstalled, UpToDate, Available, Failed }
@@ -69,7 +43,7 @@ public sealed class UpdateService
     {
         if (!_updater.IsInstalled)
             return new UpdateCheckResult(UpdateCheckStatus.NotInstalled,
-                "Updates work only in the installed program (SuomiOW.SOWBroadcast-win-Setup.exe). This copy was not installed with it.");
+                "Updates work only in the installed program (installed with SOWBroadcast-Setup-<version>.exe). This copy was not installed with it.");
         try
         {
             var offer = await _updater.CheckAsync(cancellation).ConfigureAwait(false);
