@@ -34,6 +34,25 @@ public static class AppPaths
         return Directory.Exists(beside) ? beside : Path.Combine(localAppData, "SOWBroadcast");
     }
 
+    /// <summary>
+    /// The folder where the user keeps the pictures and files the program's dialogs open in (team and broadcast logos, team files).
+    /// In the installed program it sits next to the program (<c>C:\SOW Broadcast\Logos</c>), where people can find it;
+    /// otherwise it is inside the data folder.
+    /// </summary>
+    public static string UserFilesRoot => ResolveUserFilesRoot(DataRoot);
+
+    public static string ResolveUserFilesRoot(string dataRoot)
+    {
+        var trimmed = dataRoot.TrimEnd('\\', '/');
+        return string.Equals(Path.GetFileName(trimmed), "Data", StringComparison.OrdinalIgnoreCase) && Path.GetDirectoryName(trimmed) is { Length: > 0 } parent
+            ? parent
+            : trimmed;
+    }
+
+    public static string TeamLogosDir => Path.Combine(UserFilesRoot, "Logos", "Team Logos");
+    public static string BroadcastLogosDir => Path.Combine(UserFilesRoot, "Logos", "Broadcast Logos");
+    public static string TeamFilesDir => Path.Combine(UserFilesRoot, "Team Files");
+
     /// <summary>Shipped, read-only files: <c>HTML/</c> overlays and the bundled <c>Scoreboard/</c> images.</summary>
     public static string ContentRoot => Override ?? FindContentRoot(AppContext.BaseDirectory);
 

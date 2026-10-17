@@ -219,3 +219,16 @@ public sealed class InstallerUpdaterTests : IDisposable
         Assert.Single(_started);
     }
 }
+
+public sealed class UserFilesFolderTests
+{
+    [Theory]
+    [InlineData(@"C:\SOW Broadcast\Data", @"C:\SOW Broadcast")]
+    [InlineData(@"C:\SOW Broadcast\Data\", @"C:\SOW Broadcast")]
+    [InlineData(@"C:\Users\x\AppData\Local\SOWBroadcast", @"C:\Users\x\AppData\Local\SOWBroadcast")]
+    [InlineData(@"D:\custom", @"D:\custom")]
+    public void The_logo_and_team_file_folders_sit_next_to_the_program_when_it_keeps_its_data_beside_itself(string dataRoot, string expected)
+    {
+        Assert.Equal(expected, AppPaths.ResolveUserFilesRoot(dataRoot));
+    }
+}

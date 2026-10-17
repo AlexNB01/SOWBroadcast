@@ -34,9 +34,10 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     {
         InitializeComponent();
         _services = AppServices.Start();
-        var teamsFolder = Path.Combine(AppPaths.ScoreboardDir, "Teams");
-        var logoFolder = Path.Combine(AppPaths.ScoreboardDir, "Temp", "Team Logos");
-        var broadcastLogoFolder = Path.Combine(AppPaths.ScoreboardDir, "Temp", "Broadcast Logos");
+        // Visible folders next to the program (C:\SOW Broadcast\Logos ...), where the file dialogs open
+        var teamsFolder = AppPaths.TeamFilesDir;
+        var logoFolder = AppPaths.TeamLogosDir;
+        var broadcastLogoFolder = AppPaths.BroadcastLogosDir;
         Directory.CreateDirectory(teamsFolder);
         Directory.CreateDirectory(logoFolder);
         Directory.CreateDirectory(broadcastLogoFolder);
@@ -45,7 +46,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         teamLibrary.Load();
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
             _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir,
-            standingsLogoFolder: teamsFolder, teamPicker: this,
+            standingsLogoFolder: logoFolder, teamPicker: this,
             linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action),
             archive: new SowBroadcast.Core.History.MatchArchive(Path.Combine(AppPaths.DataRoot, "History")),
             library: teamLibrary,

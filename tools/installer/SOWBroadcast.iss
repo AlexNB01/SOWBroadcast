@@ -79,6 +79,13 @@ Name: "datashortcut"; Description: "Create a Start menu shortcut to the &data fo
 ; The data folder: its presence next to the program is what tells the program to keep its data here.
 Name: "{app}\Data"; Components: program; Permissions: users-modify; Check: IsAdminInstallMode
 Name: "{app}\Data"; Components: program; Check: not IsAdminInstallMode
+; Folders the user fills and the file dialogs open in (the program creates them too, so a copy without installer works).
+Name: "{app}\Logos\Team Logos"; Components: program; Permissions: users-modify; Check: IsAdminInstallMode
+Name: "{app}\Logos\Team Logos"; Components: program; Check: not IsAdminInstallMode
+Name: "{app}\Logos\Broadcast Logos"; Components: program; Permissions: users-modify; Check: IsAdminInstallMode
+Name: "{app}\Logos\Broadcast Logos"; Components: program; Check: not IsAdminInstallMode
+Name: "{app}\Team Files"; Components: program; Permissions: users-modify; Check: IsAdminInstallMode
+Name: "{app}\Team Files"; Components: program; Check: not IsAdminInstallMode
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Components: program; Flags: ignoreversion recursesubdirs createallsubdirs
