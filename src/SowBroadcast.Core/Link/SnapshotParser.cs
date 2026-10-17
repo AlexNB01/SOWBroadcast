@@ -72,7 +72,8 @@ public static class SnapshotParser
             NullIfBlank(Str(tm, "logoUrl")),
             Array(tm, "players").Select(p => new LinkPlayer(
                 Str(p, "name"), Str(p, "battletag"), Str(p, "discord"), Str(p, "role"),
-                Array(p, "secondaryRoles").Select(r => r.GetString() ?? "").Where(r => r.Length > 0).ToArray())).ToArray())).ToArray();
+                Array(p, "secondaryRoles").Select(r => r.GetString() ?? "").Where(r => r.Length > 0).ToArray(),
+                NullIfBlank(Str(p, "hero")))).ToArray())).ToArray();
 
         var matches = Array(root, "matches").Select(m => new LinkMatch(
             Str(m, "id") ?? "", Str(m, "stageId"), Str(m, "bracket"), Str(m, "groupName"), Int(m, "round") ?? 0, Int(m, "matchNumber") ?? 0,

@@ -198,7 +198,7 @@ public sealed class TeamLibrary
     /// Takes the teams of a SOWDraft tournament: SOWDraft's values replace what the library has for a team of the same name, except that
     /// an abbreviation or colour SOWDraft does not have stays. <paramref name="logoPathOf"/> gives the downloaded file of a logo address.
     /// </summary>
-    public (int Added, int Updated, IReadOnlyList<string> Warnings) ImportFromLink(IEnumerable<LinkTeam> teams, Func<string, string?> logoPathOf)
+    public (int Added, int Updated, IReadOnlyList<string> Warnings) ImportFromLink(IEnumerable<LinkTeam> teams, Func<string, string?> logoPathOf, Func<string, string?>? resolveHero = null)
     {
         int added = 0, updated = 0;
         var warnings = new List<string>();
@@ -207,7 +207,7 @@ public sealed class TeamLibrary
             if (string.IsNullOrWhiteSpace(linked.Name)) continue;
             var existing = FindByName(linked.Name);
             var players = linked.Players.Take(Limits.PlayersPerTeam)
-                .Select(p => new Player { Name = LinkNaming.PlayerName(new LinkPlayer(p.Name, p.Battletag, p.Discord, p.Role, p.SecondaryRoles)), Hero = "", Role = LinkNaming.RoleOf(p.Role, p.SecondaryRoles) })
+                .Select(p => new Player { Name = LinkNaming.PlayerName(new LinkPlayer(p.Name, p.Battletag, p.Discord, p.Role, p.SecondaryRoles)), Hero = p.Hero is { Length: > 0 } hero ? resolveHero?.Invoke(hero) ?? "" : "", Role = LinkNaming.RoleOf(p.Role, p.SecondaryRoles) })
                 .ToArray();
             var team = new Team
             {

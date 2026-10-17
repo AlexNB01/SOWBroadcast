@@ -97,7 +97,7 @@ public sealed partial class MainWindowViewModel
         await Link.EnsureLogosAsync(teams.Where(t => !string.IsNullOrEmpty(t.LogoUrl)).Select(t => t.LogoUrl!));
         try
         {
-            var (added, updated, warnings) = _library.ImportFromLink(teams, url => Link.LogoPathOf(url));
+            var (added, updated, warnings) = _library.ImportFromLink(teams, url => Link.LogoPathOf(url), hero => ((ILinkHost)this).ResolveName(SowBroadcast.Core.Assets.AssetCategory.Heroes, hero));
             var text = $"SOWDraft teams: {added} added, {updated} updated";
             return Say(warnings.Count == 0 ? text : $"{text}. {string.Join(" ", warnings)}");
         }

@@ -171,7 +171,7 @@ public sealed class SnapshotParserTests
           "tournament": { "id": "t", "slug": "s", "name": "Cup", "format": "single_elimination", "status": "live", "bestOf": 3, "logoUrl": null },
           "stages": [ { "id": "s1", "name": "Main", "format": "single_elimination", "bestOf": 3, "ptsWin": 3, "ptsDraw": 1, "ptsLoss": 0, "tiebreakers": [] } ],
           "teams": [ { "id": "a", "name": "Alpha", "abbr": null, "color": "#ff0000", "logoUrl": "https://sowdraft.test/l.png",
-                       "players": [ { "name": "P", "battletag": "P#1", "role": "Tank", "secondaryRoles": ["Hitscan"], "country": "FI" } ] } ],
+                       "players": [ { "name": "P", "battletag": "P#1", "role": "Tank", "secondaryRoles": ["Hitscan"], "country": "FI", "hero": "Ana" }, { "name": "Q", "role": "Support", "hero": null } ] } ],
           "matches": [ { "id": "m", "stageId": "s1", "bracket": "main", "groupName": null, "round": 1, "matchNumber": 1, "team1Id": "a", "team2Id": null,
                          "score1": null, "score2": null, "winnerTeamId": null, "status": "in_progress", "scheduledAt": 5, "draftMatchId": "r", "bestOf": 3 } ],
           "standings": null,
@@ -188,6 +188,7 @@ public sealed class SnapshotParserTests
         Assert.Equal(42, snap.Version);
         Assert.Equal(("#ff0000", "https://sowdraft.test/l.png"), (snap.Teams[0].Color, snap.Teams[0].LogoUrl));
         Assert.Equal(new[] { "Hitscan" }, snap.Teams[0].Players[0].SecondaryRoles);
+        Assert.Equal(("Ana", null), (snap.Teams[0].Players[0].Hero, snap.Teams[0].Players[1].Hero));   // the hero an organiser set in SOWDraft
         Assert.Equal(5, snap.Matches[0].ScheduledAt);
         var live = snap.Live!;
         Assert.Equal((1, 0, "map", 2), (live.Score1, live.Score2, live.Phase, live.MapCount));
@@ -367,6 +368,54 @@ public sealed class MatchLinkMapperTests
         var changed = MatchLinkMapper.Apply(corrected, renamed, "m1", Options(), again.Received);
         Assert.Equal("Alpha 2", changed.State.Team1.Name);
         Assert.Equal(9, changed.State.Maps[0].T1);   // that value did not change in SOWDraft
+    }
+
+    private static TournamentSnapshot WithHeroes(TournamentSnapshot snap, params string?[] heroes) =>
+        snap with
+        {
+            Teams = snap.Teams.Select(t => t.Id != "a" ? t : t with
+            {
+                Players = t.Players.Select((p, i) => i < heroes.Length ? p with { Hero = heroes[i] } : p).ToArray(),
+            }).ToArray(),
+        };
+
+    [Fact]
+    public void The_hero_set_for_a_player_in_SOWDraft_is_filled_in_as_the_catalogue_spells_it()
+    {
+        var snap = WithHeroes(LinkFixtures.Snapshot(), "Soldier 76", "Ana");
+
+        var result = MatchLinkMapper.Apply(Blank(), snap, "m1", OptionsWithAliases() with { ResolveHero = name => name == "Soldier 76" ? "Soldier: 76" : name, }, NoHistory);
+
+        var players = result.State.Team1.Players;
+        Assert.Equal("Soldier: 76", players[0].Hero);
+        Assert.Equal("Ana", players[1].Hero);
+        Assert.Equal("", players[2].Hero);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void A_hero_the_catalogue_does_not_know_is_left_out_with_a_warning()
+    {
+        var snap = WithHeroes(LinkFixtures.Snapshot(), "Nobody");
+
+        var result = MatchLinkMapper.Apply(Blank(), snap, "m1", OptionsWithAliases(), NoHistory);
+
+        Assert.Equal("", result.State.Team1.Players[0].Hero);
+        Assert.Contains(result.Warnings, w => w.Contains("Hero \"Nobody\" is not in the hero list."));
+    }
+
+    [Fact]
+    public void A_hero_chosen_by_hand_stays_until_the_hero_in_SOWDraft_changes()
+    {
+        var opts = Options() with { ResolveHero = name => name };
+        var first = MatchLinkMapper.Apply(Blank(), WithHeroes(LinkFixtures.Snapshot(), "Ana"), "m1", opts, NoHistory);
+        var corrected = first.State with { Team1 = first.State.Team1 with { Players = first.State.Team1.Players.Select((p, i) => i == 0 ? p with { Hero = "Ashe" } : p).ToArray() } };
+
+        var same = MatchLinkMapper.Apply(corrected, WithHeroes(LinkFixtures.Snapshot(), "Ana"), "m1", opts, first.Received);
+        var changed = MatchLinkMapper.Apply(corrected, WithHeroes(LinkFixtures.Snapshot(), "Genji"), "m1", opts, first.Received);
+
+        Assert.Equal("Ashe", same.State.Team1.Players[0].Hero);      // SOWDraft's value did not change: the correction stays
+        Assert.Equal("Genji", changed.State.Team1.Players[0].Hero);  // it did: SOWDraft wins
     }
 
     [Fact]

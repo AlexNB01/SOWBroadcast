@@ -199,13 +199,13 @@ public sealed class TeamLibraryTests : IDisposable
         var teams = new[]
         {
             Linked("Kuusamo Wolves", abbr: null, color: "#112233", logo: "https://sowdraft.fi/logos/kw.png",
-                new LinkPlayer("Susi", "Susi#1234", null, "Tank", Array.Empty<string>()),
+                new LinkPlayer("Susi", "Susi#1234", null, "Tank", Array.Empty<string>(), "Ana"),
                 new LinkPlayer(null, null, "discord-name", "Main Support", new[] { "Hitscan", "Tank" })),
             Linked("Oulu", abbr: "OUL"),
             Linked("  ", abbr: "XX"),
         };
 
-        var (added, updated, warnings) = library.ImportFromLink(teams, url => url.EndsWith("kw.png") ? downloaded : null);
+        var (added, updated, warnings) = library.ImportFromLink(teams, url => url.EndsWith("kw.png") ? downloaded : null, hero => hero == "Ana" ? "Ana" : null);
 
         Assert.Equal((2, 0), (added, updated));
         Assert.Empty(warnings);
@@ -215,6 +215,7 @@ public sealed class TeamLibraryTests : IDisposable
         Assert.Equal("sowdraft", wolves.Source);
         Assert.Equal("Susi", wolves.Players[0].Name);             // the battletag before the #
         Assert.Equal("Tank", wolves.Players[0].Role);
+        Assert.Equal(("Ana", ""), (wolves.Players[0].Hero, wolves.Players[1].Hero));   // the hero set in SOWDraft, as the catalogue spells it
         Assert.Equal("discord-name", wolves.Players[1].Name);
         Assert.Equal("Flex", wolves.Players[1].Role);             // main role + secondary roles cover all three
         Assert.NotNull(library.LogoPathOf(wolves));

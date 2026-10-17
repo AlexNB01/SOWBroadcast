@@ -57,6 +57,16 @@ public static class MatchLinkMapper
         // A hero name as the catalogue spells it (by name or alias); the draft's own spelling when the catalogue does not know it.
         string Hero(string? name) => string.IsNullOrWhiteSpace(name) ? "" : options.ResolveHero?.Invoke(name) ?? name;
 
+        // The hero set for a player: as the catalogue spells it. One the catalogue does not know is left out, with a warning.
+        string PlayerHero(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "";
+            if (options.ResolveHero is null) return name;
+            var resolved = options.ResolveHero(name);
+            if (resolved is null) warnings.Add($"Hero \"{name}\" is not in the hero list.");
+            return resolved ?? "";
+        }
+
         // SOWDraft slot -> panel.
         string PanelOf(string? slot) => slot switch
         {
@@ -103,6 +113,7 @@ public static class MatchLinkMapper
                 var hasSource = i < source.Players.Count;
                 var name = hasSource ? LinkNaming.PlayerName(source.Players[i]) : "";
                 var role = hasSource ? LinkNaming.RoleOf(source.Players[i].Role, source.Players[i].SecondaryRoles) : "";
+                var hero = hasSource ? PlayerHero(source.Players[i].Hero) : "";
 
                 if (Changed($"{panel}.p{i}.name", name, out var previousName))
                 {
@@ -110,6 +121,7 @@ public static class MatchLinkMapper
                     p = p with { Name = name, Hero = previousName is not null && previousName != name ? "" : p.Hero };
                 }
                 if (Changed($"{panel}.p{i}.role", role, out _)) p = p with { Role = role };
+                if (Changed($"{panel}.p{i}.hero", hero, out _)) p = p with { Hero = hero };
                 players[i] = p;
             }
             current = current with { Players = players };

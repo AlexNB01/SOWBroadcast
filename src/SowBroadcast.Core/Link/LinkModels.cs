@@ -3,7 +3,8 @@ namespace SowBroadcast.Core.Link;
 // The neutral picture of a SOWDraft tournament that both sources (the new /broadcast API and the legacy public REST + draft
 // room) produce. Everything downstream (mapping to the match tab, standings and bracket) only knows these records.
 
-public sealed record LinkPlayer(string? Name, string? Battletag, string? Discord, string? Role, IReadOnlyList<string> SecondaryRoles);
+/// <param name="Hero">The hero an organiser set for the player in SOWDraft (broadcast data only), or null.</param>
+public sealed record LinkPlayer(string? Name, string? Battletag, string? Discord, string? Role, IReadOnlyList<string> SecondaryRoles, string? Hero = null);
 
 public sealed record LinkTeam(string Id, string Name, string? Abbr, string? Color, string? LogoUrl, IReadOnlyList<LinkPlayer> Players);
 
