@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using SowBroadcast.Server;
@@ -230,6 +231,128 @@ public sealed class OverlayServerTests : IAsyncLifetime
         var blocks = await ReadBlocksAsync(reader, 1);
 
         Assert.Equal("id: 1\ndata: {\"changed\":[\"waiting.timer\"],\"version\":1}", blocks[0]);
+    }
+
+    // ---- /ws (the same messages over a WebSocket, which is outside the browsers' six-connection limit) ------------
+
+    private async Task<ClientWebSocket> OpenSocketAsync(string? lastEventId = null, string? origin = null)
+    {
+        var socket = new ClientWebSocket();
+        if (origin is not null) socket.Options.SetRequestHeader("Origin", origin);
+        var uri = new Uri("ws://127.0.0.1:" + _server.Port + "/ws" + (lastEventId is null ? "" : "?lastEventId=" + lastEventId));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        await socket.ConnectAsync(uri, cts.Token);
+        return socket;
+    }
+
+    private static async Task<List<string>> ReadMessagesAsync(ClientWebSocket socket, int count)
+    {
+        var messages = new List<string>();
+        var buffer = new byte[4096];
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        while (messages.Count < count)
+        {
+            var result = await socket.ReceiveAsync(buffer, cts.Token);
+            if (result.MessageType == WebSocketMessageType.Close) break;
+            messages.Add(Encoding.UTF8.GetString(buffer, 0, result.Count));
+        }
+        return messages;
+    }
+
+    [Fact]
+    public async Task A_socket_gets_every_published_key_in_order_with_the_version()
+    {
+        using var socket = await OpenSocketAsync();
+        await Task.Delay(100);
+
+        for (var i = 0; i < 100; i++) _server.Hub.Publish(new[] { $"k{i}" });
+        var messages = await ReadMessagesAsync(socket, 100);
+
+        Assert.Equal(100, messages.Count);
+        for (var i = 0; i < 100; i++)
+        {
+            using var doc = JsonDocument.Parse(messages[i]);
+            Assert.Equal($"k{i}", doc.RootElement.GetProperty("changed")[0].GetString());
+            Assert.Equal(i + 1, doc.RootElement.GetProperty("version").GetInt64());
+        }
+    }
+
+    [Fact]
+    public async Task A_socket_does_not_replay_old_events_but_a_reconnect_gets_the_missed_ones()
+    {
+        for (var i = 0; i < 5; i++) _server.Hub.Publish(new[] { $"k{i}" });
+
+        using (var fresh = await OpenSocketAsync())
+        {
+            _server.Hub.Publish(new[] { "next" });
+            Assert.Contains("\"next\"", (await ReadMessagesAsync(fresh, 1))[0]);
+        }
+
+        using var again = await OpenSocketAsync(lastEventId: "3");
+        var messages = await ReadMessagesAsync(again, 3);
+        Assert.Contains("\"version\":4", messages[0]);
+        Assert.Contains("\"version\":5", messages[1]);
+        Assert.Contains("\"version\":6", messages[2]);
+    }
+
+    [Fact]
+    public async Task A_socket_from_a_previous_server_run_gets_one_full_refresh()
+    {
+        _server.Hub.Publish(new[] { "maps" });
+
+        using var socket = await OpenSocketAsync(lastEventId: "9999");
+        var message = (await ReadMessagesAsync(socket, 1))[0];
+
+        Assert.Contains("\"maps\"", message);
+        Assert.Contains("\"standings\"", message);
+    }
+
+    [Fact]
+    public async Task Many_sockets_do_not_starve_ordinary_requests()
+    {
+        var sockets = new List<ClientWebSocket>();
+        try
+        {
+            for (var i = 0; i < 12; i++) sockets.Add(await OpenSocketAsync());
+
+            Assert.Equal("<html>overlay</html>", await _http.GetStringAsync(Url("/HTML/scoreboard.html")));
+            Assert.Equal(12, _server.Hub.ClientCount);
+        }
+        finally { foreach (var s in sockets) s.Dispose(); }
+    }
+
+    [Fact]
+    public async Task A_page_from_another_address_cannot_listen_but_our_own_pages_and_plain_clients_can()
+    {
+        await Assert.ThrowsAsync<WebSocketException>(() => OpenSocketAsync(origin: "http://evil.example"));
+        await Assert.ThrowsAsync<WebSocketException>(() => OpenSocketAsync(origin: "http://127.0.0.1:" + (_server.Port + 1)));
+
+        using var own = await OpenSocketAsync(origin: "http://127.0.0.1:" + _server.Port);
+        using var local = await OpenSocketAsync(origin: "http://localhost:" + _server.Port);
+        Assert.Equal(WebSocketState.Open, own.State);
+        Assert.Equal(WebSocketState.Open, local.State);
+    }
+
+    [Fact]
+    public async Task A_closed_socket_is_removed_from_the_hub()
+    {
+        using (var socket = await OpenSocketAsync())
+        {
+            await Task.Delay(100);
+            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+        }
+
+        for (var i = 0; i < 50 && _server.Hub.ClientCount > 0; i++) await Task.Delay(100);
+
+        Assert.Equal(0, _server.Hub.ClientCount);
+    }
+
+    [Fact]
+    public async Task A_plain_request_to_the_socket_address_is_refused()
+    {
+        var response = await _http.GetAsync(Url("/ws"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     // ---- /api/state ----------------------------------------------------------------------------------------

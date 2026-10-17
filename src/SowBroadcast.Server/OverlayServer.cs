@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -122,7 +123,11 @@ public sealed class OverlayServer : IAsyncDisposable
             await next();
         });
 
+        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = options.KeepAliveInterval });
         app.MapGet("/events", (HttpContext context) => StreamEvents(context, hub, options));
+        // The same messages over a WebSocket: browsers allow only six HTTP/1.1 connections per address, and every overlay page held
+        // one open for /events, so with enough live OBS sources the rest of their requests were starved. WebSockets are outside that limit.
+        app.MapGet("/ws", (HttpContext context) => SocketEvents(context, hub));
         app.MapGet("/api/state", async (HttpContext context) =>
         {
             var json = options.StateProvider?.Invoke();
@@ -194,6 +199,68 @@ public sealed class OverlayServer : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) { /* client disconnected */ }
+    }
+
+    private static async Task SocketEvents(HttpContext context, EventHub hub)
+    {
+        if (!context.WebSockets.IsWebSocketRequest)
+        {
+            await BadRequest(context.Response, "This address takes WebSocket connections.");
+            return;
+        }
+
+        // Unlike a page reading /events, any web page can open a WebSocket to this address: only our own pages may.
+        var origin = context.Request.Headers.Origin.FirstOrDefault();
+        if (!string.IsNullOrEmpty(origin) &&
+            !(Uri.TryCreate(origin, UriKind.Absolute, out var uri) && uri.Port == context.Connection.LocalPort &&
+              (uri.Host == "127.0.0.1" || uri.Host == "localhost" || uri.Host == "[::1]")))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        long? lastId = null;
+        if (long.TryParse(context.Request.Query["lastEventId"].FirstOrDefault(), out var parsed)) lastId = parsed;
+
+        using var socket = await context.WebSockets.AcceptWebSocketAsync();
+        var (reader, subscription) = hub.Subscribe(lastId);
+        using var _ = subscription;
+        using var done = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+
+        // The client sends nothing we need; reading is how a close from its side is noticed.
+        var receiving = Task.Run(async () =>
+        {
+            var buffer = new byte[256];
+            try
+            {
+                while (socket.State == WebSocketState.Open)
+                {
+                    var result = await socket.ReceiveAsync(buffer, done.Token);
+                    if (result.MessageType == WebSocketMessageType.Close) break;
+                }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or WebSocketException) { /* gone */ }
+            done.Cancel();
+        });
+
+        try
+        {
+            while (!done.IsCancellationRequested && socket.State == WebSocketState.Open)
+            {
+                if (!await reader.WaitToReadAsync(done.Token)) break;
+                while (reader.TryRead(out var ev))
+                    await socket.SendAsync(Encoding.UTF8.GetBytes(ev.Payload), WebSocketMessageType.Text, true, done.Token);
+            }
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or WebSocketException) { /* client disconnected */ }
+
+        done.Cancel();
+        try { await receiving; } catch { /* already handled */ }
+        if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+        {
+            try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None); }
+            catch (WebSocketException) { /* the other side is already gone */ }
+        }
     }
 
     // Writes the status itself: a lambda returning Task<IResult> would bind to RequestDelegate and the result would be dropped.

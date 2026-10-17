@@ -22,7 +22,8 @@
   var state = null;       // the last /api/state
   var clockOffset = 0;    // server time minus this browser's time, for the countdown
   var loading = null;     // the first load
-  var source = null;      // our own SSE connection (keeps the state fresh for pages that poll)
+  var source = null;      // our own connection to the program (WebSocket, or SSE when that is not available)
+  var lastEventId = -1;   // the newest event this page has seen (a reconnect asks for what it missed)
   var subscribers = [];   // SOW.events() consumers
 
   // ---- loading -----------------------------------------------------------------------------------------
@@ -47,18 +48,46 @@
   // Events are handled one at a time, in order: refresh the state, then tell the page.
   var chain = Promise.resolve();
 
-  function startEvents() {
-    if (source || typeof EventSource === "undefined") return;
-    source = new EventSource("/events");
-    source.onmessage = function (ev) {
-      chain = chain.then(function () {
-        var version = -1;
-        try { version = (JSON.parse(ev.data || "{}").version) | 0; } catch (e) { /* not ours */ }
-        var stale = !state || version > (state.version | 0) || version < 0;
-        return (stale ? refresh() : Promise.resolve()).then(function () {
-          subscribers.forEach(function (s) { if (s.onmessage) { try { return s.onmessage({ data: ev.data }); } catch (e) { /* the page's problem */ } } });
-        });
+  function handle(data) {
+    chain = chain.then(function () {
+      var version = -1;
+      try { version = (JSON.parse(data || "{}").version) | 0; } catch (e) { /* not ours */ }
+      if (version > lastEventId) lastEventId = version;
+      var stale = !state || version > (state.version | 0) || version < 0;
+      return (stale ? refresh() : Promise.resolve()).then(function () {
+        subscribers.forEach(function (s) { if (s.onmessage) { try { return s.onmessage({ data: data }); } catch (e) { /* the page's problem */ } } });
       });
+    });
+  }
+
+  // The connection to the program is a WebSocket: browsers (and OBS) allow only six plain HTTP connections per address, and an
+  // open /events stream per overlay page used them all up, so the pages' other requests waited for ever. WebSockets are
+  // outside that limit. If a WebSocket cannot be opened at all, the old SSE stream (/events) is used instead.
+  function startEvents() {
+    if (source) return;
+    if (typeof WebSocket !== "undefined" && typeof location !== "undefined" && /^https?:$/.test(location.protocol)) connectSocket(0);
+    else connectStream();
+  }
+
+  function connectStream() {
+    if (typeof EventSource === "undefined") return;
+    source = new EventSource("/events");
+    source.onmessage = function (ev) { handle(ev.data); };
+  }
+
+  function connectSocket(failures) {
+    var opened = false;
+    var url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws" + (lastEventId >= 0 ? "?lastEventId=" + lastEventId : "");
+    var socket;
+    try { socket = new WebSocket(url); } catch (e) { connectStream(); return; }
+    source = socket;
+    socket.onopen = function () { opened = true; failures = 0; };
+    socket.onmessage = function (ev) { handle(ev.data); };
+    socket.onclose = function () {
+      if (source === socket) source = null;
+      // Never opened twice in a row: this program (or something in between) has no WebSocket, use the SSE stream.
+      if (!opened && failures >= 1) { connectStream(); return; }
+      setTimeout(function () { if (!source) connectSocket(opened ? 0 : failures + 1); }, opened ? 1000 : 2000);
     };
   }
 
