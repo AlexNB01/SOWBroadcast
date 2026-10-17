@@ -78,7 +78,12 @@ public static class SnapshotParser
         var matches = Array(root, "matches").Select(m => new LinkMatch(
             Str(m, "id") ?? "", Str(m, "stageId"), Str(m, "bracket"), Str(m, "groupName"), Int(m, "round") ?? 0, Int(m, "matchNumber") ?? 0,
             Str(m, "team1Id"), Str(m, "team2Id"), Int(m, "score1"), Int(m, "score2"), Str(m, "winnerTeamId"), Str(m, "status") ?? "",
-            Long(m, "scheduledAt"), Str(m, "draftMatchId"), Int(m, "bestOf"))).ToArray();
+            Long(m, "scheduledAt"), Str(m, "draftMatchId"), Int(m, "bestOf"),
+            Long(m, "startedAt"), Long(m, "completedAt"), NullIfBlank(Str(m, "roundName")), NullIfBlank(Str(m, "statusText")))).ToArray();
+
+        var advancement = Array(root, "advancement").Select(a => new AdvancementEntry(
+            Str(a, "stageId"), Str(a, "group"), Str(a, "teamId") ?? "", Str(a, "status") ?? ""))
+            .Where(a => a.TeamId.Length > 0 && a.Status.Length > 0).ToArray();
 
         return new TournamentSnapshot
         {
@@ -93,6 +98,7 @@ public static class SnapshotParser
             Teams = teams,
             Matches = matches,
             Standings = ParseStandings(Prop(root, "standings")),
+            Advancement = advancement,
             Live = Prop(root, "live") is { ValueKind: JsonValueKind.Object } live ? ParseLive(live) : null,
         };
     }

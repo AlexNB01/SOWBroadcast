@@ -123,6 +123,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         try { State = state; }
         finally { _collecting = false; }
         Match.Load(state);
+        General.Load(state);   // the status line the link fills in
         Standings.Load(state);
         Bracket.Load(state);
         TryPublish(updateStatus: false);

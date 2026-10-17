@@ -13,7 +13,11 @@ public sealed record LinkStage(string Id, string Name, string Format, int? BestO
 public sealed record LinkMatch(
     string Id, string? StageId, string? Bracket, string? GroupName, int Round, int MatchNumber,
     string? Team1Id, string? Team2Id, int? Score1, int? Score2, string? WinnerTeamId, string Status,
-    long? ScheduledAt, string? DraftMatchId, int? BestOf);
+    long? ScheduledAt, string? DraftMatchId, int? BestOf,
+    long? StartedAt = null, long? CompletedAt = null, string? RoundName = null, string? StatusText = null);
+
+/// <summary>A team of a group whose fate is decided: <c>Status</c> is "qualified" or "eliminated" (the broadcast API's <c>advancement</c>).</summary>
+public sealed record AdvancementEntry(string? StageId, string? Group, string TeamId, string Status);
 
 public sealed record LiveBan(string? Team, string Hero);
 
@@ -47,6 +51,7 @@ public sealed record TournamentSnapshot
     public IReadOnlyList<LinkTeam> Teams { get; init; } = Array.Empty<LinkTeam>();
     public IReadOnlyList<LinkMatch> Matches { get; init; } = Array.Empty<LinkMatch>();
     public IReadOnlyList<ServerStandingsGroup>? Standings { get; init; }
+    public IReadOnlyList<AdvancementEntry> Advancement { get; init; } = Array.Empty<AdvancementEntry>();
     public LiveState? Live { get; init; }
 
     public LinkTeam? TeamById(string? id) => string.IsNullOrEmpty(id) ? null : Teams.FirstOrDefault(t => t.Id == id);

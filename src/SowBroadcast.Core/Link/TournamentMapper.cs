@@ -11,6 +11,10 @@ public static class TournamentMapper
 
     // ---- standings ---------------------------------------------------------------------------------------
 
+    // "qualified" / "eliminated" for a team of a group (from SOWDraft's advancement list), else "".
+    private static string AdvancementOf(TournamentSnapshot snapshot, string? stageId, string? group, string? teamId) =>
+        snapshot.Advancement.FirstOrDefault(a => a.TeamId == teamId && a.Group == group && (a.StageId ?? "") == (stageId ?? ""))?.Status ?? "";
+
     public static StandingsSettings Standings(TournamentSnapshot snapshot, Func<string?, string?> logoOf)
     {
         var logo = snapshot.Teams.ToDictionary(t => t.Id, t => logoOf(t.LogoUrl));
@@ -31,7 +35,7 @@ public static class TournamentMapper
                         {
                             Key = $"{stage.Id}_{name}",
                             Name = $"{(string.IsNullOrEmpty(stage.Name) ? "Stage" : stage.Name)} - Group {name}",
-                            Rows = StageRows(groupMatches.Where(m => m.GroupName == name).ToArray(), stage, snapshot, logo),
+                            Rows = StageRows(groupMatches.Where(m => m.GroupName == name).ToArray(), stage, snapshot, logo, name),
                         });
                     }
                 }
@@ -41,7 +45,7 @@ public static class TournamentMapper
                     {
                         Key = string.IsNullOrEmpty(stage.Id) ? $"stage_{groups.Count + 1}" : stage.Id,
                         Name = string.IsNullOrEmpty(stage.Name) ? "Standings" : stage.Name,
-                        Rows = StageRows(stageMatches, stage, snapshot, logo),
+                        Rows = StageRows(stageMatches, stage, snapshot, logo, null),
                     });
                 }
             }
@@ -65,6 +69,7 @@ public static class TournamentMapper
                         MapDiff = e.MapDiff,
                         Points = e.Points,
                         Rank = i + 1,
+                        Status = AdvancementOf(snapshot, null, group.Key, e.Id),
                     }).ToArray(),
                 });
             }
@@ -90,7 +95,7 @@ public static class TournamentMapper
     /// to both, a loss its loss points; ordered by points, then score difference, then score for.
     /// </summary>
     private static IReadOnlyList<StandingsRow> StageRows(IReadOnlyList<LinkMatch> matches, LinkStage stage, TournamentSnapshot snapshot,
-        Dictionary<string, string?> logo)
+        Dictionary<string, string?> logo, string? group)
     {
         var stats = new Dictionary<string, Tally>();
         var order = new List<string>();
@@ -145,6 +150,7 @@ public static class TournamentMapper
                     MapDiff = t.Sf - t.Sa,
                     Points = t.Points,
                     Rank = index + 1,
+                    Status = AdvancementOf(snapshot, stage.Id, group, id),
                     Played = t.Played,
                     Draws = t.Draws,
                     Sf = t.Sf,

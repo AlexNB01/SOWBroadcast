@@ -140,6 +140,48 @@ public sealed class LinkIntegrationTests : IAsyncLifetime, IDisposable
         Assert.NotEmpty(matches.Skip(1));                                          // the pending ones are still there
     }
 
+    private const string ListTournament = """
+    {
+      "schemaVersion": 1, "version": 10, "updatedAt": 1,
+      "tournament": { "id": "t-uuid", "slug": "synth", "name": "Synthetic Cup", "format": "single_elimination", "status": "live", "bestOf": 3 },
+      "stages": [], "standings": null,
+      "teams": [ { "id": "a", "name": "Alpha", "players": [] }, { "id": "b", "name": "Bravo", "players": [] } ],
+      "matches": [
+        { "id": "old", "bracket": "main", "round": 1, "matchNumber": 1, "team1Id": "a", "team2Id": "b", "status": "completed", "completedAt": 1000, "roundName": "Quarterfinals" },
+        { "id": "new", "bracket": "main", "round": 2, "matchNumber": 1, "team1Id": "a", "team2Id": "b", "status": "completed", "completedAt": 5000, "roundName": "Semifinals" },
+        { "id": "early", "bracket": "main", "round": 3, "matchNumber": 1, "team1Id": "a", "team2Id": "b", "status": "in_progress", "startedAt": 2000, "draftMatchId": "r1", "roundName": "Final" },
+        { "id": "late", "bracket": "main", "round": 3, "matchNumber": 2, "team1Id": "b", "team2Id": "a", "status": "in_progress", "startedAt": 9000, "draftMatchId": "r2", "roundName": "Final" }
+      ],
+      "live": null
+    }
+    """;
+
+    [Fact]
+    public async Task The_list_names_the_rounds_puts_the_latest_started_match_first_and_hides_finished_matches_while_one_is_in_play()
+    {
+        _http.Set(Root + "/broadcast", 200, ListTournament);
+        _vm.Link.TournamentUrl = TournamentUrl;
+        await _vm.Link.LinkCommand.ExecuteAsync(null);
+
+        var matches = _vm.Link.Matches.Where(m => m.Id is not null).ToArray();
+
+        Assert.Equal(new[] { "late", "early" }, matches.Select(m => m.Id));
+        Assert.Equal("● Bravo vs Alpha – Final / in progress", matches[0].Label);
+    }
+
+    [Fact]
+    public async Task Finished_matches_are_listed_newest_first_with_their_round_names_when_nothing_is_in_play()
+    {
+        _http.Set(Root + "/broadcast", 200, ListTournament.Replace("\"status\": \"in_progress\"", "\"status\": \"pending\""));
+        _vm.Link.TournamentUrl = TournamentUrl;
+        await _vm.Link.LinkCommand.ExecuteAsync(null);
+
+        var matches = _vm.Link.Matches.Where(m => m.Id is not null).ToArray();
+
+        Assert.Equal(new[] { "early", "late", "new", "old" }, matches.Select(m => m.Id));   // pending first, then the finished ones newest first
+        Assert.Equal("Alpha vs Bravo – Semifinals / completed", matches.Single(m => m.Id == "new").Label);
+    }
+
     [Fact]
     public async Task Choosing_a_match_fills_the_match_tab_and_sends_it_to_the_overlays_at_once()
     {

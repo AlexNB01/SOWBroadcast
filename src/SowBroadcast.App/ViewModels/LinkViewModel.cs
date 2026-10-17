@@ -311,7 +311,7 @@ public sealed partial class LinkViewModel : ObservableObject
     }
 
     private static string Signature(AppState state) =>
-        StateStore.Serialize(state with { General = new GeneralSettings(), Waiting = new WaitingSettings() });
+        StateStore.Serialize(state with { General = new GeneralSettings { StatusText = state.General.StatusText }, Waiting = new WaitingSettings() });
 
     // ---- match list --------------------------------------------------------------------------------------
 
@@ -321,25 +321,30 @@ public sealed partial class LinkViewModel : ObservableObject
         static int Rank(LinkMatch m) =>
             m.Status == "in_progress" ? 0 : m.Status == "completed" ? 3 : string.IsNullOrEmpty(m.Team1Id) || string.IsNullOrEmpty(m.Team2Id) ? 2 : 1;
 
-        // Matches in play first, then the next ones to be played (soonest first), then the finished ones, newest first. While any match is
-        // in play the finished ones are left out (the one chosen stays, so the selection does not vanish).
+        // Matches in play first (the one started last on top), then the next ones to be played (soonest first), then the finished ones,
+        // newest first. While any match is in play the finished ones are left out (the one chosen stays, so the selection does not vanish).
         var anyInPlay = snapshot.Matches.Any(m => m.Status == "in_progress");
         var visible = snapshot.Matches
             .Where(m => m.Status != "bye" && !(anyInPlay && m.Status == "completed" && m.Id != selectedId))
             .ToArray();
-        var choices = visible.Where(m => Rank(m) < 3)
-            .OrderBy(Rank)
-            .ThenBy(m => m.ScheduledAt ?? long.MaxValue)
+        var choices = visible.Where(m => Rank(m) == 0)
+            .OrderByDescending(m => m.StartedAt ?? m.ScheduledAt ?? 0L)
             .ThenBy(m => m.Round)
             .ThenBy(m => m.MatchNumber)
+            .Concat(visible.Where(m => Rank(m) is 1 or 2)
+                .OrderBy(Rank)
+                .ThenBy(m => m.ScheduledAt ?? long.MaxValue)
+                .ThenBy(m => m.Round)
+                .ThenBy(m => m.MatchNumber))
             .Concat(visible.Where(m => Rank(m) == 3)
-                .OrderByDescending(m => m.ScheduledAt ?? 0L)
+                .OrderByDescending(m => m.CompletedAt ?? m.ScheduledAt ?? 0L)
                 .ThenByDescending(m => m.Round)
                 .ThenByDescending(m => m.MatchNumber))
             .Select(m =>
             {
                 var live = m.Status == "in_progress" && !string.IsNullOrEmpty(m.DraftMatchId);
-                var where = string.IsNullOrEmpty(m.GroupName) ? $"round {m.Round}" : $"group {m.GroupName}, round {m.Round}";
+                var round = string.IsNullOrEmpty(m.RoundName) ? $"round {m.Round}" : m.RoundName;
+                var where = string.IsNullOrEmpty(m.GroupName) ? round : $"group {m.GroupName}, {round}";
                 var status = m.Status.Replace('_', ' ');
                 return new MatchChoice(m.Id, $"{(live ? "● " : "")}{Name(m.Team1Id)} vs {Name(m.Team2Id)} – {where} / {status}", live);
             })

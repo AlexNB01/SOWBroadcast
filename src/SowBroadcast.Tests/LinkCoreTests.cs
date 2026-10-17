@@ -173,8 +173,10 @@ public sealed class SnapshotParserTests
           "teams": [ { "id": "a", "name": "Alpha", "abbr": null, "color": "#ff0000", "logoUrl": "https://sowdraft.test/l.png",
                        "players": [ { "name": "P", "battletag": "P#1", "role": "Tank", "secondaryRoles": ["Hitscan"], "country": "FI", "hero": "Ana" }, { "name": "Q", "role": "Support", "hero": null } ] } ],
           "matches": [ { "id": "m", "stageId": "s1", "bracket": "main", "groupName": null, "round": 1, "matchNumber": 1, "team1Id": "a", "team2Id": null,
-                         "score1": null, "score2": null, "winnerTeamId": null, "status": "in_progress", "scheduledAt": 5, "draftMatchId": "r", "bestOf": 3 } ],
+                         "score1": null, "score2": null, "winnerTeamId": null, "status": "in_progress", "scheduledAt": 5, "draftMatchId": "r", "bestOf": 3,
+                         "startedAt": 7, "completedAt": null, "roundName": "Quarterfinals", "statusText": "Cup – Quarterfinals – BO3" } ],
           "standings": null,
+          "advancement": [ { "stageId": "s1", "group": "A", "teamId": "a", "status": "qualified" }, { "stageId": null, "group": null, "teamId": "", "status": "" } ],
           "live": { "tournamentMatchId": "m", "draftMatchId": "r", "team1Id": "a", "team2Id": null, "phase": "map", "mapCount": 2,
                     "score": { "team1": 1, "team2": 0 }, "currentTurn": "team1", "countdownEnd": null,
                     "maps": [ { "order": 1, "map": "Busan", "gamemode": "control", "pickedBy": null, "auto": true, "side": null,
@@ -190,6 +192,9 @@ public sealed class SnapshotParserTests
         Assert.Equal(new[] { "Hitscan" }, snap.Teams[0].Players[0].SecondaryRoles);
         Assert.Equal(("Ana", null), (snap.Teams[0].Players[0].Hero, snap.Teams[0].Players[1].Hero));   // the hero an organiser set in SOWDraft
         Assert.Equal(5, snap.Matches[0].ScheduledAt);
+        Assert.Equal((7L, (long?)null, "Quarterfinals", "Cup – Quarterfinals – BO3"),
+            (snap.Matches[0].StartedAt, snap.Matches[0].CompletedAt, snap.Matches[0].RoundName, snap.Matches[0].StatusText));
+        Assert.Equal(new AdvancementEntry("s1", "A", "a", "qualified"), Assert.Single(snap.Advancement));   // an empty entry is dropped
         var live = snap.Live!;
         Assert.Equal((1, 0, "map", 2), (live.Score1, live.Score2, live.Phase, live.MapCount));
         var map = Assert.Single(live.Maps);
@@ -418,6 +423,33 @@ public sealed class MatchLinkMapperTests
         Assert.Equal("Genji", changed.State.Team1.Players[0].Hero);  // it did: SOWDraft wins
     }
 
+    private static TournamentSnapshot WithStatusText(TournamentSnapshot snap, string? text) =>
+        snap with { Matches = snap.Matches.Select(m => m.Id == "m1" ? m with { StatusText = text } : m).ToArray() };
+
+    [Fact]
+    public void The_status_line_of_the_match_is_filled_into_the_general_settings()
+    {
+        var result = MatchLinkMapper.Apply(Blank(), WithStatusText(LinkFixtures.Snapshot(), "Cup – Final – BO5"), "m1", Options(), NoHistory);
+
+        Assert.Equal("Cup – Final – BO5", result.State.General.StatusText);
+    }
+
+    [Fact]
+    public void A_status_line_typed_by_hand_stays_until_SOWDraft_changes_it_and_a_missing_one_changes_nothing()
+    {
+        var snap = WithStatusText(LinkFixtures.Snapshot(), "Cup – Final – BO5");
+        var first = MatchLinkMapper.Apply(Blank(), snap, "m1", Options(), NoHistory);
+        var typed = first.State with { General = first.State.General with { StatusText = "My own line" } };
+
+        var same = MatchLinkMapper.Apply(typed, snap, "m1", Options(), first.Received);
+        var changed = MatchLinkMapper.Apply(typed, WithStatusText(snap, "Cup – Semifinals – BO5"), "m1", Options(), first.Received);
+        var none = MatchLinkMapper.Apply(Blank() with { General = Blank().General with { StatusText = "Kept" } }, WithStatusText(LinkFixtures.Snapshot(), null), "m1", Options(), NoHistory);
+
+        Assert.Equal("My own line", same.State.General.StatusText);
+        Assert.Equal("Cup – Semifinals – BO5", changed.State.General.StatusText);
+        Assert.Equal("Kept", none.State.General.StatusText);
+    }
+
     [Fact]
     public void Switching_to_a_team_with_fewer_players_clears_the_leftover_rows_and_their_heroes()
     {
@@ -623,5 +655,60 @@ public sealed class TournamentMapperTests
         var rounds = TournamentMapper.Bracket(snap, NoLogo).Rounds;
 
         Assert.Equal(new[] { "Qualifier: Upper Final", "Finals: Upper Final" }, rounds.Select(r => r.Name));
+    }
+}
+
+public sealed class StandingsStatusTests
+{
+    private static string? NoLogo(string? _) => null;
+
+    private static TournamentSnapshot GroupSnapshot(params AdvancementEntry[] advancement)
+    {
+        LinkMatch Group(string id, string group, string t1, string t2, string? winner) =>
+            new(id, "g1", "group", group, 1, 1, t1, t2, winner is null ? null : 2, winner is null ? null : 0, winner, winner is null ? "pending" : "completed", null, null, 3);
+        var team = (string id, string name) => new LinkTeam(id, name, null, null, null, Array.Empty<LinkPlayer>());
+        return new TournamentSnapshot
+        {
+            Id = "t", Name = "Cup", Format = "group_stage",
+            Stages = new[] { new LinkStage("g1", "Groups", "group_stage", 3, 3, 1, 0) },
+            Teams = new[] { team("a", "Alpha"), team("b", "Bravo"), team("c", "Charlie"), team("d", "Delta") },
+            Matches = new[] { Group("m1", "A", "a", "b", "a"), Group("m2", "B", "c", "d", null) },
+            Advancement = advancement,
+        };
+    }
+
+    [Fact]
+    public void A_group_table_row_gets_the_status_SOWDraft_decided_for_its_team()
+    {
+        var standings = TournamentMapper.Standings(GroupSnapshot(
+            new AdvancementEntry("g1", "A", "a", "qualified"), new AdvancementEntry("g1", "A", "b", "eliminated")), NoLogo);
+
+        var groupA = standings.Groups.Single(g => g.Name.EndsWith("Group A"));
+        var groupB = standings.Groups.Single(g => g.Name.EndsWith("Group B"));
+        Assert.Equal(new[] { ("Alpha", "qualified"), ("Bravo", "eliminated") }, groupA.Rows.Select(r => (r.TeamName, r.Status)));
+        Assert.All(groupB.Rows, r => Assert.Equal("", r.Status));      // nothing decided there
+    }
+
+    [Fact]
+    public void An_entry_for_another_group_or_stage_does_not_leak_into_a_table()
+    {
+        var standings = TournamentMapper.Standings(GroupSnapshot(
+            new AdvancementEntry("g1", "B", "a", "qualified"), new AdvancementEntry("other", "A", "a", "qualified")), NoLogo);
+
+        Assert.All(standings.Groups.SelectMany(g => g.Rows), r => Assert.Equal("", r.Status));
+    }
+
+    [Fact]
+    public void Without_a_stage_the_servers_own_table_gets_the_status_too()
+    {
+        var snap = GroupSnapshot(new AdvancementEntry(null, "A", "a", "qualified")) with
+        {
+            Stages = Array.Empty<LinkStage>(),
+            Standings = new[] { new ServerStandingsGroup("A", new[] { new ServerStandingsEntry("a", "Alpha", 2, 0, 3, 6), new ServerStandingsEntry("b", "Bravo", 0, 2, -3, 0) }) },
+        };
+
+        var rows = TournamentMapper.Standings(snap, NoLogo).Groups[0].Rows;
+
+        Assert.Equal(new[] { "qualified", "" }, rows.Select(r => r.Status));
     }
 }

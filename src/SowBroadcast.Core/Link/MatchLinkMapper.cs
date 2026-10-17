@@ -175,7 +175,12 @@ public static class MatchLinkMapper
             }
         }
 
-        var result2 = StateDerivations.Apply(state with { Team1 = team1, Team2 = team2, Maps = maps });
+        // The status line (tournament, stage, group, round, series length) the operator would otherwise type.
+        var general = state.General;
+        if (!string.IsNullOrWhiteSpace(match.StatusText) && Changed("general.status", match.StatusText, out _))
+            general = general with { StatusText = match.StatusText };
+
+        var result2 = StateDerivations.Apply(state with { Team1 = team1, Team2 = team2, Maps = maps, General = general });
         return new LinkApplyResult(result2, rec, warnings, logos.Distinct().ToArray());
     }
 
