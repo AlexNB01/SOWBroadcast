@@ -5,40 +5,42 @@
              x:DataType="vm:LinkViewModel">
 
   <!-- The full SOWDraft link: tournament address, the match to follow, sides, status and the advanced manual draft room link. -->
-  <Border Classes="card" Padding="14,10">
-    <StackPanel Spacing="10">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
-        <TextBlock Classes="label" VerticalAlignment="Center" Text="SOWDRAFT TOURNAMENT" />
+  <Border Classes="card" Padding="12,8">
+    <StackPanel Spacing="6">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+        <TextBlock Classes="label" VerticalAlignment="Center" Text="SOWDRAFT" />
         <TextBox Grid.Column="1" Text="{Binding TournamentUrl}" IsEnabled="{Binding CanLink}"
                  Watermark="Paste the SOWDraft tournament link (e.g. https://…/tournament/…)" />
         <Button Grid.Column="2" Content="Link" IsEnabled="{Binding CanLink}" Command="{Binding LinkCommand}" />
         <Button Grid.Column="3" Content="Unlink" IsEnabled="{Binding IsLinked}" Command="{Binding UnlinkCommand}" />
+        <CheckBox Grid.Column="4" Content="Swap sides" IsChecked="{Binding SidesSwapped}" ToolTip.Tip="SOWDraft's team 1 goes to the Team 2 panel" />
+        <Button Grid.Column="5" Content="Advanced…" ToolTip.Tip="Link a draft room manually">
+          <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Spacing="8" Width="520">
+                <TextBlock Classes="label" Text="LINK A DRAFT ROOM MANUALLY" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                  <TextBox Text="{Binding ManualUrl}" IsEnabled="{Binding CanLink}"
+                           Watermark="Paste the SOWDraft stream link (e.g. https://…/stream?matchId=…)" />
+                  <Button Grid.Column="1" Content="Link draft room" IsEnabled="{Binding CanLink}" Command="{Binding LinkManualCommand}" />
+                </Grid>
+              </StackPanel>
+            </Flyout>
+          </Button.Flyout>
+        </Button>
       </Grid>
 
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" IsVisible="{Binding IsTournamentLinked}">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding IsTournamentLinked}">
         <TextBlock Classes="label" VerticalAlignment="Center" Text="MATCH" />
         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Matches}" SelectedItem="{Binding SelectedMatch}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:MatchChoice"><TextBlock Text="{Binding Label}" /></DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <CheckBox Grid.Column="2" Content="Swap sides" IsChecked="{Binding SidesSwapped}" ToolTip.Tip="SOWDraft's team 1 goes to the Team 2 panel" />
       </Grid>
 
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-        <TextBlock Classes="muted" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding StatusText}" />
-        <CheckBox Grid.Column="1" Content="Swap sides" IsChecked="{Binding SidesSwapped}" IsVisible="{Binding !IsTournamentLinked}"
-                  ToolTip.Tip="SOWDraft's team 1 goes to the Team 2 panel" />
-      </Grid>
+      <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding StatusText}" />
       <TextBlock Foreground="{DynamicResource SowBladeBrush}" TextWrapping="Wrap" Text="{Binding WarningText}" IsVisible="{Binding WarningText.Length}" />
-
-      <Expander Header="Advanced – link a draft room manually" Padding="0">
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,8,0,0">
-          <TextBox Text="{Binding ManualUrl}" IsEnabled="{Binding CanLink}"
-                   Watermark="Paste the SOWDraft stream link (e.g. https://…/stream?matchId=…)" />
-          <Button Grid.Column="1" Content="Link draft room" IsEnabled="{Binding CanLink}" Command="{Binding LinkManualCommand}" />
-        </Grid>
-      </Expander>
     </StackPanel>
   </Border>
 </UserControl>

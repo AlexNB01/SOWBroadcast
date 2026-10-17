@@ -37,46 +37,42 @@
 
         <ItemsControl ItemsSource="{Binding Match.Maps}">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate>
+            <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MapCardViewModel">
-              <Border Classes="card" Padding="8" Margin="0,0,8,8" IsVisible="{Binding IsShown}">
-                <StackPanel Spacing="6">
-                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                    <Border Classes="cardTitle"><TextBlock Classes="h2" Text="{Binding Label}" /></Border>
-                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding PickOptions}" SelectedItem="{Binding SelectedPick}">
-                      <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:PickOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
-                      </ComboBox.ItemTemplate>
-                    </ComboBox>
-                  </Grid>
+              <Border Classes="card" Padding="8,6" IsVisible="{Binding IsShown}">
+                <Grid ColumnDefinitions="Auto,150,Auto,2*,Auto,Auto,Auto,*,Auto,*" ColumnSpacing="8">
+                  <Border Classes="cardTitle" VerticalAlignment="Center"><TextBlock Classes="h2" Text="{Binding Label}" /></Border>
+                  <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" ItemsSource="{Binding PickOptions}" SelectedItem="{Binding SelectedPick}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PickOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
 
-                  <Border Width="128" Height="72" ClipToBounds="True" CornerRadius="4" Background="{DynamicResource SowNightBrush}">
+                  <Border Grid.Column="2" Width="64" Height="36" ClipToBounds="True" CornerRadius="4" VerticalAlignment="Center" Background="{DynamicResource SowNightBrush}">
                     <Panel>
-                      <TextBlock Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" Text="TBA" />
-                      <Image Source="{Binding MapImagePath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=256}"
+                      <TextBlock Classes="muted" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" Text="TBA" />
+                      <Image Source="{Binding MapImagePath, Converter={x:Static conv:PathToBitmapConverter.Instance}, ConverterParameter=128}"
                              Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
                     </Panel>
                   </Border>
 
-                  <controls:SearchableComboBox ItemsSource="{Binding MapNames}" SelectedItem="{Binding Map}" NoneText="— Map —" />
+                  <controls:SearchableComboBox Grid.Column="3" VerticalAlignment="Center" ItemsSource="{Binding MapNames}" SelectedItem="{Binding Map}" NoneText="— Map —" />
 
-                  <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="6">
-                    <NumericUpDown MinWidth="0" Minimum="0" Maximum="200" FormatString="0" Value="{Binding T1}" />
-                    <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" Text="–" />
-                    <NumericUpDown Grid.Column="2" MinWidth="0" Minimum="0" Maximum="200" FormatString="0" Value="{Binding T2}" />
-                  </Grid>
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <NumericUpDown Width="100" MinWidth="0" Minimum="0" Maximum="200" FormatString="0" Value="{Binding T1}" />
+                    <TextBlock Classes="muted" VerticalAlignment="Center" Text="–" />
+                    <NumericUpDown Width="100" MinWidth="0" Minimum="0" Maximum="200" FormatString="0" Value="{Binding T2}" />
+                  </StackPanel>
 
-                  <CheckBox Content="Completed" IsChecked="{Binding Completed}" />
+                  <CheckBox Grid.Column="5" VerticalAlignment="Center" Content="Completed" IsChecked="{Binding Completed}" />
 
-                  <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
-                    <TextBlock Classes="label" VerticalAlignment="Center" Text="T1 BAN" />
-                    <controls:SearchableComboBox Grid.Column="1" ItemsSource="{Binding HeroNames}" SelectedItem="{Binding T1Ban}" NoneText="— Hero —" />
-                    <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="T2 BAN" />
-                    <controls:SearchableComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding HeroNames}" SelectedItem="{Binding T2Ban}" NoneText="— Hero —" />
-                  </Grid>
-                </StackPanel>
+                  <TextBlock Grid.Column="6" Classes="label" VerticalAlignment="Center" Text="T1 BAN" />
+                  <controls:SearchableComboBox Grid.Column="7" VerticalAlignment="Center" ItemsSource="{Binding HeroNames}" SelectedItem="{Binding T1Ban}" NoneText="— Hero —" />
+                  <TextBlock Grid.Column="8" Classes="label" VerticalAlignment="Center" Text="T2 BAN" />
+                  <controls:SearchableComboBox Grid.Column="9" VerticalAlignment="Center" ItemsSource="{Binding HeroNames}" SelectedItem="{Binding T2Ban}" NoneText="— Hero —" />
+                </Grid>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
