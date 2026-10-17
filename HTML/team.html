@@ -321,8 +321,9 @@
     const subs     = players.slice(5);
 
     const startersEl=document.getElementById("starters");
-    startersEl.innerHTML="";
-    for(const p of starters){ startersEl.appendChild(await createPlayerCard(p)); }
+    const cards=[];
+    for(const p of starters){ cards.push(await createPlayerCard(p)); }
+    startersEl.replaceChildren(...cards);
 
     const subsEl=document.getElementById("subs");
     subsEl.innerHTML="";
@@ -361,19 +362,29 @@
     applyStagger(live);
   }
 
+  let rendering = false, pending = null;   // pending: null, or {live} for the one render still to do
+  async function renderQueued(live){
+    if(rendering){ pending = { live: live && (pending ? pending.live : true) }; return; }
+    rendering = true;
+    try{
+      await render(live);
+      while(pending){ const next = pending; pending = null; await render(next.live); }
+    }finally{ rendering = false; }
+  }
+
   function startSSE(){
     try{
       const es=SOW.events();
       es.onmessage=async ev=>{
         try{
           const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
-          if(ch.some(k=>k.startsWith(TEAM.toLowerCase() + ".") || k==="general.colors")) await render(true);
+          if(ch.some(k=>k.startsWith(TEAM.toLowerCase() + ".") || k==="general.colors")) await renderQueued(true);
         }catch{}
       };
     }catch{}
   }
 
-  (async()=>{ await render(); startSSE(); })();
+  (async()=>{ await renderQueued(false); startSSE(); })();
 
 function setOverlayVisible(v){
   if(v) applyStagger();
