@@ -207,28 +207,48 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
     return (rows || []).some(row => row.played !== undefined && row.played !== null);
   }
 
+  // The fixed columns in canvas pixels (the team column takes what is left). Wide enough to spell out full words instead of
+  // abbreviations; they grow with the row scale so the columns stay proportional on a short single-group table.
+  function fixedColumns(showStatus, showExtended){
+    const cols = showExtended ? [60, 130, 85, 110, 95, 85, 150, 75, 120] : [60, 85, 95, 75, 120];
+    if(showStatus) cols.push(110);
+    return cols;
+  }
+
+  // The team column must keep at least this much (at row scale 1), or the names and logos disappear.
+  const TEAM_MIN = 340;   // a logo, its gap and about sixteen letters
+  // The width of a table's content on the 1920 px canvas: one table fills the frame, two tables sit side by side.
+  function availableWidth(isSingleTable){
+    return isSingleTable ? 1688 : 806;
+  }
+  // The fixed columns plus the gaps between all the columns (one gap of 16 px per fixed column; the team column is the other side of one).
+  function fixedWidth(showStatus, showExtended){
+    const cols = fixedColumns(showStatus, showExtended);
+    return cols.reduce((sum, n)=> sum + n, 0) + 16 * cols.length;
+  }
+  // The long layout (played, drawn, for, against) only when it leaves room for the team.
+  function fitsExtended(showStatus, isSingleTable){
+    return fixedWidth(showStatus, true) + TEAM_MIN <= availableWidth(isSingleTable);
+  }
+
   function gridColumns(showStatus, showExtended, rowScale){
-    // Wide enough to spell out full words instead of abbreviations - also
-    // fills more of the row width when only one table is on screen, instead
-    // of leaving a wide empty gap next to a handful of narrow letter columns.
-    // Scales with rowScale so columns stay proportional to the enlarged
-    // row height/font on a short single-group table.
     const rs = rowScale || 1;
     const px = n => `${Math.round(n * rs)}px`;
-    const cols = showExtended
-      ? [px(60), "1fr", px(130), px(85), px(110), px(95), px(85), px(150), px(75), px(120)]
-      : [px(60), "1fr", px(85), px(95), px(75), px(120)];
-    if(showStatus) cols.push(px(110));
-    return cols.join(" ");
+    const fixed = fixedColumns(showStatus, showExtended).map(px);
+    // [rank, team, ...the rest]: the team column takes the free width
+    return [fixed[0], "1fr", ...fixed.slice(1)].join(" ");
   }
 
   // Few teams in the only table on screen -> grow rows (font/padding/logos,
   // via the --rs CSS variable) instead of leaving a small table floating in
   // a lot of empty space. Caps out at 2x so a 4-team stage doesn't get
   // comically oversized text.
-  function computeRowScale(rowCount, isSingleTable){
+  function computeRowScale(rowCount, isSingleTable, showStatus, showExtended){
     if(!isSingleTable) return 1;
-    return Math.min(2, Math.max(1, 8 / Math.max(rowCount, 1)));
+    const byRows = Math.min(2, Math.max(1, 8 / Math.max(rowCount, 1)));
+    // never so large that the columns crowd the team column out (4 teams used to double the columns and leave no room for names)
+    const byWidth = availableWidth(true) / (fixedWidth(showStatus, showExtended) + TEAM_MIN);
+    return Math.max(1, Math.min(byRows, byWidth));
   }
 
   function buildHeader(showStatus, showExtended, rowScale){
@@ -333,8 +353,9 @@ body.leaving       .canvas { transform: translateY(32px); opacity: 0; }
         displayRows.push({ __placeholder: true });
       }
       const showStatus = rows.some(row=>String(row.status || "").trim());
-      const showExtended = hasExtendedStats(rows);
-      const rowScale = computeRowScale(displayRows.length, activeGroups.length === 1);
+      const isSingleTable = activeGroups.length === 1;
+      const showExtended = hasExtendedStats(rows) && fitsExtended(showStatus, isSingleTable);
+      const rowScale = computeRowScale(displayRows.length, isSingleTable, showStatus, showExtended);
 
       const table = document.createElement("div");
       table.className = "table";
