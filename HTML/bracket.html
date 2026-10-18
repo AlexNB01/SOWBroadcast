@@ -288,17 +288,12 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
           const want = Math.ceil(place / 2);
           const targetEl = targetEls.find(el => Number(el.dataset.slot) === want) || targetEls[want - 1];
           if(!targetEl) return;
-          let target = edges(targetEl);
-          // Its neighbour place is a bye, so the other team of the next match is already there: line this match up
-          // with the team row it feeds (the upper row for an odd place, the lower for an even one) and join them
-          // with a straight line instead of an elbow.
+          const target = edges(targetEl);
+          // Its neighbour place is a bye, so nothing else feeds the next match: put this match at the same height as
+          // the match it feeds and join them with a straight line instead of an elbow.
           const siblingPlace = place % 2 === 1 ? place + 1 : place - 1;
-          const row = targetEl.querySelectorAll(".team")[place % 2 === 1 ? 0 : 1];
-          if(row && !places.has(siblingPlace)){
-            const rowRect = row.getBoundingClientRect();
-            const rowCenter = rowRect.top - origin.top + rowRect.height / 2;
-            sourceEl.style.transform = `translateY(${rowCenter - edges(sourceEl).centerY}px)`;
-            target = { ...target, centerY: rowCenter };
+          if(!places.has(siblingPlace)){
+            sourceEl.style.transform = `translateY(${target.centerY - edges(sourceEl).centerY}px)`;
           }
           const source = edges(sourceEl);
           addElbowConnector(layer, source.right, source.centerY, target.left, target.centerY);
