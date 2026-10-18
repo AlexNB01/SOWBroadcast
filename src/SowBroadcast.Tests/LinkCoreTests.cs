@@ -640,7 +640,7 @@ public sealed class TournamentMapperTests
     }
 
     [Fact]
-    public void With_several_bracket_stages_the_round_names_carry_the_stage_name()
+    public void With_several_bracket_stages_the_round_names_do_not_carry_the_stage_name()
     {
         var snap = new TournamentSnapshot
         {
@@ -654,7 +654,7 @@ public sealed class TournamentMapperTests
 
         var rounds = TournamentMapper.Bracket(snap, NoLogo).Rounds;
 
-        Assert.Equal(new[] { "Qualifier: Upper Final", "Finals: Upper Final" }, rounds.Select(r => r.Name));
+        Assert.Equal(new[] { "Upper Final", "Upper Final" }, rounds.Select(r => r.Name));
     }
 }
 

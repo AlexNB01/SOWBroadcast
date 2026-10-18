@@ -171,9 +171,8 @@ public static class TournamentMapper
 
         var rounds = new List<BracketRound>();
         var stages = snapshot.Stages.Where(s => BracketFormats.Contains(s.Format)).ToArray();
-        var multiStage = stages.Length > 1;
 
-        void AddRounds(IEnumerable<LinkMatch> stageMatches, string stageLabel, int? bestOf)
+        void AddRounds(IEnumerable<LinkMatch> stageMatches, int? bestOf)
         {
             var boLabel = bestOf is > 0 ? $"BO{bestOf}" : "";
             var bySide = stageMatches
@@ -198,9 +197,7 @@ public static class TournamentMapper
                         Status = "",
                         ScheduledAt = m.ScheduledAt ?? 0,
                     }).ToArray();
-                    var name = RoundName(side, roundNo, maxRound);
-                    if (multiStage && stageLabel.Length > 0) name = $"{stageLabel}: {name}";
-                    rounds.Add(new BracketRound { Name = name, Side = side, Matches = matches });
+                    rounds.Add(new BracketRound { Name = RoundName(side, roundNo, maxRound), Side = side, Matches = matches });
                 }
             }
         }
@@ -212,13 +209,13 @@ public static class TournamentMapper
                 var stageMatches = snapshot.Matches.Where(m => m.StageId == stage.Id);
                 if (stage.Format == "group_stage")
                     stageMatches = stageMatches.Where(m => m.Bracket is "playoff" or "main");
-                AddRounds(stageMatches, stage.Name, stage.BestOf ?? snapshot.BestOf);
+                AddRounds(stageMatches, stage.BestOf ?? snapshot.BestOf);
             }
         }
         else
         {
             // Not staged: matches carry the fixed bracket kinds directly.
-            AddRounds(snapshot.Matches, "", snapshot.BestOf);
+            AddRounds(snapshot.Matches, snapshot.BestOf);
         }
 
         return new BracketSettings

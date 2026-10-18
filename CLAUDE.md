@@ -709,7 +709,7 @@ siellä missä vanha sovellus käyttää sitä ("Overlay colours", "Select colou
 - **Bracket**: vaiheet `single_elimination, double_elimination, group_stage`. `bye`-matchit pudotetaan; säilytä vain `bracket` ∈
   `main, winners, losers, grand_final, playoff`. Sivu: `winners→upper`, `losers→lower`, `grand_final→grand`, muu→`upper`.
   Kierrosnimi etäisyydestä viimeiseen: `Final` / `Semifinals` / `Quarterfinals` / `Round N`, etuliite `Upper `/`Lower `; grand → `Grand Final`;
-  useampi vaihe → `"{Stage}: {nimi}"`. `bo_label = "BO{best_of}"`. Tiimilista max 16; `double_elim_view="upper"`; `stage=""`.
+  useampi vaihe → ei enää etuliitettä (uusi sovellus jättää vaiheen nimen pois kierrosotsikoista, 2026-10-18). `bo_label = "BO{best_of}"`. Tiimilista max 16; `double_elim_view="upper"`; `stage=""`.
 - Linkin jälkeen Standings- ja Bracket-välilehdet lukitaan kunnes Unlink (data jää paikalleen).
 
 ### 8.4 Linkityksen uusi malli: turnaus ensin (PÄÄTETTY 2026-10-15, korvaa 8.1:n ja 8.2:n käyttötavan)
