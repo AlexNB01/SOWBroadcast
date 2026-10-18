@@ -53,6 +53,7 @@ public sealed partial class BracketMatchViewModel : EditableObject
     // Carried through unchanged (they come from a tournament link or the template).
     private readonly string _id, _boLabel, _status;
     private readonly long _scheduledAt;
+    private readonly int _slot;
 
     public BracketMatchViewModel(BracketMatch match, Func<string, TeamRef?> lookup, IReadOnlyList<string> teamNames)
     {
@@ -61,6 +62,7 @@ public sealed partial class BracketMatchViewModel : EditableObject
         _boLabel = match.BoLabel;
         _status = match.Status;
         _scheduledAt = match.ScheduledAt;
+        _slot = match.Slot;
         _ref1 = match.Team1;
         _ref2 = match.Team2;
         Loading = true;
@@ -124,6 +126,7 @@ public sealed partial class BracketMatchViewModel : EditableObject
         Score1 = Math.Clamp(Score1, 0, 99),
         Score2 = Math.Clamp(Score2, 0, 99),
         ScheduledAt = _scheduledAt,
+        Slot = _slot,
     };
 }
 
@@ -133,14 +136,16 @@ public sealed class BracketRoundViewModel
     {
         Name = round.Name;
         Side = round.Side;
+        Slots = round.Slots;
         Matches = matches;
     }
 
     public string Name { get; }
     public string Side { get; }
+    public int Slots { get; }
     public IReadOnlyList<BracketMatchViewModel> Matches { get; }
 
-    public BracketRound ToRound() => new() { Name = Name, Side = Side, Matches = Matches.Select(m => m.ToMatch()).ToArray() };
+    public BracketRound ToRound() => new() { Name = Name, Side = Side, Slots = Slots, Matches = Matches.Select(m => m.ToMatch()).ToArray() };
 }
 
 public sealed class BracketSectionViewModel

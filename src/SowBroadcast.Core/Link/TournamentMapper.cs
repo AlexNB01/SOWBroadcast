@@ -175,10 +175,19 @@ public static class TournamentMapper
         void AddRounds(IEnumerable<LinkMatch> stageMatches, int? bestOf)
         {
             var boLabel = bestOf is > 0 ? $"BO{bestOf}" : "";
-            var bySide = stageMatches
-                .Where(m => m.Status != "bye" && BracketKinds.Contains(string.IsNullOrEmpty(m.Bracket) ? "main" : m.Bracket!))
+            var inBracket = stageMatches
+                .Where(m => BracketKinds.Contains(string.IsNullOrEmpty(m.Bracket) ? "main" : m.Bracket!))
+                .ToArray();
+            var bySide = inBracket
+                .Where(m => m.Status != "bye")
                 .GroupBy(m => SideOf(m.Bracket))
                 .ToDictionary(g => g.Key, g => g.GroupBy(m => m.Round <= 0 ? 1 : m.Round).ToDictionary(r => r.Key, r => r.ToArray()));
+            // Every place of an upper round, byes included: a round whose byes are left out keeps its matches in their places,
+            // so the overlay draws them where they are and joins them to the match they really feed.
+            var places = inBracket
+                .Where(m => SideOf(m.Bracket) == "upper")
+                .GroupBy(m => m.Round <= 0 ? 1 : m.Round)
+                .ToDictionary(g => g.Key, g => g.Count());
 
             foreach (var side in new[] { "upper", "lower", "grand" }.Where(bySide.ContainsKey))
             {
@@ -186,7 +195,9 @@ public static class TournamentMapper
                 var maxRound = roundMap.Keys.Max();
                 foreach (var roundNo in roundMap.Keys.OrderBy(k => k))
                 {
-                    var matches = roundMap[roundNo].OrderBy(m => m.MatchNumber).Select(m => new BracketMatch
+                    var inRound = roundMap[roundNo];
+                    var slots = side == "upper" && places.TryGetValue(roundNo, out var all) && all > inRound.Length ? all : 0;
+                    var matches = inRound.OrderBy(m => m.MatchNumber).Select(m => new BracketMatch
                     {
                         Id = m.Id,
                         BoLabel = boLabel,
@@ -196,8 +207,9 @@ public static class TournamentMapper
                         Score2 = m.Score2 ?? 0,
                         Status = "",
                         ScheduledAt = m.ScheduledAt ?? 0,
+                        Slot = slots > 0 ? m.MatchNumber : 0,
                     }).ToArray();
-                    rounds.Add(new BracketRound { Name = RoundName(side, roundNo, maxRound), Side = side, Matches = matches });
+                    rounds.Add(new BracketRound { Name = RoundName(side, roundNo, maxRound), Side = side, Slots = slots, Matches = matches });
                 }
             }
         }

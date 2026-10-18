@@ -307,21 +307,31 @@ public sealed class ScoreboardExporter
         {
             ["title"] = b.Title,
             ["stage"] = b.Stage,
-            ["rounds"] = new JsonArray(b.Rounds.Select(r => (JsonNode)new JsonObject
+            ["rounds"] = new JsonArray(b.Rounds.Select(r =>
             {
-                ["name"] = r.Name,
-                ["side"] = r.Side,
-                ["matches"] = new JsonArray(r.Matches.Select(m => (JsonNode)new JsonObject
+                var round = new JsonObject
                 {
-                    ["id"] = m.Id,
-                    ["bo_label"] = m.BoLabel,
-                    ["team1"] = TeamRefJson(m.Team1),
-                    ["team2"] = TeamRefJson(m.Team2),
-                    ["score1"] = m.Score1,
-                    ["score2"] = m.Score2,
-                    ["status"] = m.Status,
-                    ["scheduled_at"] = m.ScheduledAt,
-                }).ToArray()),
+                    ["name"] = r.Name,
+                    ["side"] = r.Side,
+                    ["matches"] = new JsonArray(r.Matches.Select(m =>
+                    {
+                        var match = new JsonObject
+                        {
+                            ["id"] = m.Id,
+                            ["bo_label"] = m.BoLabel,
+                            ["team1"] = TeamRefJson(m.Team1),
+                            ["team2"] = TeamRefJson(m.Team2),
+                            ["score1"] = m.Score1,
+                            ["score2"] = m.Score2,
+                            ["status"] = m.Status,
+                            ["scheduled_at"] = m.ScheduledAt,
+                        };
+                        if (m.Slot > 0) match["slot"] = m.Slot;      // only when byes were left out of the round
+                        return (JsonNode)match;
+                    }).ToArray()),
+                };
+                if (r.Slots > 0) round["slots"] = r.Slots;
+                return (JsonNode)round;
             }).ToArray()),
             ["double_elim_view"] = b.DoubleElimView,
         };

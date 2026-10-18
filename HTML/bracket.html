@@ -279,6 +279,19 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
 
     function connect(sourceEls, targetEls){
       if(!sourceEls.length || !targetEls.length) return;
+      // A round whose byes were left out says which place each match has: the winner of place p goes to place
+      // ceil(p / 2) of the next round, so the line must follow that and not the order of the cards.
+      if(sourceEls.every(el => el.dataset.slot)){
+        sourceEls.forEach(sourceEl=>{
+          const want = Math.ceil(Number(sourceEl.dataset.slot) / 2);
+          const targetEl = targetEls.find(el => Number(el.dataset.slot) === want) || targetEls[want - 1];
+          if(!targetEl) return;
+          const source = edges(sourceEl);
+          const target = edges(targetEl);
+          addElbowConnector(layer, source.right, source.centerY, target.left, target.centerY);
+        });
+        return;
+      }
       const ratio = Math.max(1, Math.round(sourceEls.length / targetEls.length));
       targetEls.forEach((targetEl, j)=>{
         const target = edges(targetEl);
@@ -389,7 +402,9 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     const rowHeightValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--row-height"), 10) || 64;
 
     function addSection(sectionRounds, rowIndex, columnOffset = 0, rowOffset = 0){
-      const maxMatches = Math.max(1, ...sectionRounds.map(r=>(r.matches || []).length || 0));
+      // round.slots: the places of a round whose byes were left out (more places than matches).
+      const placesOf = r => Math.max((r.matches || []).length, Number(r.slots) || 0);
+      const maxMatches = Math.max(1, ...sectionRounds.map(placesOf));
       const totalRows = maxMatches * 2;
       const sectionMatchEls = [];
       sectionRounds.forEach((round, roundIndex)=>{
@@ -409,7 +424,7 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
         matchesWrap.className = "matches";
         matchesWrap.style.setProperty("--rows", totalRows);
 
-        const matchCount = (round.matches || []).length || 1;
+        const matchCount = placesOf(round) || 1;
         const block = totalRows / matchCount;
         const titleRow = Math.max(1, Math.round(block / 2));
         matchesWrap.style.setProperty("--title-offset", `${(titleRow - 1) * rowHeightValue}px`);
@@ -431,7 +446,9 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
 
           const matchEl = document.createElement("div");
           matchEl.className = "match" + (changed ? " flash" : "");
-          const computedRow = Math.round(block / 2 + idx * block);
+          const place = Number(match.slot) > 0 ? Number(match.slot) - 1 : idx;
+          if(Number(match.slot) > 0) matchEl.dataset.slot = String(match.slot);
+          const computedRow = Math.round(block / 2 + place * block);
           const maxStart = Math.max(1, totalRows - 1);
           matchEl.style.gridRow = `${Math.min(maxStart, computedRow)} / span 2`;
           roundMatchEls.push(matchEl);

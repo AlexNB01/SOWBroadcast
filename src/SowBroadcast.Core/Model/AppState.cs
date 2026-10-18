@@ -140,6 +140,12 @@ public sealed record BracketMatch
     public string Status { get; init; } = "";
     /// <summary>Epoch milliseconds, 0 = not scheduled.</summary>
     public long ScheduledAt { get; init; }
+    /// <summary>
+    /// The place of this match in its round, counted from 1, when the round has fewer matches than places because byes were
+    /// left out (a tournament link). 0 = the matches of the round simply follow each other.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int Slot { get; init; }
 }
 
 public sealed record BracketRound
@@ -147,6 +153,9 @@ public sealed record BracketRound
     public string Name { get; init; } = "";
     /// <summary>"upper", "lower" or "grand".</summary>
     public string Side { get; init; } = "upper";
+    /// <summary>How many places the round has when byes were left out of <see cref="Matches"/>; 0 = as many as it has matches.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int Slots { get; init; }
     public IReadOnlyList<BracketMatch> Matches { get; init; } = Array.Empty<BracketMatch>();
 }
 

@@ -640,6 +640,58 @@ public sealed class TournamentMapperTests
     }
 
     [Fact]
+    public void A_round_whose_byes_are_left_out_keeps_its_matches_in_their_places()
+    {
+        // Five teams: of the four first-round places only the second is played, the others are byes.
+        var snap = new TournamentSnapshot
+        {
+            Stages = new[] { new LinkStage("a", "Cup", "single_elimination", 3) },
+            Matches = new[]
+            {
+                new LinkMatch("b1", "a", "main", null, 1, 1, "t1", null, null, null, "t1", "bye", null, null, 3),
+                new LinkMatch("p2", "a", "main", null, 1, 2, "t4", "t5", null, null, null, "pending", null, null, 3),
+                new LinkMatch("b3", "a", "main", null, 1, 3, "t2", null, null, null, "t2", "bye", null, null, 3),
+                new LinkMatch("b4", "a", "main", null, 1, 4, "t3", null, null, null, "t3", "bye", null, null, 3),
+                new LinkMatch("s1", "a", "main", null, 2, 1, "t1", null, null, null, null, "pending", null, null, 3),
+                new LinkMatch("s2", "a", "main", null, 2, 2, "t2", "t3", null, null, null, "pending", null, null, 3),
+                new LinkMatch("f", "a", "main", null, 3, 1, null, null, null, null, null, "pending", null, null, 3),
+            },
+        };
+
+        var rounds = TournamentMapper.Bracket(snap, NoLogo).Rounds;
+
+        Assert.Equal(new[] { "Upper Quarterfinals", "Upper Semifinals", "Upper Final" }, rounds.Select(r => r.Name));
+        Assert.Equal(4, rounds[0].Slots);
+        Assert.Equal(new[] { "p2" }, rounds[0].Matches.Select(m => m.Id));
+        Assert.Equal(2, rounds[0].Matches[0].Slot);
+        // Rounds with all their matches need no places.
+        Assert.Equal(new[] { 0, 0 }, new[] { rounds[1].Slots, rounds[2].Slots });
+        Assert.All(rounds[1].Matches.Concat(rounds[2].Matches), m => Assert.Equal(0, m.Slot));
+    }
+
+    [Fact]
+    public void The_places_reach_the_overlays_bracket_json_only_when_a_round_has_them()
+    {
+        var withPlaces = new BracketSettings
+        {
+            Rounds = new[]
+            {
+                new BracketRound { Name = "R1", Slots = 4, Matches = new[] { new BracketMatch { Id = "x", Slot = 2 } } },
+                new BracketRound { Name = "R2", Matches = new[] { new BracketMatch { Id = "y" } } },
+            },
+        };
+
+        var json = new SowBroadcast.Core.Export.ScoreboardExporter(Path.GetTempPath(), new SowBroadcast.Core.Export.SkiaLogoConverter())
+            .BuildBracketJson(new AppState { Bracket = withPlaces });
+
+        var rounds = json["rounds"]!.AsArray();
+        Assert.Equal(4, (int)rounds[0]!["slots"]!);
+        Assert.Equal(2, (int)rounds[0]!["matches"]![0]!["slot"]!);
+        Assert.Null(rounds[1]!["slots"]);
+        Assert.Null(rounds[1]!["matches"]![0]!["slot"]);
+    }
+
+    [Fact]
     public void With_several_bracket_stages_the_round_names_do_not_carry_the_stage_name()
     {
         var snap = new TournamentSnapshot
