@@ -326,6 +326,16 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
       connect(finalSources, grandMatchEls);
     }
 
+    // A round whose byes were left out has its first match further down (and maybe moved to the height of the
+    // match it feeds), so its title goes above the first match that is really there.
+    roundsWrap.querySelectorAll(".matches").forEach(wrap=>{
+      const title = wrap.querySelector(":scope > .round-title");
+      const shown = [...wrap.querySelectorAll(".match[data-slot]")];
+      if(!title || !shown.length) return;
+      const top = Math.min(...shown.map(el => el.getBoundingClientRect().top));
+      title.style.top = `${top - wrap.getBoundingClientRect().top}px`;
+    });
+
     roundsWrap.style.transform = prevTransform;
   }
 
