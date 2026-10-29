@@ -25,6 +25,7 @@ public static class ControlCatalog
     public const string Update = "update";
     public const string Undo = "undo";
     public const string Redo = "redo";
+    public const string ScheduleShow = "schedule.show";
     public const string ObsScene = "obs.scene";
     public const string ObsReplaySave = "obs.replay.save";
     public const string ObsReplayToggle = "obs.replay.toggle";
@@ -46,6 +47,7 @@ public static class ControlCatalog
         new(Update, "Update (send to the overlays)", "Ctrl+Alt+F9"),
         new(Undo, "Undo the last change", "Ctrl+Alt+Z"),
         new(Redo, "Redo", "Ctrl+Alt+Y"),
+        new(ScheduleShow, "Waiting screens: show the match schedule now", "Ctrl+Alt+L"),
         new(ObsReplaySave, "OBS: save the replay now", "Ctrl+Alt+R"),
         new(ObsReplayToggle, "OBS: replay buffer start / stop", null),
         new(ObsScene, "OBS: switch scene (over HTTP: ?name=Scene name)", null),

@@ -395,6 +395,7 @@ public sealed class LinkIntegrationTests : IAsyncLifetime, IDisposable
         public int ReplayAnnouncements { get; private set; }
 
         public void AnnounceReplay() => ReplayAnnouncements++;
+        public void AnnounceScheduleShow() { }
 
         public Task<string?> PickOpenStateFileAsync(string? initialDirectory) => Task.FromResult<string?>(null);
         public Task<string?> PickSaveStateFileAsync(string? initialDirectory, string suggestedName) => Task.FromResult<string?>(null);

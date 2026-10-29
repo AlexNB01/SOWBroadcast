@@ -849,6 +849,15 @@ function upSchedule(){
   schAdvance();
 }
 
+// The operator asked for the schedule now: leave the video at once and go on with the first page; the cycle continues from there.
+function schShowNow(){
+  const pages = SCH.pages;
+  if (!SCH.data || pages.length < 2) return;
+  clearTimeout(SCH.timer);
+  SCH.current = null;                  // the video; the next page is the first one with matches
+  schAdvance();
+}
+
 function startSSE(){
   try{
     const es=SOW.events();
@@ -856,6 +865,7 @@ function startSSE(){
       try{
         const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
         if(ch.some(k=>k==="schedule")) upSchedule();
+        if(ch.some(k=>k==="schedule.show")) schShowNow();
         if(ch.some(k=>k==="general.colors")) await applyColors();
 		if(ch.some(k=>k==="waiting.texts")) await upText();
 		if(ch.some(k=>k==="waiting.timer")) await upTimer();

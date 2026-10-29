@@ -681,6 +681,10 @@ public sealed class MainWindowViewModelTests : IDisposable
         public int ReplayAnnouncements { get; private set; }
 
         public void AnnounceReplay() => ReplayAnnouncements++;
+
+        public int ScheduleShows { get; private set; }
+
+        public void AnnounceScheduleShow() => ScheduleShows++;
     }
 
     internal sealed class FakeDialogs : IFileDialogs, IMessages

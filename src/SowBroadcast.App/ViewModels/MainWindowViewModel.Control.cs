@@ -1,4 +1,5 @@
 using SowBroadcast.Core.Control;
+using SowBroadcast.Core.Waiting;
 
 namespace SowBroadcast.App.ViewModels;
 
@@ -66,6 +67,7 @@ public sealed partial class MainWindowViewModel
             ControlCatalog.MapNext => FinishMap(),
             ControlCatalog.Swap => Run(SwapTeamsCommand.Execute, "Teams swapped"),
             ControlCatalog.Update => Run(UpdateMatchCommand.Execute, "Updated"),
+            ControlCatalog.ScheduleShow => ShowSchedule(),
             ControlCatalog.TimerToggle => Run(Waiting.IsRunning ? Waiting.PauseTimerCommand.Execute : Waiting.StartTimerCommand.Execute,
                 Waiting.IsRunning ? "Countdown paused" : "Countdown started"),
             ControlCatalog.TimerStart => Run(Waiting.StartTimerCommand.Execute, "Countdown started"),
@@ -87,6 +89,15 @@ public sealed partial class MainWindowViewModel
 
     private ControlOutcome Describe(bool ok, string message) =>
         new(ok, message, Match.Team1.Score, Match.Team2.Score, CurrentMapCard()?.Index, Waiting.TimerText, Waiting.IsRunning, HasUnsentChanges);
+
+    // The waiting screens bring the schedule up now (instead of waiting for the end of the video). The link data is already on the overlays.
+    private (bool, string) ShowSchedule()
+    {
+        if (!State.Waiting.ScheduleEnabled) return (false, "The match schedule is switched off");
+        if (ScheduleOverlay.Upcoming(State).Count == 0 && ScheduleOverlay.Results(State).Count == 0) return (false, "No matches to show");
+        _publisher.AnnounceScheduleShow();
+        return (true, "Match schedule shown");
+    }
 
     private (bool, string) Run(Action<object?> action, string done)
     {

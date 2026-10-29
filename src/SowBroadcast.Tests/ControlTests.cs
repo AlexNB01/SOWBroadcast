@@ -68,7 +68,7 @@ public sealed class ControlSettingsTests : IDisposable
 
         var active = settings.ActiveBindings();
 
-        Assert.Equal(12, active.Count);
+        Assert.Equal(13, active.Count);
         Assert.Equal(active.Count, active.Select(a => a.Gesture).Distinct().Count());
         Assert.Empty(settings.Problems());
         Assert.Equal("Ctrl+Alt+F1", settings.GestureFor(ControlCatalog.Team1ScoreUp));
@@ -160,6 +160,24 @@ public sealed class ControlCommandTests : IDisposable
         Assert.True(again.Unsent);
         Assert.Empty(_publisher.Published);           // KYS-9: only Update sends
         Assert.Equal(2, vm.State.Team1.Score);        // the autosave path collected the tabs
+    }
+
+    [Fact]
+    public void Show_schedule_tells_the_waiting_screens_when_there_are_matches_to_show_and_says_so_when_there_are_none()
+    {
+        var vm = Create();
+
+        var none = vm.RunControl(ControlCatalog.ScheduleShow);
+        vm.State = vm.State with { Schedule = new[] { new ScheduleEntry { Id = "a", Team1 = "Alpha", Team2 = "Bravo", StreamUrl = "https://twitch.tv/x", Status = ScheduleStatus.Upcoming } } };
+        var shown = vm.RunControl(ControlCatalog.ScheduleShow);
+        vm.State = vm.State with { Waiting = vm.State.Waiting with { ScheduleEnabled = false } };
+        var off = vm.RunControl(ControlCatalog.ScheduleShow);
+
+        Assert.False(none.Ok);
+        Assert.True(shown.Ok);
+        Assert.False(off.Ok);
+        Assert.Equal(1, _publisher.ScheduleShows);    // only the one that had something to show
+        Assert.Empty(_publisher.Published);           // it is not an Update: nothing else is sent
     }
 
     [Fact]

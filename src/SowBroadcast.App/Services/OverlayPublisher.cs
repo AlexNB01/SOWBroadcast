@@ -39,6 +39,9 @@ public interface IOverlayPublisher
     /// <summary>A new replay clip is in the playlist: tell the overlays (the files were written by the replay watcher).</summary>
     void AnnounceReplay();
 
+    /// <summary>The operator asks the waiting screens to show the match schedule now (it takes the place of the video for one round).</summary>
+    void AnnounceScheduleShow();
+
     /// <summary>Asset edits are written to disk at once but only announced to overlays with the next Update.</summary>
     void MarkAssetsChanged(AssetCategory category);
 }
@@ -161,6 +164,12 @@ public sealed class OverlayPublisher : IOverlayPublisher
         UpdateState(willAnnounce: true);
         _hub.Publish(new[] { "replay" });
     }
+
+    public void AnnounceScheduleShow()
+    {
+        UpdateState(willAnnounce: true);
+        _hub.Publish(new[] { "schedule.show" });
+    }
 }
 
 /// <summary>Used when the local server could not start: files are still written so OBS text sources keep working.</summary>
@@ -179,4 +188,6 @@ public sealed class FileOnlyPublisher : IOverlayPublisher
     public void MarkAssetsChanged(AssetCategory category) { }
 
     public void AnnounceReplay() { }
+
+    public void AnnounceScheduleShow() { }
 }

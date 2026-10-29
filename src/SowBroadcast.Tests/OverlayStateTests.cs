@@ -205,6 +205,20 @@ public sealed class OverlayStateTests : IDisposable
     }
 
     [Fact]
+    public void Show_schedule_is_announced_as_its_own_key()
+    {
+        var (publisher, _, hub) = Publisher();
+        publisher.Publish(Sample());
+        var reader = hub.Subscribe(null).Reader;
+        while (reader.TryRead(out _)) { }
+
+        publisher.AnnounceScheduleShow();
+
+        Assert.True(reader.TryRead(out var ev));
+        Assert.Equal(new[] { "schedule.show" }, ev!.Changed);
+    }
+
+    [Fact]
     public void A_new_replay_raises_the_version_too()
     {
         var (publisher, holder, hub) = Publisher();
