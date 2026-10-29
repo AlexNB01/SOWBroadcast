@@ -115,6 +115,9 @@
       <TabItem Header="BRACKET">
         <views:BracketView />
       </TabItem>
+      <TabItem Header="REPLAY">
+        <views:ReplayView DataContext="{Binding Replay}" />
+      </TabItem>
       <TabItem x:Name="ThemeTab" Header="THEME" IsVisible="False">
         <views:ThemePreview x:Name="ThemeView" />
       </TabItem>

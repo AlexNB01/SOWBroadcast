@@ -53,14 +53,16 @@ public sealed class OverlayPublisher : IOverlayPublisher
     private readonly HashSet<string> _pendingAssetKeys = new();
     private readonly OverlayStateHolder? _state;
     private readonly Func<long> _nowMs;
+    private readonly Func<System.Text.Json.Nodes.JsonObject?>? _replay;
     private AppState? _lastPublished;
 
-    public OverlayPublisher(ScoreboardExporter exporter, EventHub hub, string? baseUrl, OverlayStateHolder? state = null, Func<long>? nowMs = null)
+    public OverlayPublisher(ScoreboardExporter exporter, EventHub hub, string? baseUrl, OverlayStateHolder? state = null, Func<long>? nowMs = null, Func<System.Text.Json.Nodes.JsonObject?>? replay = null)
     {
         _exporter = exporter;
         _hub = hub;
         BaseUrl = baseUrl;
         _state = state;
+        _replay = replay;
         _nowMs = nowMs ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     }
 
@@ -71,7 +73,7 @@ public sealed class OverlayPublisher : IOverlayPublisher
     private void UpdateState(bool willAnnounce)
     {
         if (_state is null || _lastPublished is null) return;
-        _state.Json = OverlayStateJson.Build(_lastPublished, _exporter, _hub.LastId + (willAnnounce ? 1 : 0), _nowMs());
+        _state.Json = OverlayStateJson.Build(_lastPublished, _exporter, _hub.LastId + (willAnnounce ? 1 : 0), _nowMs(), _replay?.Invoke());
     }
 
     public string? BaseUrl { get; }

@@ -36,7 +36,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         ITeamPicker? teamPicker = null, MatchIdSource? matchIds = null,
         LinkService? linkService = null, LogoCache? logoCache = null, Action<Action>? uiPost = null, Func<long>? epochMs = null,
         MatchArchive? archive = null, Func<DateTime>? now = null, TeamLibrary? library = null,
-        SowBroadcast.Core.Profiles.ProfileStore? profiles = null)
+        SowBroadcast.Core.Profiles.ProfileStore? profiles = null,
+        SowBroadcast.Core.Replay.ReplayLibrary? replayClips = null, IClipPlayer? clipPlayer = null)
     {
         _archive = archive;
         _profiles = profiles;
@@ -57,6 +58,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         Standings = new StandingsViewModel(picker, standingsLogoFolder);
         Bracket = new BracketViewModel(picker, standingsLogoFolder,
             () => StandingsOperations.TeamsFromStandings(Standings.ApplyTo(State).Standings), teamPicker, messages, matchIds);
+        Replay = new ReplayViewModel(replayClips ?? new SowBroadcast.Core.Replay.ReplayLibrary(Path.Combine(Path.GetTempPath(), "sowb-replay-" + Guid.NewGuid().ToString("N"))),
+            publisher, clipPlayer, ReplayContext, messages, uiPost ?? (action => action()), text => StatusText = text);
         Link = new LinkViewModel(linkService ?? UnavailableLink(), logoCache, this, messages, uiPost ?? (action => action()));
         Match.Edited += () => MarkUnsent("match");
         General.Edited += () => MarkUnsent("general");
@@ -82,6 +85,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
 
     /// <summary>The Waiting Screen tab (videos, countdown, texts, ticker, socials).</summary>
     public WaitingViewModel Waiting { get; }
+
+    /// <summary>The Replay tab (saved clips, preview, trimming, categories).</summary>
+    public ReplayViewModel Replay { get; }
+
+    // What a new replay clip is filed under: the match on the screen and the tournament named in the status text.
+    private (string Match, string Tournament) ReplayContext()
+    {
+        CollectTabs();
+        var a = State.Team1.Name.Trim();
+        var b = State.Team2.Name.Trim();
+        var match = a.Length > 0 && b.Length > 0 ? $"{a} vs {b}" : a.Length > 0 ? a : b;
+        return (match, State.General.StatusText.Trim());
+    }
 
     /// <summary>The SOWDraft link (tournament, match list, sides, status).</summary>
     public LinkViewModel Link { get; }

@@ -28,6 +28,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
     private readonly UpdateService _updates = new(new InstallerUpdater(AppInfo.Repository, AppInfo.Version, AppPaths.ProgramFolder), AppInfo.Version);
     private readonly SowBroadcast.Integrations.Obs.ObsController _obsController = new();
     private Views.ObsWindow? _obsWindow;
+    private readonly LibVlcClipPlayer _clipPlayer;
     private Dictionary<HotkeyGesture, string> _windowKeys = new();
 
     public MainWindow()
@@ -44,13 +45,15 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         SowBroadcast.Core.Colour.RecentColours.Shared.UseFile(AppPaths.RecentColoursPath);
         var teamLibrary = new SowBroadcast.Core.Teams.TeamLibrary(Path.Combine(AppPaths.ScoreboardDir, "TeamLibrary"), new SkiaLogoConverter());
         teamLibrary.Load();
+        _clipPlayer = new LibVlcClipPlayer();
         _viewModel = new MainWindowViewModel(this, this, _services.Publisher, AppPaths.AutosavePath,
             _services.Assets, this, new SkiaLogoConverter(), teamsFolder, logoFolder, broadcastLogoFolder, AppPaths.DefaultHighlightsDir,
             standingsLogoFolder: logoFolder, teamPicker: this,
             linkService: _services.Link, logoCache: _services.Logos, uiPost: action => Avalonia.Threading.Dispatcher.UIThread.Post(action),
             archive: new SowBroadcast.Core.History.MatchArchive(Path.Combine(AppPaths.DataRoot, "History")),
             library: teamLibrary,
-            profiles: new SowBroadcast.Core.Profiles.ProfileStore(Path.Combine(AppPaths.DataRoot, "Profiles")));
+            profiles: new SowBroadcast.Core.Profiles.ProfileStore(Path.Combine(AppPaths.DataRoot, "Profiles")),
+            replayClips: _services.Clips, clipPlayer: _clipPlayer);
         DataContext = _viewModel;
         UpdateStartupItem.IsChecked = _appSettings.CheckForUpdatesAtStartup;
         _viewModel.UseAutomation(_services.ControlSettings.Automation);
@@ -58,7 +61,12 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         StartControl();
         _services.Assets.Changed += _ => _viewModel.MarkUnsent("assets");
 
-        _services.Replay.ReplayReady += name => Avalonia.Threading.Dispatcher.UIThread.Post(() => { Serilog.Log.Information("Replay clip saved: {Name}", name); _viewModel.StatusText = $"Replay clip saved: {name}"; });
+        _services.Replay.ReplayReady += name => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            Serilog.Log.Information("Replay clip saved: {Name}", name);
+            _viewModel.StatusText = $"Replay clip saved: {name}";
+            _viewModel.Replay.OnClipArrived(name);
+        });
         _services.Replay.Problem += message => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = message);
         try { _services.Replay.Start(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -98,6 +106,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         Closing += (_, _) =>
         {
             _hotkeys.Dispose();
+            _clipPlayer.Dispose();
             _obsController.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
             if (!_skipAutosave)
             {

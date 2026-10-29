@@ -56,19 +56,20 @@ body.leaving       .replaytext { opacity: 0; }
 </head>
 <body>
 
-  <video id="v1" class=""  autoplay loop playsinline></video>
-  <video id="v2" class="hidden" autoplay loop playsinline></video>
+  <video id="v1" class=""  autoplay playsinline></video>
+  <video id="v2" class="hidden" autoplay playsinline></video>
 
   <div class="replaytext">
     <img id="brand" class="logo" alt="logo"/>
     <div class="badge"><span>REPLAY</span></div>
   </div>
 
+<script src="sow-data.js"></script>
 <script>
   const ROOT="..", SB=ROOT+"/Scoreboard", GENERAL=SB+"/General", REPLAY=SB+"/Replay", PLAYLIST=REPLAY+"/Playlist";
 
-  async function read(p){ try{ const r=await fetch(p+"?_="+Date.now()); return r.ok?await r.text():""; }catch{ return ""; } }
-  async function ok(p){ try{ const r=await fetch(p+"?_="+Date.now(),{method:"HEAD"}); return r.ok; }catch{ return false; } }
+  const read = p => SOW.read(p);
+  const ok = p => SOW.ok(p);
   const hex=s=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s||"").trim())?(s||"").trim():null;
 
   async function applyColors(){
@@ -88,40 +89,102 @@ body.leaving       .replaytext { opacity: 0; }
     img.classList.add("hidden");
   }
 
-  let flip = 1;
-  let lastName = "";
+  // What the stream shows: the newest clip, looped (its trim and speed applied by this page - the file is never cut), until the
+  // operator asks for something else. A request (one clip, a category, ...) plays once through, in order, and then the page goes
+  // back to the newest clip. The program puts both in /api/state under "replay".
+  const vids = { 1: document.getElementById("v1"), 2: document.getElementById("v2") };
+  let active = 1;           // the video that is visible
+  let token = 0;            // every change of what is shown makes the older one's events void
+  let latestKey = "";       // what the loop is showing now
+  let seenNonce = null;     // the newest play request this page has handled
+  let sequenceRunning = false;
 
-  function swapTo(src){
-    const v1=document.getElementById("v1");
-    const v2=document.getElementById("v2");
-    if(flip===1){
-      if(v2.getAttribute("src")!==src){
-        v1.setAttribute("src", src);
-        setTimeout(()=>{ v1.classList.remove("hidden"); v2.classList.add("hidden"); }, 200);
-        flip=2;
-      }
-    }else{
-      if(v1.getAttribute("src")!==src){
-        v2.setAttribute("src", src);
-        setTimeout(()=>{ v2.classList.remove("hidden"); v1.classList.add("hidden"); }, 200);
-        flip=1;
-      }
-    }
+  const clipUrl = c => `${PLAYLIST}/${encodeURIComponent(c.file)}`;
+  const clipKey = c => [c.file, c.start_ms || 0, c.end_ms || 0, c.speed || 1].join("|");
+
+  // Shows a clip on the hidden video and fades it in once it is moving. onDone: what to do at the end of the shown part (default: loop it).
+  function show(clip, onDone){
+    const my = ++token;
+    const nextId = active === 1 ? 2 : 1;
+    const nv = vids[nextId], ov = vids[active];
+    const start = (clip.start_ms || 0) / 1000, end = (clip.end_ms || 0) / 1000;
+    const speed = clip.speed > 0 ? clip.speed : 1;
+    let revealed = false;
+    const reveal = () => {
+      if (revealed || my !== token) return;
+      revealed = true;
+      nv.classList.remove("hidden");
+      ov.classList.add("hidden");
+      active = nextId;
+      setTimeout(() => { if (my === token) ov.pause(); }, 800);
+    };
+    const finish = () => {
+      if (my !== token) return;
+      if (onDone) onDone();
+      else { nv.currentTime = start; nv.play().catch(() => {}); }
+    };
+    nv.pause();
+    nv.onloadedmetadata = () => { nv.currentTime = start; nv.playbackRate = speed; };
+    nv.onplaying = reveal;
+    nv.ontimeupdate = () => { if (my === token && end > 0 && nv.currentTime >= end) finish(); };
+    nv.onended = finish;
+    nv.defaultPlaybackRate = speed;
+    nv.src = clipUrl(clip);
+    nv.playbackRate = speed;
+    nv.play().catch(() => {});
+    setTimeout(reveal, 2500);   // never stay on the old picture because a clip is slow to start
   }
 
-  async function tick(){
-    const name = (await read(REPLAY+"/replaypath.txt")).trim();
-    if(!name){ return; }
-    if(name !== lastName){
-      const src = `${PLAYLIST}/${encodeURIComponent(name)}`;
-      swapTo(src);
-      lastName = name;
+  function showLatest(){
+    const r = (SOW.state() || {}).replay || {};
+    if (!r.latest) return false;
+    const key = clipKey(r.latest);
+    if (key !== latestKey) { latestKey = key; show(r.latest, null); }
+    return true;
+  }
+
+  function playSequence(clips){
+    const next = i => {
+      if (i >= clips.length) { sequenceRunning = false; latestKey = ""; showLatest(); return; }
+      show(clips[i], () => next(i + 1));
+    };
+    sequenceRunning = true;
+    next(0);
+  }
+
+  function sync(){
+    const st = SOW.state() || {};
+    const r = st.replay || {};
+    const play = r.play;
+    if (seenNonce === null) {
+      seenNonce = play ? play.nonce : 0;
+      // OBS loads this page when the scene comes up: a request made just before is still shown
+      if (play && play.clips && play.clips.length && (st.server_time || 0) - play.at < 15000) { playSequence(play.clips); return; }
+    } else if (play && play.nonce !== seenNonce) {
+      seenNonce = play.nonce;
+      if (play.clips && play.clips.length) { playSequence(play.clips); return; }
+      sequenceRunning = false;   // "stop": back to the newest clip
+      latestKey = "";
     }
+    if (!sequenceRunning) showLatest();
+  }
+
+  // Without the clip list (an older program, or clips copied in by hand) the file replaypath.txt names the clip to loop.
+  let lastName = "";
+  async function tick(){
+    if (sequenceRunning || ((SOW.state() || {}).replay || {}).latest) return;
+    const name = (await read(REPLAY+"/replaypath.txt")).trim();
+    if (!name || name === lastName) return;
+    lastName = name;
+    show({ file: name, start_ms: 0, end_ms: 0, speed: 1 }, null);
   }
 
   async function init(){
     await applyColors();
     await setLogo();
+    await ok(SB + "/Match/T1Name.txt");   // loads the state
+    sync();
+    SOW.events().onmessage = () => sync();
     await tick();
     setInterval(tick, 1000);
   }

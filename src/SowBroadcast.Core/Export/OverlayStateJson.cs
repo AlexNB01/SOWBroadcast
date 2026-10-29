@@ -21,7 +21,7 @@ public static class OverlayStateJson
 
     private static readonly JsonSerializerOptions Options = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    public static string Build(AppState state, ScoreboardExporter exporter, long version, long serverNowMs)
+    public static string Build(AppState state, ScoreboardExporter exporter, long version, long serverNowMs, JsonObject? replay = null)
     {
         var derived = StateDerivations.Apply(state);
         var match = LegacyMatchJson.BuildObject(derived);
@@ -55,6 +55,7 @@ public static class OverlayStateJson
             ["standings"] = exporter.BuildStandingsJson(derived),
             ["bracket"] = exporter.BuildBracketJson(derived),
             ["schedule"] = ScheduleOverlay.BuildJson(derived, exporter.NormalizeLogoPath),
+            ["replay"] = replay ?? new JsonObject { ["latest"] = null, ["play"] = null },
         };
         return root.ToJsonString(Options);
     }

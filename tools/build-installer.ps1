@@ -43,6 +43,15 @@ if (Test-Path $publish) { Remove-Item $publish -Recurse -Force }
 & dotnet publish $project -c Release -r win-x64 --self-contained true -o $publish --nologo
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 
+# The Replay tab's video preview (LibVLC) ships its native files in libvlc\win-x64; leave out what playing a local file never uses.
+$vlc = Join-Path $publish 'libvlc\win-x64'
+if (Test-Path $vlc) {
+    Get-ChildItem $vlc -Filter '*.lib' -File | Remove-Item -Force
+    foreach ($unused in 'lua', 'locale', 'hrtfs') { $dir = Join-Path $vlc $unused; if (Test-Path $dir) { Remove-Item $dir -Recurse -Force } }
+} else {
+    Write-Warning 'libvlc was not published: the Replay tab will have no video preview.'
+}
+
 # The overlay pages and the shipped catalogue images sit next to the program (AppPaths.ContentRoot finds them there).
 Copy-Item (Join-Path $root 'HTML') (Join-Path $publish 'HTML') -Recurse
 foreach ($folder in 'Heroes', 'HeroesBody', 'Maps', 'Gametypes', 'Roles', 'General\Icons') {

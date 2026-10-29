@@ -29,6 +29,11 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public async Task<ControlOutcome> RunControlAsync(string id, IReadOnlyDictionary<string, string>? arguments = null)
     {
+        if (ControlCatalog.IsReplay(id) && ControlCatalog.Find(id) is { } replay)
+        {
+            var shown = Replay.RunCommand(replay.Id, arguments);
+            return Describe(shown.Ok, shown.Message);
+        }
         if (!ControlCatalog.IsObs(id) || ControlCatalog.Find(id) is not { } known) return RunControl(id);
 
         FlushHistory();
@@ -68,6 +73,7 @@ public sealed partial class MainWindowViewModel
             ControlCatalog.Swap => Run(SwapTeamsCommand.Execute, "Teams swapped"),
             ControlCatalog.Update => Run(UpdateMatchCommand.Execute, "Updated"),
             ControlCatalog.ScheduleShow => ShowSchedule(),
+            ControlCatalog.ReplayLatest or ControlCatalog.ReplayStop or ControlCatalog.ReplayClip or ControlCatalog.ReplayCategory => Replay.RunCommand(known.Id, null),
             ControlCatalog.TimerToggle => Run(Waiting.IsRunning ? Waiting.PauseTimerCommand.Execute : Waiting.StartTimerCommand.Execute,
                 Waiting.IsRunning ? "Countdown paused" : "Countdown started"),
             ControlCatalog.TimerStart => Run(Waiting.StartTimerCommand.Execute, "Countdown started"),
@@ -79,7 +85,7 @@ public sealed partial class MainWindowViewModel
         };
 
         // A command changes the match on the screen only; the overlays get it with Update. The autosave keeps it safe.
-        if (ok && known.Id is not (ControlCatalog.Update or ControlCatalog.Undo or ControlCatalog.Redo)) Autosave();
+        if (ok && known.Id is not (ControlCatalog.Update or ControlCatalog.Undo or ControlCatalog.Redo) && !ControlCatalog.IsReplay(known.Id)) Autosave();
         StatusText = ok ? message : $"Control: {message}";
         return Describe(ok, message);
     }

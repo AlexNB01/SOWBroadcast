@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SowBroadcast.App.ViewModels"
+             xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
+             x:Class="SowBroadcast.App.Views.ReplayView"
+             x:DataType="vm:ReplayViewModel">
+
+  <Grid Margin="0,12,0,0" ColumnDefinitions="380,14,*">
+
+    <!-- Left: categories and the clips -->
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,10">
+        <StackPanel Spacing="8">
+          <Border Classes="cardTitle"><TextBlock Classes="h2" Text="CATEGORIES" /></Border>
+          <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ReplayCategoryItem">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Text="{Binding NewCategoryName}" Watermark="New category (e.g. Best plays)" />
+            <Button Grid.Column="1" Content="Add" Command="{Binding AddCategoryCommand}" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Show this category on stream" Command="{Binding ShowCategoryCommand}" />
+            <Button Content="Delete category" IsEnabled="{Binding CanDeleteCategory}" Command="{Binding DeleteCategoryCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+        <TextBlock Classes="muted" VerticalAlignment="Center" Text="{Binding Summary}" TextWrapping="Wrap" />
+        <Button Grid.Column="1" Content="Open folder" Command="{Binding OpenFolderCommand}" />
+      </Grid>
+
+      <Border Classes="card" Padding="6">
+        <ListBox Background="Transparent" ItemsSource="{Binding Clips}" SelectedItem="{Binding Selected}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:ReplayClipItem">
+              <StackPanel Margin="6,4" Spacing="1">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                <TextBlock Classes="muted" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+    </DockPanel>
+
+    <!-- Right: preview, the clip's settings and the stream buttons -->
+    <DockPanel Grid.Column="2">
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
+        <Button Content="Delete clip" IsEnabled="{Binding HasSelection}" Command="{Binding DeleteSelectedCommand}" />
+        <Button Content="Stop (back to newest)" Command="{Binding StopStreamCommand}" />
+        <Button Content="Show newest on stream" Command="{Binding ShowLatestCommand}" />
+        <!-- the one primary button of this view -->
+        <Button Classes="primary" Content="Show this clip on stream" MinWidth="200" IsEnabled="{Binding HasSelection}" Command="{Binding ShowSelectedCommand}" />
+      </StackPanel>
+
+      <ScrollViewer>
+        <StackPanel Spacing="12" Margin="0,0,12,0">
+
+          <Border Classes="card" Padding="14,10">
+            <StackPanel Spacing="8">
+              <Border Classes="cardTitle"><TextBlock Classes="h2" Text="PREVIEW" /></Border>
+              <Border Background="Black" CornerRadius="4" Height="280" ClipToBounds="True">
+                <Grid>
+                  <vlc:VideoView x:Name="Video" IsVisible="{Binding PreviewAvailable}" />
+                  <TextBlock IsVisible="{Binding !PreviewAvailable}" Text="{Binding PreviewProblem}" TextWrapping="Wrap"
+                             Foreground="{DynamicResource SowFrostBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20" />
+                  <TextBlock IsVisible="{Binding !HasSelection}" Text="Select a clip to see it here." Foreground="{DynamicResource SowFrostBrush}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Slider x:Name="Seek" Minimum="0" Maximum="{Binding LengthSeconds}" Value="{Binding PositionSeconds, Mode=OneWay}"
+                        IsEnabled="{Binding HasSelection}" />
+                <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" MinWidth="110" TextAlignment="Right" Text="{Binding PositionText}" />
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Play / pause" MinWidth="110" Command="{Binding TogglePlayCommand}" />
+                <Button Content="Play the shown part" Command="{Binding PreviewTrimmedCommand}" />
+                <CheckBox Content="Mute" IsChecked="{Binding Muted}" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card" Padding="14,10" IsEnabled="{Binding HasSelection}">
+            <StackPanel Spacing="8">
+              <Border Classes="cardTitle"><TextBlock Classes="h2" Text="THIS CLIP" /></Border>
+              <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="12">
+                <TextBlock Classes="label" VerticalAlignment="Center" Text="TITLE" />
+                <TextBox Grid.Column="1" Text="{Binding EditTitle}" />
+                <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="MATCH" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditMatch}" Watermark="e.g. Alpha vs Bravo" />
+                <TextBlock Grid.Row="2" Classes="label" VerticalAlignment="Center" Text="TOURNAMENT" />
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EditTournament}" Watermark="Status text of the General tab when the clip was saved" />
+              </Grid>
+
+              <Grid ColumnDefinitions="Auto,Auto,Auto,24,Auto,Auto,Auto,24,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Classes="label" VerticalAlignment="Center" Text="START (S)" />
+                <NumericUpDown Grid.Column="1" MinWidth="110" Minimum="0" Increment="0.1" FormatString="0.0" Value="{Binding EditStart}" />
+                <Button Grid.Column="2" Content="Set here" Command="{Binding SetStartHereCommand}" />
+                <TextBlock Grid.Column="4" Classes="label" VerticalAlignment="Center" Text="END (S)" />
+                <NumericUpDown Grid.Column="5" MinWidth="110" Minimum="0" Increment="0.1" FormatString="0.0" Value="{Binding EditEnd}" />
+                <Button Grid.Column="6" Content="Set here" Command="{Binding SetEndHereCommand}" />
+                <TextBlock Grid.Column="8" Classes="label" VerticalAlignment="Center" Text="SPEED" />
+                <NumericUpDown Grid.Column="9" MinWidth="100" Minimum="0.1" Maximum="4" Increment="0.25" FormatString="0.##" Value="{Binding EditSpeed}" />
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Clear trim and speed" Command="{Binding ClearTrimCommand}" />
+                <TextBlock Classes="muted" VerticalAlignment="Center" TextWrapping="Wrap"
+                           Text="End 0 = to the end of the file. The video file itself is never changed; the stream shows the chosen part at the chosen speed." />
+              </StackPanel>
+
+              <TextBlock Classes="label" Text="IN THESE CATEGORIES" />
+              <ItemsControl ItemsSource="{Binding Tags}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ReplayTagItem">
+                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsOn}" Margin="0,0,16,0" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="muted" Text="The match and the tournament are filed automatically when a clip arrives; make your own categories on the left." />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+  </Grid>
+</UserControl>

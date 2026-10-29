@@ -17,16 +17,16 @@ public sealed class AppServices : IAsyncDisposable
     private readonly HttpFetcher _http;
 
     private AppServices(IOverlayPublisher publisher, AssetService assets, OverlayServer? server, string? startupError, HttpFetcher http,
-        ControlSettings control, ControlGateway gateway)
+        ControlSettings control, ControlGateway gateway, ReplayLibrary clips)
     {
         ControlSettings = control;
+        Clips = clips;
         ControlGateway = gateway;
         Publisher = publisher;
         Assets = assets;
         _http = http;
         Link = new LinkService(http, () => new SocketIoConnection());
-        Replay = new ReplayWatcher(Path.Combine(AppPaths.ScoreboardDir, "Replay"));
-        Replay.ReplayReady += _ => Publisher.AnnounceReplay();
+        Replay = new ReplayWatcher(Path.Combine(AppPaths.ScoreboardDir, "Replay"), keep: 0);   // clips stay until the operator deletes them
         AssetUpdater = new SowBroadcast.Integrations.Assets.ManifestUpdater(http, assets, AppInfo.Repository);
         Logos = new LogoCache(Path.Combine(AppPaths.ScoreboardDir, "TeamLogos"), http);
         _server = server;
@@ -44,6 +44,9 @@ public sealed class AppServices : IAsyncDisposable
 
     /// <summary>Takes the clips OBS' replay buffer saves into the playlist the replay overlay plays.</summary>
     public ReplayWatcher Replay { get; }
+
+    /// <summary>The saved clips with their titles, trims and categories (the Replay tab).</summary>
+    public ReplayLibrary Clips { get; }
 
     /// <summary>The SOWDraft connection.</summary>
     public LinkService Link { get; }
@@ -94,9 +97,11 @@ public sealed class AppServices : IAsyncDisposable
         assets.Load();
 
         // What /api/state serves; starts as an empty match and is rebuilt after every publish.
+        var clips = new ReplayLibrary(Path.Combine(AppPaths.ScoreboardDir, "Replay"));
+        clips.Sync();
         var stateHolder = new OverlayStateHolder
         {
-            Json = OverlayStateJson.Build(AppState.CreateDefault(), exporter, 0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+            Json = OverlayStateJson.Build(AppState.CreateDefault(), exporter, 0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), clips.BuildOverlayJson()),
         };
         var controlSettings = ControlSettings.Load(AppPaths.ControlSettingsPath);
         try { controlSettings.Save(AppPaths.ControlSettingsPath); }   // the first run writes the token, so it stays the same next time
@@ -117,12 +122,12 @@ public sealed class AppServices : IAsyncDisposable
         {
             var server = Task.Run(() => OverlayServer.StartAsync(options)).GetAwaiter().GetResult();
             Serilog.Log.Information("Overlay server listening on {Url}", server.BaseUrl);
-            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl, stateHolder), assets, server, null, http, controlSettings, gateway);
+            return new AppServices(new OverlayPublisher(exporter, server.Hub, server.BaseUrl, stateHolder, replay: clips.BuildOverlayJson), assets, server, null, http, controlSettings, gateway, clips);
         }
         catch (IOException ex)
         {
             Serilog.Log.Error(ex, "The overlay server could not start");
-            return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message, http, controlSettings, gateway);
+            return new AppServices(new FileOnlyPublisher(exporter), assets, null, ex.Message, http, controlSettings, gateway, clips);
         }
     }
 
