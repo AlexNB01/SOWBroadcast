@@ -4,8 +4,9 @@ name: Release
 # The installer with its checksum (what "Check for updates" in the program downloads and runs) and the hero and map list
 # (Scoreboard/manifest.json, what "Update hero and map list" reads) are attached to the GitHub release.
 #
-# Code signing: add the secrets SIGN_PFX_BASE64 (the certificate as base64) and SIGN_PFX_PASSWORD and the installer and the program
-# is signed; without them the release is unsigned (Windows SmartScreen will warn when it is installed).
+# Code signing (SignPath Foundation, free for open-source projects; setup in tools/signpath/README.md): add the secret SIGNPATH_API_TOKEN
+# and the repository variable SIGNPATH_ORGANIZATION_ID and the installer is signed by SignPath before it is attached to the release;
+# without the secret the release is unsigned (Windows SmartScreen will warn when it is installed).
 
 on:
   push:
@@ -16,6 +17,8 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,26 +50,45 @@ jobs:
         shell: pwsh
         run: choco install innosetup --no-progress -y
 
-      - name: Certificate (when the secrets exist)
-        shell: pwsh
-        env:
-          PFX_BASE64: ${{ secrets.SIGN_PFX_BASE64 }}
-        run: |
-          if ($env:PFX_BASE64) {
-            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\sign.pfx", [Convert]::FromBase64String($env:PFX_BASE64))
-            "SIGN_PFX=$env:RUNNER_TEMP\sign.pfx" | Out-File -FilePath $env:GITHUB_ENV -Append
-          }
-
       - name: Installer
         shell: pwsh
-        env:
-          SIGN_PFX_PASSWORD: ${{ secrets.SIGN_PFX_PASSWORD }}
+        run: ./tools/build-installer.ps1
+
+      # SignPath signs the finished installer (the setup program, which is what SmartScreen looks at). It is handed over as a GitHub artifact
+      # and the signed copy comes back; the checksum the program verifies after downloading is then made again from the signed file.
+      - name: Hand the installer to SignPath
+        id: unsigned
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: artifacts/installer/SOWBroadcast-Setup-*.exe
+
+      - name: Sign the installer
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: sowbroadcast
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-installer
+
+      - name: Use the signed installer
+        if: env.SIGNPATH_API_TOKEN != ''
+        shell: pwsh
         run: |
-          if ($env:SIGN_PFX) {
-            $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1).FullName
-            ./tools/build-installer.ps1 -SignTool "`"$signtool`" sign /f `"$env:SIGN_PFX`" /p `"$env:SIGN_PFX_PASSWORD`" /fd sha256 /tr http://timestamp.digicert.com /td sha256 `$f"
-          }
-          else { ./tools/build-installer.ps1 }
+          $signed = Get-ChildItem signed-installer -Recurse -Filter 'SOWBroadcast-Setup-*.exe' | Select-Object -First 1
+          if (-not $signed) { throw 'SignPath returned no installer.' }
+          $setup = Get-ChildItem artifacts/installer -Filter 'SOWBroadcast-Setup-*.exe' | Select-Object -First 1
+          Copy-Item $signed.FullName $setup.FullName -Force
+          $signature = Get-AuthenticodeSignature $setup.FullName
+          if ($signature.Status -ne 'Valid') { throw "The installer is not validly signed: $($signature.Status)" }
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$($setup.FullName).sha256", "$hash  $($setup.Name)`n")
+          Write-Host "Signed by: $($signature.SignerCertificate.Subject)"
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
