@@ -11,7 +11,13 @@ namespace SowBroadcast.Core.Export;
 /// </summary>
 public static class LegacyMatchJson
 {
-    public static string Build(AppState state) => FileWriter.Crlf(BuildObject(state).ToJsonString(StateStore.Options));
+    /// <summary>The <c>match.json</c> file. The short status text is left out: it exists only in the overlay state (<c>/api/state</c>).</summary>
+    public static string Build(AppState state)
+    {
+        var root = BuildObject(state);
+        root["general"]!.AsObject().Remove("short_status_text");
+        return FileWriter.Crlf(root.ToJsonString(StateStore.Options));
+    }
 
     public static JsonObject BuildObject(AppState state)
     {

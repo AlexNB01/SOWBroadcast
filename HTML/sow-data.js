@@ -150,6 +150,8 @@
       case "Match/CurrentMap.txt": return state && state.match && state.match.current_map ? String(state.match.current_map) : "";
       case "Match/matchtext.txt": return str(state && state.matchtext);
       case "Match/status.txt": return str(general().status_text).trim();
+      // The camera-row overlays: just the tournament name; the long line when no short one is set.
+      case "Match/status_short.txt": return (str(general().short_status_text).trim() || str(general().status_text).trim());
       case "Match/match.json": return (state && state.match) || {};
       case "General/host.txt": return str(general().host);
       case "General/caster1.txt": return str(general().caster1);

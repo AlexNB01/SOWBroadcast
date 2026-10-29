@@ -69,7 +69,7 @@ for (const file of walk(goldenDir)) {
     if (rel.endsWith('.json')) {
         const actual = await SOW.readJSON(path);
         // match.json legacy copies carry local logo paths and the legacy-only "link" settings; the API state leaves paths out.
-        const strip = v => { const o = JSON.parse(JSON.stringify(v)); for (const t of ['team1', 'team2']) if (o[t]) o[t].logo_path = null; if (o.general) { o.general.overlay_logo_path = null; o.general.transition_logo_path = null; } delete o.standings; delete o.bracket; return o; };
+        const strip = v => { const o = JSON.parse(JSON.stringify(v)); for (const t of ['team1', 'team2']) if (o[t]) o[t].logo_path = null; if (o.general) { o.general.overlay_logo_path = null; o.general.transition_logo_path = null; delete o.general.short_status_text; } delete o.standings; delete o.bracket; return o; };
         const [a, e] = rel === 'Match/match.json' ? [strip(actual), strip(JSON.parse(expected))] : [actual, JSON.parse(expected)];
         if (rel === 'Match/match.json') for (const o of [a, e]) { delete o.draft_link_url; delete o.tournament_link_url; }
         if (canonical(a) !== canonical(e)) problems.push(`${rel}\n  expected ${canonical(e).slice(0, 300)}\n  actual   ${canonical(a).slice(0, 300)}`);

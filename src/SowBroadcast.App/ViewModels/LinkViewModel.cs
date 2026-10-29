@@ -271,7 +271,8 @@ public sealed partial class LinkViewModel : ObservableObject
             string? LogoOf(string? url) => url is null ? null : _logos?.PathOf(url);
             next = next with
             {
-                Standings = TournamentMapper.Standings(snapshot, LogoOf),
+                // The group shown in standings.html is the operator's choice, so a refresh keeps it (the first group is only the start).
+                Standings = TournamentMapper.Standings(snapshot, LogoOf, link.TournamentId == snapshot.Id ? state.Standings.DisplayGroup : null),
                 Bracket = TournamentMapper.Bracket(snapshot, LogoOf),
                 Schedule = ScheduleMapper.FromSnapshot(snapshot, LogoOf),
             };
@@ -317,7 +318,7 @@ public sealed partial class LinkViewModel : ObservableObject
     }
 
     private static string Signature(AppState state) =>
-        StateStore.Serialize(state with { General = new GeneralSettings { StatusText = state.General.StatusText }, Waiting = new WaitingSettings() });
+        StateStore.Serialize(state with { General = new GeneralSettings { StatusText = state.General.StatusText, ShortStatusText = state.General.ShortStatusText }, Waiting = new WaitingSettings() });
 
     // ---- match list --------------------------------------------------------------------------------------
 

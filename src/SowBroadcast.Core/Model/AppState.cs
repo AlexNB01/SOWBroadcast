@@ -48,6 +48,9 @@ public sealed record GeneralSettings
     public string Caster1 { get; init; } = "";
     public string Caster2 { get; init; } = "";
     public string StatusText { get; init; } = "";
+
+    /// <summary>The short status line (just the tournament name) the camera-row overlays show; they fall back to <see cref="StatusText"/> when empty.</summary>
+    public string ShortStatusText { get; init; } = "";
     public string? OverlayLogoPath { get; init; }
     public string? TransitionLogoPath { get; init; }
     public IReadOnlyDictionary<string, string> Colors { get; init; } = DefaultColors();

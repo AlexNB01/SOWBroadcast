@@ -9,18 +9,20 @@
   <DockPanel Margin="0,12,0,0">
     <views:LinkBar DockPanel.Dock="Top" DataContext="{Binding Link}" Margin="0,0,0,10" />
 
-  <!-- Read-only while the tournament is linked: the tab is then a mirror of SOWDraft's data. -->
-  <DockPanel IsEnabled="{Binding !Link.IsTournamentLinked}">
+  <!-- While the tournament is linked the tables, title and groups are a mirror of SOWDraft's data (read-only);
+       which group standings.html shows stays the operator's choice. -->
+  <DockPanel>
     <!-- Update + sort is the one primary button of this view -->
     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
-      <Button Content="Reset this tab" Command="{Binding ResetStandingsCommand}" />
-      <Button Classes="primary" Content="Update + sort" MinWidth="150" Command="{Binding UpdateStandingsCommand}" />
+      <Button Content="Reset this tab" IsEnabled="{Binding !Link.IsTournamentLinked}" Command="{Binding ResetStandingsCommand}" />
+      <Button Classes="primary" Content="Update + sort" MinWidth="150" Command="{Binding UpdateStandingsCommand}"
+              ToolTip.Tip="Sorts and ranks the tables, then publishes. While a tournament is linked the tables keep SOWDraft's order." />
     </StackPanel>
 
     <!-- One row: add a group, which group the overlay shows, title and subtitle -->
     <Border DockPanel.Dock="Top" Classes="card" Padding="12,8" Margin="0,0,0,10">
       <Grid ColumnDefinitions="Auto,Auto,220,Auto,*,Auto,*" ColumnSpacing="10">
-        <Button Content="Add Group" Command="{Binding Standings.AddGroupCommand}" />
+        <Button Content="Add Group" IsEnabled="{Binding !Link.IsTournamentLinked}" Command="{Binding Standings.AddGroupCommand}" />
         <TextBlock Grid.Column="1" Classes="label" VerticalAlignment="Center" Text="SHOW IN STANDINGS.HTML" />
         <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Standings.DisplayOptions}" SelectedItem="{Binding Standings.SelectedDisplay}">
           <ComboBox.ItemTemplate>
@@ -28,14 +30,14 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
         <TextBlock Grid.Column="3" Classes="label" VerticalAlignment="Center" Margin="10,0,0,0" Text="TITLE" />
-        <TextBox Grid.Column="4" Text="{Binding Standings.Title}" />
+        <TextBox Grid.Column="4" IsEnabled="{Binding !Link.IsTournamentLinked}" Text="{Binding Standings.Title}" />
         <TextBlock Grid.Column="5" Classes="label" VerticalAlignment="Center" Text="SUBTITLE / GROUP" />
-        <TextBox Grid.Column="6" Text="{Binding Standings.Subtitle}" />
+        <TextBox Grid.Column="6" IsEnabled="{Binding !Link.IsTournamentLinked}" Text="{Binding Standings.Subtitle}" />
       </Grid>
     </Border>
 
     <ScrollViewer>
-      <ItemsControl ItemsSource="{Binding Standings.Groups}" Margin="0,0,12,0">
+      <ItemsControl ItemsSource="{Binding Standings.Groups}" Margin="0,0,12,0" IsEnabled="{Binding !Link.IsTournamentLinked}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate><UniformGrid Columns="{Binding Standings.GroupColumns}" /></ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>

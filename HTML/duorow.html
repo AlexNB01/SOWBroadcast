@@ -100,7 +100,7 @@
   position:absolute;
   left:50%; bottom:6%; transform:translateX(-50%);
   display:none;
-  max-width:80vw;
+  width:max-content; max-width:80vw; box-sizing:border-box;
   padding:14px 28px;
   line-height:1.2;
 
@@ -189,7 +189,7 @@ body.leaving       .scoreboardwrapper { transform: translateY(-40px); opacity: 0
 async function upStatus(){
   const el  = document.getElementById("status");
   if (!el) return;
-  const txt = (await read(SB + "/Match/status.txt")).trim();
+  const txt = (await read(SB + "/Match/status_short.txt")).trim();
   el.textContent = txt;
   el.style.display = txt ? "inline-block" : "none";
 }

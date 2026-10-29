@@ -179,6 +179,9 @@ public static class MatchLinkMapper
         var general = state.General;
         if (!string.IsNullOrWhiteSpace(match.StatusText) && Changed("general.status", match.StatusText, out _))
             general = general with { StatusText = match.StatusText };
+        // The short line is just the tournament's name.
+        if (!string.IsNullOrWhiteSpace(snapshot.Name) && Changed("general.short_status", snapshot.Name.Trim(), out _))
+            general = general with { ShortStatusText = snapshot.Name.Trim() };
 
         var result2 = StateDerivations.Apply(state with { Team1 = team1, Team2 = team2, Maps = maps, General = general });
         return new LinkApplyResult(result2, rec, warnings, logos.Distinct().ToArray());

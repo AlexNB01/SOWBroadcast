@@ -38,7 +38,7 @@ public static class StateDiff
         if (og.MapsCount != ng.MapsCount) Add("general.first_to");
         if ((og.OverlayLogoPath ?? "") != (ng.OverlayLogoPath ?? "") ||
             (og.TransitionLogoPath ?? "") != (ng.TransitionLogoPath ?? "")) Add("general.logo");
-        if (og.StatusText.Trim() != ng.StatusText.Trim()) Add("general.status");
+        if (og.StatusText.Trim() != ng.StatusText.Trim() || og.ShortStatusText.Trim() != ng.ShortStatusText.Trim()) Add("general.status");
 
         var ow = previous.Waiting;
         var nw = current.Waiting;

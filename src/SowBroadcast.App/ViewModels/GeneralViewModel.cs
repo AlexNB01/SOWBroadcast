@@ -58,6 +58,7 @@ public sealed partial class GeneralViewModel : ObservableObject
     [ObservableProperty] private string _caster1 = "";
     [ObservableProperty] private string _caster2 = "";
     [ObservableProperty] private string _statusText = "";
+    [ObservableProperty] private string _shortStatusText = "";
     [ObservableProperty] private string? _overlayLogoPath;
     [ObservableProperty] private string? _transitionLogoPath;
 
@@ -103,6 +104,7 @@ public sealed partial class GeneralViewModel : ObservableObject
             Caster1 = g.Caster1;
             Caster2 = g.Caster2;
             StatusText = g.StatusText;
+            ShortStatusText = g.ShortStatusText;
             OverlayLogoPath = string.IsNullOrEmpty(g.OverlayLogoPath) ? null : g.OverlayLogoPath;
             TransitionLogoPath = string.IsNullOrEmpty(g.TransitionLogoPath) ? null : g.TransitionLogoPath;
             var defaults = GeneralSettings.DefaultColors();
@@ -120,6 +122,7 @@ public sealed partial class GeneralViewModel : ObservableObject
             Caster1 = Caster1.Trim(),
             Caster2 = Caster2.Trim(),
             StatusText = StatusText.Trim(),
+            ShortStatusText = ShortStatusText.Trim(),
             OverlayLogoPath = string.IsNullOrEmpty(OverlayLogoPath) ? null : OverlayLogoPath,
             TransitionLogoPath = string.IsNullOrEmpty(TransitionLogoPath) ? null : TransitionLogoPath,
             Colors = Colours.ToDictionary(c => c.Key, c => c.Hex),

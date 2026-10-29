@@ -36,7 +36,12 @@
             <Border Classes="card" Padding="14,10">
               <StackPanel Spacing="8">
                 <Border Classes="cardTitle"><TextBlock Classes="h2" Text="STATUS TEXT" /></Border>
+                <TextBlock Classes="label" Text="LONG (SCOREBOARD)" />
                 <TextBox Text="{Binding General.StatusText}" Watermark="Tournament name here" />
+                <TextBlock Classes="label" Text="SHORT (CAMERA ROWS)" />
+                <TextBox Text="{Binding General.ShortStatusText}" Watermark="Just the tournament name" />
+                <TextBlock Classes="muted" TextWrapping="Wrap"
+                           Text="The camera-row overlays show the short text (the long one when it is empty). A linked tournament fills it with its name." />
               </StackPanel>
             </Border>
           </StackPanel>

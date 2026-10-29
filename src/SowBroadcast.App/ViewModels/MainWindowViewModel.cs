@@ -236,11 +236,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, ILinkHost
         Autosave();
     }
 
-    /// <summary>Update + sort: orders and ranks every table, then publishes the standings.</summary>
+    /// <summary>
+    /// Update + sort: orders and ranks every table, then publishes the standings. While a tournament is linked the tables stay in
+    /// SOWDraft's order (its tiebreakers are not ours); only the operator's choices (which group to show) are published.
+    /// </summary>
     [RelayCommand]
     private void UpdateStandings()
     {
-        Standings.SortAll();
+        if (!Link.IsTournamentLinked) Standings.SortAll();
         CollectTabs();
         PublishPart(PublishScope.Standings, "standings", "Standings");
     }

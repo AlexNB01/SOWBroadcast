@@ -15,7 +15,11 @@ public static class TournamentMapper
     private static string AdvancementOf(TournamentSnapshot snapshot, string? stageId, string? group, string? teamId) =>
         snapshot.Advancement.FirstOrDefault(a => a.TeamId == teamId && a.Group == group && (a.StageId ?? "") == (stageId ?? ""))?.Status ?? "";
 
-    public static StandingsSettings Standings(TournamentSnapshot snapshot, Func<string?, string?> logoOf)
+    /// <param name="keepDisplayGroup">
+    /// The group the operator chose to show in standings.html (<c>__all__</c> or a group key). Kept when the tournament still has it;
+    /// otherwise, and on the first link, the first group is shown.
+    /// </param>
+    public static StandingsSettings Standings(TournamentSnapshot snapshot, Func<string?, string?> logoOf, string? keepDisplayGroup = null)
     {
         var logo = snapshot.Teams.ToDictionary(t => t.Id, t => logoOf(t.LogoUrl));
         var groups = new List<StandingsGroup>();
@@ -75,13 +79,18 @@ public static class TournamentMapper
             }
         }
 
+        var display = groups.Count > 0 ? groups[0].Key : "";
+        if (!string.IsNullOrEmpty(keepDisplayGroup) && (keepDisplayGroup == "__all__" || groups.Any(g => g.Key == keepDisplayGroup)))
+            display = keepDisplayGroup;
+        var shown = groups.FirstOrDefault(g => g.Key == display) ?? (groups.Count > 0 ? groups[0] : null);
+
         return new StandingsSettings
         {
             Title = snapshot.Name,
             Subtitle = "",
-            Rows = groups.Count > 0 ? groups[0].Rows : Array.Empty<StandingsRow>(),
+            Rows = shown?.Rows ?? Array.Empty<StandingsRow>(),
             Groups = groups,
-            DisplayGroup = groups.Count > 0 ? groups[0].Key : "",
+            DisplayGroup = display,
         };
     }
 

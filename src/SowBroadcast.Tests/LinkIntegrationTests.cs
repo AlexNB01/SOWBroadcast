@@ -97,6 +97,23 @@ public sealed class LinkIntegrationTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task The_group_shown_in_standings_html_is_the_operators_choice_even_while_linked_and_survives_the_next_update()
+    {
+        await LinkAndSelectAsync();
+        await SettledAsync();
+        Assert.Equal("s1", _vm.Standings.SelectedDisplay.Key);                     // the first group to start with
+
+        _vm.Standings.SelectedDisplay = _vm.Standings.AllOption;
+        Socket.Fire("update-state", LinkFixtures.DraftRoom);
+        await Task.Delay(300);
+        _vm.UpdateStandingsCommand.Execute(null);
+
+        Assert.Same(_vm.Standings.AllOption, _vm.Standings.SelectedDisplay);
+        Assert.Equal("Alpha", _vm.Standings.Groups[0].Rows[0].TeamName);           // the table keeps SOWDraft's order
+        Assert.Equal("__all__", _recorder.Parts.Last().State.Standings.DisplayGroup);
+    }
+
+    [Fact]
     public async Task The_match_list_is_sorted_with_live_matches_first_and_finished_ones_last()
     {
         _vm.Link.TournamentUrl = TournamentUrl;
@@ -389,7 +406,14 @@ public sealed class LinkIntegrationTests : IAsyncLifetime, IDisposable
             return new PublishResult(Array.Empty<string>(), Array.Empty<string>());
         }
 
-        public PublishResult PublishPart(AppState state, PublishScope scope) => new(Array.Empty<string>(), Array.Empty<string>());
+        public List<(AppState State, PublishScope Scope)> Parts { get; } = new();
+
+        public PublishResult PublishPart(AppState state, PublishScope scope)
+        {
+            Parts.Add((state, scope));
+            return new PublishResult(Array.Empty<string>(), Array.Empty<string>());
+        }
+
         public void MarkAssetsChanged(AssetCategory category) { }
 
         public int ReplayAnnouncements { get; private set; }

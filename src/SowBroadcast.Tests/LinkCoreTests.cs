@@ -435,6 +435,21 @@ public sealed class MatchLinkMapperTests
     }
 
     [Fact]
+    public void The_short_status_line_is_the_tournament_name_and_a_hand_typed_one_stays_until_the_name_changes()
+    {
+        var snap = LinkFixtures.Snapshot();
+        var first = MatchLinkMapper.Apply(Blank(), snap, "m1", Options(), NoHistory);
+        var typed = first.State with { General = first.State.General with { ShortStatusText = "My cup" } };
+
+        var same = MatchLinkMapper.Apply(typed, snap, "m1", Options(), first.Received);
+        var renamed = MatchLinkMapper.Apply(typed, snap with { Name = "Renamed Cup" }, "m1", Options(), first.Received);
+
+        Assert.Equal("Synthetic Cup", first.State.General.ShortStatusText);
+        Assert.Equal("My cup", same.State.General.ShortStatusText);
+        Assert.Equal("Renamed Cup", renamed.State.General.ShortStatusText);
+    }
+
+    [Fact]
     public void A_status_line_typed_by_hand_stays_until_SOWDraft_changes_it_and_a_missing_one_changes_nothing()
     {
         var snap = WithStatusText(LinkFixtures.Snapshot(), "Cup – Final – BO5");
@@ -620,6 +635,29 @@ public sealed class TournamentMapperTests
         Assert.Equal(("Alpha", 9, 1, "L:a.png"), (standings.Rows[0].TeamName, standings.Rows[0].Points, standings.Rows[0].Rank, standings.Rows[0].LogoPath));
         Assert.Equal(2, standings.Rows[1].Rank);
         Assert.Equal("A", standings.DisplayGroup);
+    }
+
+    [Fact]
+    public void The_group_the_operator_chose_for_standings_html_survives_a_refresh_while_it_exists()
+    {
+        var snap = new TournamentSnapshot
+        {
+            Name = "Old style",
+            Standings = new[]
+            {
+                new ServerStandingsGroup("A", new[] { new ServerStandingsEntry("a", "Alpha", 3, 1, 4, 9) }),
+                new ServerStandingsGroup("B", new[] { new ServerStandingsEntry("b", "Bravo", 1, 3, -2, 3) }),
+            },
+        };
+
+        var kept = TournamentMapper.Standings(snap, NoLogo, "B");
+        var all = TournamentMapper.Standings(snap, NoLogo, "__all__");
+        var gone = TournamentMapper.Standings(snap, NoLogo, "Z");
+
+        Assert.Equal("B", kept.DisplayGroup);
+        Assert.Equal("Bravo", kept.Rows[0].TeamName);
+        Assert.Equal("__all__", all.DisplayGroup);
+        Assert.Equal("A", gone.DisplayGroup);
     }
 
     [Fact]
