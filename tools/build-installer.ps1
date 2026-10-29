@@ -15,11 +15,6 @@
     list, shrinks oversized full-body hero pictures, recompresses PNGs losslessly). The repository's own pictures are never changed. It runs when
     Python with Pillow is available (otherwise a warning says the installer is bigger); -NoOptimize skips it.
 
-    Code signing: pass -SignTool with the full command Inno should run for each file, with $f for the file, for example
-    -SignTool 'signtool.exe sign /f cert.pfx /p password /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f'.
-    The installer and its uninstaller are signed (sign the program's own exe in the same way before this step if wanted). Without it the
-    installer is unsigned and Windows SmartScreen warns.
-
     The music library (22 MB) is an optional component of the installer, taken from the Music folder of the repository; -NoMusic leaves it out.
 
 .EXAMPLE
@@ -29,8 +24,7 @@
 param(
     [switch] $NoMusic,
     [switch] $NoPack,
-    [switch] $NoOptimize,
-    [string] $SignTool = ''
+    [switch] $NoOptimize
 )
 
 $ErrorActionPreference = 'Stop'
@@ -96,7 +90,6 @@ if (-not $NoMusic) {
     if (Test-Path $music) { $arguments += "/DMusicDir=$music" }
     else { Write-Warning "No Music folder at $music, so the installer has no music component." }
 }
-if ($SignTool) { $arguments += @("/Ssowsign=$SignTool", '/DSignToolName=sowsign') }
 $arguments += (Join-Path $PSScriptRoot 'installer\SOWBroadcast.iss')
 
 & $iscc @arguments

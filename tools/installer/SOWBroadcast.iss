@@ -3,7 +3,6 @@
 ;   /DPublishDir=...            the published program with HTML/ and the shipped images
 ;   /DOutputDir=...             where SOWBroadcast-Setup-<version>.exe goes
 ;   /DMusicDir=...              (optional) the Music folder; without it the Music component is left out
-;   /DSignToolName=...          (optional) name of a sign tool given with /S on the ISCC command line
 ;
 ; The program goes into a folder the user can see and choose (default C:\SOW Broadcast). Everything the program writes
 ; (autosave, the generated overlay files, logs, settings) lives in the Data folder next to it, so there is one place to look.
@@ -52,10 +51,6 @@ UsePreviousAppDir=yes
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany=Suomi OW ry
 VersionInfoDescription={#AppName} setup
-#ifdef SignToolName
-SignTool={#SignToolName}
-SignedUninstaller=yes
-#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
