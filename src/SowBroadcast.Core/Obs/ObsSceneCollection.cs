@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 namespace SowBroadcast.Core.Obs;
 
 /// <summary>
-/// The OBS scene collection for the program's overlays (EHD-6): the 18 scenes of the old collection with every browser source pointed
+/// The OBS scene collection for the program's overlays (EHD-6): the 18 scenes of the old collection (and one more for the replay clips) with every browser source pointed
 /// at the current pages and everything that belonged to one machine removed (NDI sender names, the webcam, absolute paths, dead
 /// addresses). Built from the template shipped inside the program, with the server address and the program's folders filled in.
 /// Import it in OBS with Scene Collection > Import; pick the NDI senders and the camera afterwards.
@@ -35,7 +35,67 @@ public static class ObsSceneCollection
     {
         using var stream = typeof(ObsSceneCollection).Assembly.GetManifestResourceStream(TemplateResource)
                            ?? throw new InvalidOperationException("The OBS scene template is missing from the program.");
-        return JsonNode.Parse(stream)!.AsObject();
+        var template = JsonNode.Parse(stream)!.AsObject();
+        AddReplayClipsScene(template);
+        return template;
+    }
+
+    // ---- replay ---------------------------------------------------------------------------------------------
+    // The old collection had one replay scene. The replay page has two jobs now (replay.html?mode=instant loops the newest clip, ?mode=clips
+    // plays what the operator asks for in the Replay tab), so the collection has a scene for each: the old one becomes the instant replay and
+    // a copy of it, with its own sources, shows the clips.
+
+    /// <summary>The scene that plays the clips asked for in the Replay tab.</summary>
+    public const string ReplayClipsScene = "Replay Clips";
+
+    private const string InstantReplayScene = "InstantReplay";
+    private const string InstantReplayPage = "replay.html?mode=instant";
+    private const string ReplayClipsPage = "replay.html?mode=clips";
+
+    // Ids of the copies in the template (the final ids are made from them like all the others).
+    private const string ReplayClipsSceneUuid = "b1c2d3e4-0001-4a5b-8c6d-7e8f90a1b2c3";
+    private const string ReplayClipsPageUuid = "b1c2d3e4-0002-4a5b-8c6d-7e8f90a1b2c3";
+    private const string ReplayClipsTransitionUuid = "b1c2d3e4-0003-4a5b-8c6d-7e8f90a1b2c3";
+
+    private static void AddReplayClipsScene(JsonObject template)
+    {
+        var sources = template["sources"]!.AsArray();
+        JsonObject Find(string name) => sources.Select(s => s!.AsObject()).First(s => s["name"]!.GetValue<string>() == name);
+
+        var scene = Find(InstantReplayScene);
+        var items = scene["settings"]!["items"]!.AsArray().Select(i => i!.AsObject()).ToArray();
+        var pageItem = items.First(i => i["name"]!.GetValue<string>().StartsWith("HTML Instant Replay", StringComparison.Ordinal));
+        var transitionItem = items.First(i => i["name"]!.GetValue<string>().StartsWith("HTML Transition", StringComparison.Ordinal));
+        var page = Find(pageItem["name"]!.GetValue<string>());
+        var transition = Find(transitionItem["name"]!.GetValue<string>());
+        page["settings"]!["url"] = "http://127.0.0.1:8324/HTML/" + InstantReplayPage;
+
+        var pageCopy = page.DeepClone().AsObject();
+        pageCopy["name"] = "HTML Replay Clips";
+        pageCopy["uuid"] = ReplayClipsPageUuid;
+        pageCopy["settings"]!["url"] = "http://127.0.0.1:8324/HTML/" + ReplayClipsPage;
+
+        var transitionCopy = transition.DeepClone().AsObject();
+        transitionCopy["name"] = "HTML Transition Replay Clips";
+        transitionCopy["uuid"] = ReplayClipsTransitionUuid;
+
+        var sceneCopy = scene.DeepClone().AsObject();
+        sceneCopy["name"] = ReplayClipsScene;
+        sceneCopy["uuid"] = ReplayClipsSceneUuid;
+        foreach (var item in sceneCopy["settings"]!["items"]!.AsArray().Select(i => i!.AsObject()))
+        {
+            var isPage = item["name"]!.GetValue<string>().StartsWith("HTML Instant Replay", StringComparison.Ordinal);
+            item["name"] = isPage ? pageCopy["name"]!.GetValue<string>() : transitionCopy["name"]!.GetValue<string>();
+            item["source_uuid"] = isPage ? ReplayClipsPageUuid : ReplayClipsTransitionUuid;
+        }
+
+        sources.Add(pageCopy);
+        sources.Add(transitionCopy);
+        sources.Add(sceneCopy);
+
+        var order = template["scene_order"]!.AsArray();
+        var at = order.ToList().FindIndex(o => o!["name"]!.GetValue<string>() == InstantReplayScene);
+        order.Insert(at + 1, new JsonObject { ["name"] = ReplayClipsScene });
     }
 
     /// <summary>The names of the scenes in the collection, in the order of OBS's scene list.</summary>
@@ -283,6 +343,7 @@ public static class ObsSceneCollection
     {
         var at = url.IndexOf("/html/", StringComparison.OrdinalIgnoreCase);
         var name = at >= 0 ? url[(at + 6)..] : url;
+        if (name.StartsWith("replay.html?mode=", StringComparison.OrdinalIgnoreCase)) return name;
         var bare = name.Split('?')[0];
         return Pages.TryGetValue(bare, out var page) ? page : name;
     }

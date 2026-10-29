@@ -436,17 +436,46 @@ public sealed class ObsSceneCollectionTests
     }
 
     [Fact]
-    public void The_collection_has_the_eighteen_scenes_and_starts_on_In_Game()
+    public void The_collection_has_the_old_eighteen_scenes_and_the_replay_clips_scene_and_starts_on_In_Game()
     {
         var root = JsonDocument.Parse(Build()).RootElement;
 
         var scenes = root.GetProperty("sources").EnumerateArray().Where(s => s.GetProperty("id").GetString() == "scene").Select(s => s.GetProperty("name").GetString()).ToArray();
 
-        Assert.Equal(18, scenes.Length);
+        Assert.Equal(19, scenes.Length);
+        Assert.Contains("Replay Clips", scenes);
         Assert.Equal("SOW Broadcast", root.GetProperty("name").GetString());
         Assert.Equal("In Game", root.GetProperty("current_scene").GetString());
         Assert.Equal(SowBroadcast.Core.Obs.ObsSceneCollection.SceneNames().OrderBy(n => n), scenes.OrderBy(n => n));
         Assert.Contains("Starting Soon", SowBroadcast.Core.Obs.ObsSceneCollection.SceneNames());
+    }
+
+    [Fact]
+    public void The_instant_replay_scene_loops_the_newest_clip_and_the_replay_clips_scene_plays_what_is_asked_for()
+    {
+        var root = JsonDocument.Parse(Build("http://127.0.0.1:9000")).RootElement;
+        var sources = root.GetProperty("sources").EnumerateArray().ToArray();
+        JsonElement Source(string name) => sources.Single(s => s.GetProperty("name").GetString() == name);
+        string Url(string name) => Source(name).GetProperty("settings").GetProperty("url").GetString()!;
+        string[] ItemsOf(string scene) => Source(scene).GetProperty("settings").GetProperty("items").EnumerateArray().Select(i => i.GetProperty("name").GetString()!).ToArray();
+
+        Assert.Equal("http://127.0.0.1:9000/HTML/replay.html?mode=instant", Url("HTML Instant Replay"));
+        Assert.Equal("http://127.0.0.1:9000/HTML/replay.html?mode=clips", Url("HTML Replay Clips"));
+
+        // each scene has its own page and its own transition, so showing one never restarts the other
+        Assert.Equal(new[] { "HTML Instant Replay", "HTML Transition Replay" }, ItemsOf("InstantReplay"));
+        Assert.Equal(new[] { "HTML Replay Clips", "HTML Transition Replay Clips" }, ItemsOf("Replay Clips"));
+
+        // the items point at the sources of their own scene
+        foreach (var scene in new[] { "InstantReplay", "Replay Clips" })
+            foreach (var item in Source(scene).GetProperty("settings").GetProperty("items").EnumerateArray())
+                Assert.Equal(Source(item.GetProperty("name").GetString()!).GetProperty("uuid").GetString(), item.GetProperty("source_uuid").GetString());
+
+        // the scenes sit next to each other in OBS's list, and every uuid is still its own
+        var names = SowBroadcast.Core.Obs.ObsSceneCollection.SceneNames().ToList();
+        Assert.Equal(names.IndexOf("InstantReplay") + 1, names.IndexOf("Replay Clips"));
+        var uuids = sources.Select(s => s.GetProperty("uuid").GetString()).ToArray();
+        Assert.Equal(uuids.Length, uuids.Distinct().Count());
     }
 
     [Fact]

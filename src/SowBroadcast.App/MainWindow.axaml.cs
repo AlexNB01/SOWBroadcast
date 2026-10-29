@@ -76,7 +76,11 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
 
         // The countdown counts on a monotonic clock; this only refreshes what is shown (and the timer files) a few times a second.
         var clock = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-        clock.Tick += (_, _) => _viewModel.Waiting.Tick();
+        clock.Tick += (_, _) =>
+        {
+            _viewModel.Waiting.Tick();
+            _viewModel.Replay.UpdateRun();   // the time the requested clips have left on the stream
+        };
         // What was edited since the last look becomes one undo step once the typing pauses.
         var steps = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         steps.Tick += (_, _) => _viewModel.FlushHistory();

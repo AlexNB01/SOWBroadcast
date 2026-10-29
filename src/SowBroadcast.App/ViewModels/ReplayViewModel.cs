@@ -63,14 +63,19 @@ public sealed partial class ReplayViewModel : ObservableObject
     private readonly IMessages _messages;
     private readonly Action<Action> _uiPost;
     private readonly Action<string> _say;
+    private readonly IClipExporter _exporter;
+    private readonly Func<long> _nowMs;
     private bool _loading;
     private long _stopAtMs;
     private int _ownChanges;   // library changes this view caused itself (its rows are already right)
 
     public ReplayViewModel(ReplayLibrary library, IOverlayPublisher publisher, IClipPlayer? player = null,
-        Func<(string Match, string Tournament)>? context = null, IMessages? messages = null, Action<Action>? uiPost = null, Action<string>? say = null)
+        Func<(string Match, string Tournament)>? context = null, IMessages? messages = null, Action<Action>? uiPost = null, Action<string>? say = null,
+        IClipExporter? exporter = null, Func<long>? nowMs = null)
     {
         _library = library;
+        _nowMs = nowMs ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        _exporter = exporter ?? new FfmpegClipExporter();
         _publisher = publisher;
         Player = player ?? new NoClipPlayer();
         _context = context ?? (() => ("", ""));
@@ -119,6 +124,13 @@ public sealed partial class ReplayViewModel : ObservableObject
     [ObservableProperty] private bool _isPlaying;
     [ObservableProperty] private bool _muted = true;
 
+    // saving the shown part as a new video file
+    [ObservableProperty] private bool _isExporting;
+    [ObservableProperty] private string _exportStatus = "";
+
+    public bool CanSaveCopy => HasSelection && !IsExporting;
+    partial void OnIsExportingChanged(bool value) => OnPropertyChanged(nameof(CanSaveCopy));
+
     public bool HasSelection => Selected is not null;
     public bool HasClips => Clips.Count > 0;
     public bool CanDeleteCategory => SelectedCategory?.IsCustom == true;
@@ -129,6 +141,65 @@ public sealed partial class ReplayViewModel : ObservableObject
         var t = TimeSpan.FromMilliseconds(Math.Max(0, ms));
         var whole = $"{(int)t.TotalMinutes}:{t.Seconds:00}";
         return tenths ? whole + "." + (t.Milliseconds / 100) : whole;
+    }
+
+    // ---- what is on the stream ---------------------------------------------------------------------------
+
+    /// <summary>The clips shown on the Replay Clips scene are running out in this many seconds or less: time to change scene.</summary>
+    public const int UrgentSeconds = 10;
+
+    [ObservableProperty] private ReplayRunStatus _run = ReplayRunStatus.None;
+
+    public bool RunActive => Run.IsPlaying;
+    public bool RunIdle => !Run.IsPlaying;
+    public bool RunUrgent => Run.IsPlaying && Run.RemainingMs <= UrgentSeconds * 1000L;
+
+    /// <summary>The time left of everything that was asked for, rounded up to the second (it reaches 0:00 when the page is empty again).</summary>
+    public string RunRemainingText => Run.IsPlaying ? Clock((Run.RemainingMs + 999) / 1000 * 1000) : "";
+
+    public string RunCaption
+    {
+        get
+        {
+            if (Run.Current is not { } now) return "";
+            var which = Run.Count > 1 ? $"Clip {Run.Index + 1} of {Run.Count} · " : "";
+            return which + now.Title;
+        }
+    }
+
+    /// <summary>What is not certain about the time left (a clip whose length is not known yet).</summary>
+    public string RunNote => Run.IsPlaying && Run.LengthUnknown ? "The length of some clips is not known yet, so there may be more to come." : "";
+
+    public bool HasRunNote => RunNote.Length > 0;
+
+    public string RunTotalText => Run.IsPlaying ? "of " + Clock((Run.TotalMs + 500) / 1000 * 1000) : "";
+
+    /// <summary>The short form for the header, which every tab shows.</summary>
+    public string RunPillText => Run.IsPlaying ? "Replay clips · " + RunRemainingText : "";
+
+    /// <summary>The length of each clip, for the bar.</summary>
+    public IReadOnlyList<long> RunSegments => Run.Segments.Select(s => s.LengthMs).ToArray();
+
+    /// <summary>Called a few times a second (by the window, so it runs on every tab): works out how long the requested clips still last.</summary>
+    public void UpdateRun()
+    {
+        var next = ReplayRun.At(_library.Request, _nowMs(), clip => _library.Find(clip.Id) ?? clip);
+        if (!next.IsPlaying && !Run.IsPlaying) return;
+        Run = next;
+    }
+
+    partial void OnRunChanged(ReplayRunStatus value)
+    {
+        OnPropertyChanged(nameof(RunActive));
+        OnPropertyChanged(nameof(RunIdle));
+        OnPropertyChanged(nameof(RunUrgent));
+        OnPropertyChanged(nameof(RunRemainingText));
+        OnPropertyChanged(nameof(RunCaption));
+        OnPropertyChanged(nameof(RunNote));
+        OnPropertyChanged(nameof(HasRunNote));
+        OnPropertyChanged(nameof(RunTotalText));
+        OnPropertyChanged(nameof(RunPillText));
+        OnPropertyChanged(nameof(RunSegments));
     }
 
     // ---- the lists ---------------------------------------------------------------------------------------
@@ -171,6 +242,7 @@ public sealed partial class ReplayViewModel : ObservableObject
     partial void OnSelectedChanged(ReplayClipItem? value)
     {
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(CanSaveCopy));
         if (_loading) return;
         LoadEditor();
         OpenPreview();
@@ -328,6 +400,67 @@ public sealed partial class ReplayViewModel : ObservableObject
         EditSpeed = 1;
     }
 
+    /// <summary>
+    /// Writes the shown part (trim and speed) of the selected clip as a new video file and adds it as a new clip. The original file is not
+    /// touched. Needs ffmpeg, which the program does not ship.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveCopy()
+    {
+        if (IsExporting || Selected is not { } item) return;
+        var clip = _library.Find(item.Id) ?? item.Clip;
+
+        const string title = "Save as new clip";
+        if (clip.StartMs <= 0 && clip.EndMs <= 0 && Math.Abs(clip.Speed - 1) < 0.001)
+        {
+            await _messages.ShowInfoAsync(title, "Set a start, an end or a speed first. Without them the new clip would be the same as this one.");
+            return;
+        }
+        if (_exporter.FindTool() is null)
+        {
+            await _messages.ShowErrorAsync("ffmpeg is needed",
+                "Cutting a clip into a new video file needs ffmpeg, which is not installed.\n\nInstall it once (in a command prompt: winget install Gyan.FFmpeg), then restart this program.");
+            return;
+        }
+        var source = _library.PathOf(clip);
+        if (!File.Exists(source))
+        {
+            await _messages.ShowErrorAsync(title, "The video file of this clip is missing.");
+            return;
+        }
+
+        var temp = _library.TempExportPath();
+        IsExporting = true;
+        ExportStatus = "Saving the new clip… this takes a moment.";
+        _say("Replay: saving the shown part as a new clip…");
+        ClipExportResult result;
+        try { result = await _exporter.ExportAsync(source, temp, clip.StartMs, clip.EndMs, clip.Speed); }
+        catch (Exception ex) { result = new ClipExportResult(false, ex.Message.Split('\n', 2)[0].Trim()); }
+        finally
+        {
+            IsExporting = false;
+            ExportStatus = "";
+        }
+
+        if (!result.Ok)
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { /* left for later */ }
+            _say("Replay: the new clip could not be saved");
+            await _messages.ShowErrorAsync(title, "The new clip could not be saved: " + result.Error);
+            return;
+        }
+
+        var created = _library.AdoptCopy(clip, temp, (clip.Title.Length > 0 ? clip.Title : clip.File) + " (cut)");
+        if (created is null)
+        {
+            await _messages.ShowErrorAsync(title, "The new clip could not be added to the playlist.");
+            return;
+        }
+        Refresh();
+        Selected = Clips.FirstOrDefault(c => c.Id == created.Id) ?? Selected;
+        _say($"Replay: saved \"{created.Title}\"");
+    }
+
     // ---- the stream --------------------------------------------------------------------------------------
 
     [RelayCommand]
@@ -360,6 +493,7 @@ public sealed partial class ReplayViewModel : ObservableObject
         if (clips.Count == 0) return Said(false, $"No clips in {what}");
         _library.Play(clips);
         _publisher.AnnounceReplay();
+        UpdateRun();
         return Said(true, clips.Count == 1 ? $"Replay: showing {what}" : $"Replay: showing {clips.Count} clips of {what}");
     }
 
@@ -394,7 +528,8 @@ public sealed partial class ReplayViewModel : ObservableObject
             case ControlCatalogIds.Stop:
                 _library.Stop();
                 _publisher.AnnounceReplay();
-                return Said(true, "Replay: back to the newest clip");
+                UpdateRun();
+                return Said(true, "Replay: stopped");
             case ControlCatalogIds.Clip:
             {
                 var wanted = Arg("id");

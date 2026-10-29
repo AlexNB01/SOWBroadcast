@@ -211,6 +211,46 @@ public sealed class ReplayLibrary
         return true;
     }
 
+    /// <summary>A path in the playlist folder for a video that is being written (not an <c>.mp4</c>, so nothing mistakes it for a clip).</summary>
+    public string TempExportPath() => Path.Combine(PlaylistFolder, "export-" + Guid.NewGuid().ToString("N")[..8] + ".tmp");
+
+    /// <summary>
+    /// Takes the finished video at <paramref name="tempFile"/> into the playlist as a new clip with the title, match, tournament and
+    /// categories of <paramref name="source"/> (untrimmed, normal speed). It is filed just below the source, so it never becomes the
+    /// newest clip and the stream keeps showing what it showed. Null when the file could not be moved.
+    /// </summary>
+    public ReplayClip? AdoptCopy(ReplayClip source, string tempFile, string title)
+    {
+        ReplayClip clip;
+        lock (_lock)
+        {
+            var number = _clips.Select(c => NumberOf(c.File)).DefaultIfEmpty(0).Max();
+            if (Directory.Exists(PlaylistFolder))
+                foreach (var path in Directory.EnumerateFiles(PlaylistFolder, "*.mp4")) number = Math.Max(number, NumberOf(Path.GetFileName(path)));
+
+            var file = $"{number + 1}-Replay-Replay.mp4";
+            try { System.IO.File.Move(tempFile, Path.Combine(PlaylistFolder, file)); }
+            catch (IOException) { return null; }
+            catch (UnauthorizedAccessException) { return null; }
+
+            clip = Normalise(new ReplayClip
+            {
+                Id = Guid.NewGuid().ToString("N")[..10],
+                File = file,
+                Title = title,
+                AddedAt = source.AddedAt - 1,
+                DurationMs = Mp4Info.ReadDurationMs(Path.Combine(PlaylistFolder, file)),
+                Match = source.Match,
+                Tournament = source.Tournament,
+                Tags = source.Tags.ToArray(),
+            });
+            _clips.Add(clip);
+            Save();
+        }
+        Changed?.Invoke();
+        return clip;
+    }
+
     /// <summary>Removes the clip from the library and deletes its file.</summary>
     public bool Remove(string id)
     {

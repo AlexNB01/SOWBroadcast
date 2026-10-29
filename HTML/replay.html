@@ -52,6 +52,9 @@ body:not(.visible) video,
 body.leaving       video       { opacity: 0; }
 body:not(.visible) .replaytext,
 body.leaving       .replaytext { opacity: 0; }
+/* ?mode=clips with nothing to show: the page is empty (the scene shows what is behind it) */
+body.idle video,
+body.idle .replaytext { opacity: 0; }
 </style>
 </head>
 <body>
@@ -89,9 +92,15 @@ body.leaving       .replaytext { opacity: 0; }
     img.classList.add("hidden");
   }
 
-  // What the stream shows: the newest clip, looped (its trim and speed applied by this page - the file is never cut), until the
-  // operator asks for something else. A request (one clip, a category, ...) plays once through, in order, and then the page goes
-  // back to the newest clip. The program puts both in /api/state under "replay".
+  // What the stream shows depends on ?mode=
+  //   instant : the newest clip, looped (its trim and speed applied by this page - the file is never cut). Asks of the operator are ignored.
+  //   clips   : what the operator asks for (one clip, a category, ...): played once through, in order. Then the page is empty again.
+  //   (none)  : both, as this page always did: a request plays once through and the page goes back to the newest clip.
+  // The program puts the newest clip and the request in /api/state under "replay".
+  const MODE = (new URLSearchParams(location.search).get("mode") || "").toLowerCase();
+  const INSTANT = MODE === "instant", CLIPS = MODE === "clips";
+  if (CLIPS) document.body.classList.add("idle");
+
   const vids = { 1: document.getElementById("v1"), 2: document.getElementById("v2") };
   let active = 1;           // the video that is visible
   let token = 0;            // every change of what is shown makes the older one's events void
@@ -143,16 +152,38 @@ body.leaving       .replaytext { opacity: 0; }
     return true;
   }
 
+  // ?mode=clips: nothing to show. The picture fades out, then the video stops.
+  function goIdle(){
+    token++;
+    sequenceRunning = false;
+    latestKey = "";
+    if (document.body.classList.contains("idle")) return;
+    document.body.classList.add("idle");
+    setTimeout(() => { if (document.body.classList.contains("idle")) { vids[1].pause(); vids[2].pause(); } }, 800);
+  }
+
+  function leaveIdle(){
+    if (!document.body.classList.contains("idle")) return;
+    document.body.classList.remove("idle");
+    const badge = document.querySelector(".badge");
+    if (badge) { badge.style.animation = "none"; void badge.offsetWidth; badge.style.animation = ""; }
+  }
+
   function playSequence(clips){
     const next = i => {
-      if (i >= clips.length) { sequenceRunning = false; latestKey = ""; showLatest(); return; }
+      if (i >= clips.length) {
+        if (CLIPS) { goIdle(); return; }
+        sequenceRunning = false; latestKey = ""; showLatest(); return;
+      }
       show(clips[i], () => next(i + 1));
     };
     sequenceRunning = true;
+    leaveIdle();
     next(0);
   }
 
   function sync(){
+    if (INSTANT) { showLatest(); return; }
     const st = SOW.state() || {};
     const r = st.replay || {};
     const play = r.play;
@@ -163,16 +194,18 @@ body.leaving       .replaytext { opacity: 0; }
     } else if (play && play.nonce !== seenNonce) {
       seenNonce = play.nonce;
       if (play.clips && play.clips.length) { playSequence(play.clips); return; }
-      sequenceRunning = false;   // "stop": back to the newest clip
+      sequenceRunning = false;   // "stop": back to the newest clip (or, with ?mode=clips, to an empty page)
       latestKey = "";
+      if (CLIPS) { goIdle(); return; }
     }
+    if (CLIPS) return;
     if (!sequenceRunning) showLatest();
   }
 
   // Without the clip list (an older program, or clips copied in by hand) the file replaypath.txt names the clip to loop.
   let lastName = "";
   async function tick(){
-    if (sequenceRunning || ((SOW.state() || {}).replay || {}).latest) return;
+    if (CLIPS || sequenceRunning || ((SOW.state() || {}).replay || {}).latest) return;
     const name = (await read(REPLAY+"/replaypath.txt")).trim();
     if (!name || name === lastName) return;
     lastName = name;

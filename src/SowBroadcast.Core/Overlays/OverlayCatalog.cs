@@ -24,7 +24,8 @@ public static class OverlayCatalog
         new("Duo camera row", "duorow.html"),
         new("Trio camera row", "triorow.html"),
         new("Single camera", "singlecam.html"),
-        new("Instant replay", "replay.html"),
+        new("Instant replay", "replay.html?mode=instant"),
+        new("Replay clips", "replay.html?mode=clips"),
         new("Transition", "transition.html"),
     };
 

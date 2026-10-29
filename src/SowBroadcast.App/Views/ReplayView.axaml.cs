@@ -39,11 +39,18 @@ public partial class ReplayView : UserControl
     {
         base.OnAttachedToVisualTree(e);
         _timer.Start();
+        // The video surface gets its window handle after this tab is shown; playing only then keeps LibVLC from opening a window of its own.
+        Dispatcher.UIThread.Post(() =>
+        {
+            ConnectVideo();
+            if (DataContext is ReplayViewModel { Player: LibVlcClipPlayer player }) player.SurfaceReady();
+        }, DispatcherPriority.Background);
     }
 
     protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
         _timer.Stop();
+        if (DataContext is ReplayViewModel { Player: LibVlcClipPlayer player }) player.SurfaceLost();
         base.OnDetachedFromVisualTree(e);
     }
 }

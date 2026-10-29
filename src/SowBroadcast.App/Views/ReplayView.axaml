@@ -1,9 +1,19 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SowBroadcast.App.ViewModels"
+             xmlns:ctl="using:SowBroadcast.App.Controls"
              xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
              x:Class="SowBroadcast.App.Views.ReplayView"
              x:DataType="vm:ReplayViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.remaining">
+      <Setter Property="Foreground" Value="{DynamicResource SowBladeBrush}" />
+    </Style>
+    <Style Selector="TextBlock.remaining.urgent">
+      <Setter Property="Foreground" Value="{DynamicResource SowErrorBrush}" />
+    </Style>
+  </UserControl.Styles>
 
   <Grid Margin="0,12,0,0" ColumnDefinitions="380,14,*">
 
@@ -53,11 +63,32 @@
     <DockPanel Grid.Column="2">
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
         <Button Content="Delete clip" IsEnabled="{Binding HasSelection}" Command="{Binding DeleteSelectedCommand}" />
-        <Button Content="Stop (back to newest)" Command="{Binding StopStreamCommand}" />
+        <Button Content="Stop" Command="{Binding StopStreamCommand}"
+                ToolTip.Tip="Takes the clips off the Replay Clips scene at once." />
         <Button Content="Show newest on stream" Command="{Binding ShowLatestCommand}" />
         <!-- the one primary button of this view -->
         <Button Classes="primary" Content="Show this clip on stream" MinWidth="200" IsEnabled="{Binding HasSelection}" Command="{Binding ShowSelectedCommand}" />
       </StackPanel>
+
+      <!-- How long what was asked for stays on the stream: the time to change scene -->
+      <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,12,12" MinHeight="118">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <Border Classes="cardTitle" HorizontalAlignment="Left"><TextBlock Classes="h2" Text="ON STREAM" /></Border>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" IsVisible="{Binding RunActive}">
+              <TextBlock Classes="result remaining" Classes.urgent="{Binding RunUrgent}" FontSize="32" VerticalAlignment="Center"
+                         Text="{Binding RunRemainingText}" />
+              <TextBlock Classes="muted" VerticalAlignment="Center" Text="{Binding RunTotalText}" />
+            </StackPanel>
+          </Grid>
+          <ctl:ReplayRunBar IsVisible="{Binding RunActive}" Segments="{Binding RunSegments}" ElapsedMs="{Binding Run.ElapsedMs}"
+                            Urgent="{Binding RunUrgent}" Height="22" />
+          <TextBlock IsVisible="{Binding RunActive}" Text="{Binding RunCaption}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding RunNote}" IsVisible="{Binding HasRunNote}" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding RunIdle}"
+                     Text="Nothing is playing. What you show from here appears in the Replay Clips scene (replay.html?mode=clips) and leaves it empty when it ends. The Instant Replay scene keeps looping the newest clip." />
+        </StackPanel>
+      </Border>
 
       <ScrollViewer>
         <StackPanel Spacing="12" Margin="0,0,12,0">
@@ -111,9 +142,12 @@
               </Grid>
               <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button Content="Clear trim and speed" Command="{Binding ClearTrimCommand}" />
-                <TextBlock Classes="muted" VerticalAlignment="Center" TextWrapping="Wrap"
-                           Text="End 0 = to the end of the file. The video file itself is never changed; the stream shows the chosen part at the chosen speed." />
+                <Button Content="Save as new clip…" IsEnabled="{Binding CanSaveCopy}" Command="{Binding SaveCopyCommand}"
+                        ToolTip.Tip="Writes the chosen part, at the chosen speed, to a new video file (needs ffmpeg). The original stays as it is." />
+                <TextBlock Classes="muted" VerticalAlignment="Center" Text="{Binding ExportStatus}" IsVisible="{Binding IsExporting}" />
               </StackPanel>
+              <TextBlock Classes="muted" TextWrapping="Wrap"
+                         Text="End 0 = to the end of the file. The stream shows the chosen part at the chosen speed without changing the video file. “Save as new clip” writes that part into a new video file (needs ffmpeg); the original is kept." />
 
               <TextBlock Classes="label" Text="IN THESE CATEGORIES" />
               <ItemsControl ItemsSource="{Binding Tags}">

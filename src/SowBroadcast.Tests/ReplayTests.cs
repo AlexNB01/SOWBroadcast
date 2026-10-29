@@ -419,4 +419,310 @@ public sealed class ReplayTests : IDisposable
         }
         Assert.False(ControlCatalog.IsReplay(ControlCatalog.ObsReplaySave));
     }
+
+    // ---- saving the shown part as a new clip -------------------------------------------------------------
+
+    [Fact]
+    public void The_ffmpeg_arguments_cut_exactly_and_change_the_speed()
+    {
+        var args = FfmpegClipExporter.BuildArguments("in.mp4", "out.tmp", 2000, 5000, 0.5);
+        Assert.Equal(new[] { "-ss", "2", "-t", "3", "-i", "in.mp4" }, args.Skip(5).Take(6));
+        Assert.Contains("setpts=PTS/0.5", args);
+        Assert.Contains("atempo=0.5", args);
+        Assert.Equal("out.tmp", args[^1]);
+        Assert.Contains("libx264", args);
+
+        var whole = FfmpegClipExporter.BuildArguments("in.mp4", "out.tmp", 0, 0, 1);
+        Assert.DoesNotContain("-ss", whole);
+        Assert.DoesNotContain("-t", whole);
+        Assert.DoesNotContain("-vf", whole);
+
+        var fromStart = FfmpegClipExporter.BuildArguments("in.mp4", "out.tmp", 1500, 0, 1);
+        Assert.Contains("-ss", fromStart);
+        Assert.DoesNotContain("-t", fromStart);   // to the end of the file
+    }
+
+    [Theory]
+    [InlineData(0.1, "atempo=0.5,atempo=0.5,atempo=0.5,atempo=0.8")]
+    [InlineData(4, "atempo=2,atempo=2")]
+    [InlineData(1.5, "atempo=1.5")]
+    public void Audio_speed_is_split_into_stages_ffmpeg_accepts(double speed, string expected)
+    {
+        var args = FfmpegClipExporter.BuildArguments("in.mp4", "out.tmp", 0, 0, speed);
+        Assert.Equal(expected, args[args.ToList().IndexOf("-af") + 1]);
+    }
+
+    [Fact]
+    public void ffmpeg_is_found_in_the_given_folders_and_reported_missing_otherwise()
+    {
+        var folder = Path.Combine(_root, "tools");
+        Directory.CreateDirectory(folder);
+        Assert.Null(new FfmpegClipExporter(searchFolders: new[] { folder }).FindTool());
+
+        var exe = Path.Combine(folder, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+        File.WriteAllBytes(exe, new byte[] { 1 });
+        Assert.Equal(exe, new FfmpegClipExporter(searchFolders: new[] { folder }).FindTool());
+        Assert.Null(new FfmpegClipExporter(tool: Path.Combine(folder, "nothing.exe")).FindTool());
+    }
+
+    [Fact]
+    public void A_cut_copy_is_filed_just_below_its_source_and_never_becomes_the_newest_clip()
+    {
+        var library = Library();
+        library.Add(Clip(1), "Alpha vs Bravo", "ESM 2026");
+        var source = library.Add(Clip(2), "Alpha vs Bravo", "ESM 2026");
+        source = source with { Title = "Nice save", StartMs = 1000, EndMs = 3000, Speed = 0.5, Tags = new[] { "Best plays" } };
+        library.Update(source);
+
+        var temp = library.TempExportPath();
+        File.WriteAllBytes(temp, new byte[] { 9, 9, 9 });
+        var copy = library.AdoptCopy(library.Find(source.Id)!, temp, "Nice save (cut)");
+
+        Assert.NotNull(copy);
+        Assert.Equal("3-Replay-Replay.mp4", copy!.File);
+        Assert.True(File.Exists(library.PathOf(copy)));
+        Assert.False(File.Exists(temp));
+        Assert.Equal(0, copy.StartMs);
+        Assert.Equal(0, copy.EndMs);
+        Assert.Equal(1, copy.Speed);
+        Assert.Equal("Alpha vs Bravo", copy.Match);
+        Assert.Equal(new[] { "Best plays" }, copy.Tags);
+        Assert.Equal(source.Id, library.Latest()!.Id);   // the stream keeps showing what it showed
+        Assert.Equal(new[] { "2-Replay-Replay.mp4", "3-Replay-Replay.mp4", "1-Replay-Replay.mp4" }, library.Clips().Select(c => c.File));
+        Assert.Equal(1000, library.Find(source.Id)!.StartMs);   // the original keeps its own trim
+    }
+
+    // ---- how long the clips on the stream still last ------------------------------------------------------
+
+    private static ReplayClip Timed(string title, long durationMs, long startMs = 0, long endMs = 0, double speed = 1)
+        => new() { Id = title, File = title + ".mp4", Title = title, DurationMs = durationMs, StartMs = startMs, EndMs = endMs, Speed = speed };
+
+    private static readonly long Lead = ReplayRun.StartLagMs;
+    private static readonly long Gap = ReplayRun.ClipLagMs;
+
+    [Fact]
+    public void Nothing_is_playing_without_a_request_or_after_a_stop()
+    {
+        Assert.False(ReplayRun.At(null, 1000).IsPlaying);
+        Assert.False(ReplayRun.At(new ReplayRequest(1, 0, Array.Empty<ReplayClip>()), 1000).IsPlaying);
+    }
+
+    [Fact]
+    public void The_run_adds_up_the_shown_lengths_with_trim_and_speed_and_the_lags()
+    {
+        var request = new ReplayRequest(1, 10_000, new[]
+        {
+            Timed("A", 8000),                                             // 8 s
+            Timed("B", 20_000, startMs: 1000, endMs: 5000, speed: 0.5),   // 4 s of file at half speed = 8 s
+        });
+
+        var start = ReplayRun.At(request, 10_000);
+        Assert.True(start.IsPlaying);
+        Assert.Equal(0, start.Index);
+        Assert.Equal(8000 + Gap + Lead + 8000 + Gap, start.TotalMs);
+        Assert.Equal(start.TotalMs, start.RemainingMs);
+        Assert.False(start.LengthUnknown);
+        Assert.Equal(new long[] { 8000 + Gap + Lead, 8000 + Gap }, start.Segments.Select(s => s.LengthMs));
+
+        // still on the first clip one millisecond before it ends, on the second right after
+        var firstEnds = 10_000 + 8000 + Gap + Lead;
+        Assert.Equal(0, ReplayRun.At(request, firstEnds - 1).Index);
+        var second = ReplayRun.At(request, firstEnds);
+        Assert.Equal(1, second.Index);
+        Assert.Equal("B", second.Current!.Title);
+        Assert.Equal(0, second.ClipElapsedMs);
+        Assert.Equal(1000, ReplayRun.At(request, firstEnds + 1000).ClipElapsedMs);
+
+        // gone when the last clip has ended
+        Assert.True(ReplayRun.At(request, 10_000 + start.TotalMs - 1).IsPlaying);
+        Assert.False(ReplayRun.At(request, 10_000 + start.TotalMs).IsPlaying);
+    }
+
+    [Fact]
+    public void A_clip_of_unknown_length_is_flagged_until_the_library_has_learned_it()
+    {
+        var request = new ReplayRequest(1, 0, new[] { Timed("A", 0), Timed("B", 4000) });
+
+        var unknown = ReplayRun.At(request, 0);
+        Assert.True(unknown.LengthUnknown);
+        Assert.Equal(Lead + Gap + 4000 + Gap, unknown.TotalMs);   // at least this much
+
+        var learned = ReplayRun.At(request, 0, clip => clip.Id == "A" ? clip with { DurationMs = 6000 } : clip);
+        Assert.False(learned.LengthUnknown);
+        Assert.Equal(Lead + 6000 + Gap + 4000 + Gap, learned.TotalMs);
+    }
+
+    [Fact]
+    public void The_view_model_counts_the_time_down_and_turns_urgent_for_the_last_seconds()
+    {
+        var now = 100_000L;
+        var library = new ReplayLibrary(_root, () => 100_000);
+        var clip = library.Add(Clip(1), "", "");
+        library.Update(clip with { DurationMs = 20_000 });
+        var tab = new ReplayViewModel(library, new Recorder(), null, () => ("", ""), new Asks(true), null, null, null, () => now);
+
+        tab.UpdateRun();
+        Assert.False(tab.RunActive);
+        Assert.True(tab.RunIdle);
+        Assert.Equal("", tab.RunPillText);
+
+        library.Play(new[] { library.Find(clip.Id)! });
+        tab.UpdateRun();
+        Assert.True(tab.RunActive);
+        Assert.False(tab.RunIdle);
+        Assert.False(tab.RunUrgent);
+        Assert.Equal("0:21", tab.RunRemainingText);   // 20.75 s, rounded up
+        Assert.Equal("of 0:21", tab.RunTotalText);
+        Assert.Equal("Replay clips · 0:21", tab.RunPillText);
+        Assert.Equal(new long[] { 20_000 + Gap + Lead }, tab.RunSegments);
+        Assert.False(tab.HasRunNote);
+
+        now += 10_000;   // 10.75 s left
+        tab.UpdateRun();
+        Assert.Equal("0:11", tab.RunRemainingText);
+        Assert.False(tab.RunUrgent);
+
+        now += 1000;   // 9.75 s left
+        tab.UpdateRun();
+        Assert.Equal("0:10", tab.RunRemainingText);
+        Assert.True(tab.RunUrgent);
+
+        now += 10_000;   // over
+        tab.UpdateRun();
+        Assert.False(tab.RunActive);
+        Assert.Equal("", tab.RunPillText);
+    }
+
+    [Fact]
+    public void Stopping_clears_the_run_and_a_clip_of_unknown_length_says_so()
+    {
+        var now = 100_000L;
+        var library = new ReplayLibrary(_root, () => 100_000);
+        var clip = library.Add(Clip(1), "", "");   // the file is not a real video: its length is unknown
+        var tab = new ReplayViewModel(library, new Recorder(), null, () => ("", ""), new Asks(true), null, null, null, () => now);
+
+        library.Play(new[] { library.Find(clip.Id)! });
+        tab.UpdateRun();
+        Assert.True(tab.RunActive);
+        Assert.True(tab.HasRunNote);
+
+        Assert.True(tab.RunCommand(ControlCatalog.ReplayStop, null).Ok);
+        Assert.False(tab.RunActive);
+        Assert.Equal("", tab.RunRemainingText);
+    }
+
+    private sealed class FakeExporter : IClipExporter
+    {
+        public string? Tool = "ffmpeg.exe";
+        public ClipExportResult Result = new(true);
+        public (long Start, long End, double Speed)? Called;
+
+        public string? FindTool() => Tool;
+
+        public Task<ClipExportResult> ExportAsync(string input, string output, long startMs, long endMs, double speed, CancellationToken cancel = default)
+        {
+            Called = (startMs, endMs, speed);
+            if (Result.Ok) File.WriteAllBytes(output, new byte[] { 1, 2, 3, 4 });
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class Speaker : IMessages
+    {
+        public readonly List<string> Errors = new();
+        public readonly List<string> Infos = new();
+        public Task ShowErrorAsync(string title, string message) { Errors.Add(message); return Task.CompletedTask; }
+        public Task ShowInfoAsync(string title, string message) { Infos.Add(message); return Task.CompletedTask; }
+        public Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(true);
+    }
+
+    private (ReplayViewModel Tab, ReplayLibrary Library, FakeExporter Exporter, Speaker Messages) CuttingTab()
+    {
+        var library = Library();
+        var exporter = new FakeExporter();
+        var messages = new Speaker();
+        var tab = new ReplayViewModel(library, new Recorder(), null, () => ("Alpha vs Bravo", "ESM 2026"), messages, null, null, exporter);
+        tab.OnClipArrived(Clip(1));
+        tab.Selected = tab.Clips[0];
+        return (tab, library, exporter, messages);
+    }
+
+    [Fact]
+    public async Task Saving_the_shown_part_adds_a_new_clip_and_leaves_the_original_alone()
+    {
+        var (tab, library, exporter, messages) = CuttingTab();
+        var originalId = tab.Selected!.Id;
+        tab.EditStart = 1m;
+        tab.EditEnd = 3m;
+        tab.EditSpeed = 0.5m;
+
+        await tab.SaveCopyCommand.ExecuteAsync(null);
+
+        Assert.Equal((1000L, 3000L, 0.5), exporter.Called);
+        Assert.Empty(messages.Errors);
+        Assert.Equal(2, library.Clips().Count);
+        var copy = library.Clips().Single(c => c.Id != originalId);
+        Assert.Equal("Clip 1 (cut)", copy.Title);
+        Assert.Equal(copy.Id, tab.Selected!.Id);   // the new clip is the one shown
+        var original = library.Find(originalId)!;
+        Assert.Equal(1000, original.StartMs);
+        Assert.Equal(0.5, original.Speed);
+        Assert.False(tab.IsExporting);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_root, "Playlist"), "*.tmp"));
+    }
+
+    [Fact]
+    public async Task Saving_with_nothing_to_cut_or_without_ffmpeg_says_so_and_does_nothing()
+    {
+        var (tab, library, exporter, messages) = CuttingTab();
+        await tab.SaveCopyCommand.ExecuteAsync(null);   // no trim, normal speed
+        Assert.Single(messages.Infos);
+        Assert.Null(exporter.Called);
+
+        tab.EditStart = 1m;
+        exporter.Tool = null;
+        await tab.SaveCopyCommand.ExecuteAsync(null);
+        Assert.Contains(messages.Errors, m => m.Contains("ffmpeg"));
+        Assert.Null(exporter.Called);
+        Assert.Single(library.Clips());
+    }
+
+    [Fact]
+    public async Task A_failed_cut_is_reported_and_leaves_no_half_written_file()
+    {
+        var (tab, library, exporter, messages) = CuttingTab();
+        tab.EditEnd = 2m;
+        exporter.Result = new ClipExportResult(false, "Unknown encoder 'libx264'");
+
+        await tab.SaveCopyCommand.ExecuteAsync(null);
+
+        Assert.Contains(messages.Errors, m => m.Contains("libx264"));
+        Assert.Single(library.Clips());
+        Assert.Empty(Directory.GetFiles(Path.Combine(_root, "Playlist"), "*.tmp"));
+        Assert.True(tab.CanSaveCopy);
+    }
+
+    [Fact]
+    public async Task A_real_ffmpeg_cuts_the_part_and_changes_the_speed()
+    {
+        var exporter = new FfmpegClipExporter();
+        if (exporter.FindTool() is not { } tool) return;   // ffmpeg is not installed on this machine: nothing to try
+
+        var source = Path.Combine(_root, "source.mp4");
+        var made = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(tool,
+            $"-hide_banner -loglevel error -y -f lavfi -i testsrc=duration=4:size=320x180:rate=25 -f lavfi -i sine=duration=4 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest \"{source}\"")
+        { UseShellExecute = false, CreateNoWindow = true })!;
+        made.WaitForExit();
+        Assert.Equal(0, made.ExitCode);
+
+        var output = Path.Combine(_root, "cut.mp4");
+        var result = await exporter.ExportAsync(source, output, 1000, 3000, 2);   // two seconds at double speed = one second
+        Assert.True(result.Ok, result.Error);
+        var length = Mp4Info.ReadDurationMs(output);
+        Assert.InRange(length, 800, 1300);
+
+        var missing = await exporter.ExportAsync(Path.Combine(_root, "nothing.mp4"), Path.Combine(_root, "none.mp4"), 0, 0, 1);
+        Assert.False(missing.Ok);
+        Assert.False(File.Exists(Path.Combine(_root, "none.mp4")));
+    }
 }
