@@ -72,6 +72,12 @@ public sealed partial class WaitingViewModel : ObservableObject
     [ObservableProperty] private string _textEnd = DefaultEnd;
     [ObservableProperty] private string _tickerOverride = "";
     [ObservableProperty] private bool _tickerOverrideEnabled;
+    [ObservableProperty] private bool _scheduleEnabled = true;
+    [ObservableProperty] private int _scheduleRows = Defaults.ScheduleRows;
+    [ObservableProperty] private int _scheduleSeconds = Defaults.ScheduleSeconds;
+    [ObservableProperty] private int _scheduleVideoSeconds = Defaults.ScheduleVideoSeconds;
+    [ObservableProperty] private string _scheduleStreamFilter = "";
+    [ObservableProperty] private bool _scheduleShowUnknown;
     [ObservableProperty] private string _timerText = CountdownTimer.Format(0);
     [ObservableProperty] private bool _isRunning;
 
@@ -180,6 +186,12 @@ public sealed partial class WaitingViewModel : ObservableObject
         TextEnd = DefaultEnd;
         TickerOverrideEnabled = false;
         TickerOverride = "";
+        ScheduleEnabled = true;
+        ScheduleRows = Defaults.ScheduleRows;
+        ScheduleSeconds = Defaults.ScheduleSeconds;
+        ScheduleVideoSeconds = Defaults.ScheduleVideoSeconds;
+        ScheduleStreamFilter = "";
+        ScheduleShowUnknown = false;
         Timer.Reset();
         RefreshTimer();
         if (wasRunning || before != Timer.Remaining) TimerCommanded?.Invoke();
@@ -214,6 +226,12 @@ public sealed partial class WaitingViewModel : ObservableObject
             TextEnd = w.TextEnd;
             TickerOverride = w.TickerOverride;
             TickerOverrideEnabled = w.TickerOverrideEnabled;
+            ScheduleEnabled = w.ScheduleEnabled;
+            ScheduleRows = ScheduleOverlay.RowsOf(w);
+            ScheduleSeconds = ScheduleOverlay.SecondsOf(w);
+            ScheduleVideoSeconds = ScheduleOverlay.VideoSecondsOf(w);
+            ScheduleStreamFilter = w.ScheduleStreamFilter;
+            ScheduleShowUnknown = w.ScheduleShowUnknown;
             foreach (var social in Socials)
                 social.Text = w.Socials.TryGetValue(social.Kind, out var handle) ? handle : "";
         }
@@ -241,6 +259,12 @@ public sealed partial class WaitingViewModel : ObservableObject
             TextEnd = OrDefault(TextEnd, DefaultEnd),
             TickerOverride = TickerOverride.Trim(),
             TickerOverrideEnabled = TickerOverrideEnabled,
+            ScheduleEnabled = ScheduleEnabled,
+            ScheduleRows = Math.Clamp(ScheduleRows, ScheduleOverlay.MinRows, ScheduleOverlay.MaxRows),
+            ScheduleSeconds = Math.Clamp(ScheduleSeconds, ScheduleOverlay.MinSeconds, ScheduleOverlay.MaxSeconds),
+            ScheduleVideoSeconds = Math.Clamp(ScheduleVideoSeconds, ScheduleOverlay.MinVideoSeconds, ScheduleOverlay.MaxVideoSeconds),
+            ScheduleStreamFilter = ScheduleStreamFilter.Trim(),
+            ScheduleShowUnknown = ScheduleShowUnknown,
             Socials = Socials
                 .Select(s => (s.Kind, Handle: SocialHandles.Normalize(s.Kind, s.Text)))
                 .Where(s => s.Handle.Length > 0)

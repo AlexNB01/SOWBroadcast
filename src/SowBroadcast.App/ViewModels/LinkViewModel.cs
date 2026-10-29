@@ -150,6 +150,7 @@ public sealed partial class LinkViewModel : ObservableObject
         _host.ApplyLinked(state with
         {
             Maps = state.Maps.Select(m => new MapEntry { Index = m.Index }).ToArray(),
+            Schedule = Array.Empty<ScheduleEntry>(),   // a list of matches that is no longer kept up to date would only mislead
             Link = new LinkSettings(),
         });
         RefreshStatus();
@@ -268,7 +269,12 @@ public sealed partial class LinkViewModel : ObservableObject
         if (!update.IsManualDraftRoom)
         {
             string? LogoOf(string? url) => url is null ? null : _logos?.PathOf(url);
-            next = next with { Standings = TournamentMapper.Standings(snapshot, LogoOf), Bracket = TournamentMapper.Bracket(snapshot, LogoOf) };
+            next = next with
+            {
+                Standings = TournamentMapper.Standings(snapshot, LogoOf),
+                Bracket = TournamentMapper.Bracket(snapshot, LogoOf),
+                Schedule = ScheduleMapper.FromSnapshot(snapshot, LogoOf),
+            };
             toFetch.AddRange(snapshot.Teams.Select(t => t.LogoUrl).Where(u => !string.IsNullOrEmpty(u))!);
         }
 

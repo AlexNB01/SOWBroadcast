@@ -95,6 +95,27 @@
           </Border>
         </Grid>
 
+        <!-- Row 3: the match schedule that rotates over the video (Be Right Back) or stays (Starting Soon) -->
+        <Border Classes="card" Padding="14,10">
+          <StackPanel Spacing="8">
+            <Border Classes="cardTitle"><TextBlock Classes="h2" Text="MATCH SCHEDULE" /></Border>
+            <CheckBox Content="List upcoming matches and latest results on the waiting screens" IsChecked="{Binding Waiting.ScheduleEnabled}" />
+            <Grid ColumnDefinitions="Auto,Auto,24,Auto,Auto,24,Auto,Auto,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8" IsEnabled="{Binding Waiting.ScheduleEnabled}">
+              <TextBlock Classes="label" VerticalAlignment="Center" Text="MATCHES PER PAGE" />
+              <NumericUpDown Grid.Column="1" MinWidth="90" Minimum="1" Maximum="8" FormatString="0" Value="{Binding Waiting.ScheduleRows}" />
+              <TextBlock Grid.Column="3" Classes="label" VerticalAlignment="Center" Text="SECONDS PER PAGE" />
+              <NumericUpDown Grid.Column="4" MinWidth="90" Minimum="5" Maximum="120" FormatString="0" Value="{Binding Waiting.ScheduleSeconds}" />
+              <TextBlock Grid.Column="6" Classes="label" VerticalAlignment="Center" Text="VIDEO ALONE (SECONDS)" />
+              <NumericUpDown Grid.Column="7" MinWidth="90" Minimum="10" Maximum="600" FormatString="0" Value="{Binding Waiting.ScheduleVideoSeconds}" />
+              <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="STREAM LINK CONTAINS" />
+              <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="8" Text="{Binding Waiting.ScheduleStreamFilter}" Watermark="e.g. twitch.tv/suomiow (empty = any link)" />
+            </Grid>
+            <CheckBox Content="Also list matches in which neither team is known yet" IsChecked="{Binding Waiting.ScheduleShowUnknown}" IsEnabled="{Binding Waiting.ScheduleEnabled}" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Upcoming matches come from the SOWDraft link and are listed only when the match has a stream link in SOWDraft. The video plays alone for the set time; then Starting Soon shows the upcoming matches and Be Right Back the upcoming matches and the latest results (every finished match, streamed or not), a page at a time, before the video goes on." />
+          </StackPanel>
+        </Border>
+
         <Border Classes="card" Padding="14,10">
           <StackPanel Spacing="8">
             <Border Classes="cardTitle"><TextBlock Classes="h2" Text="SOCIALS" /></Border>

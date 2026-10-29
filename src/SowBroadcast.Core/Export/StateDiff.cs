@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Storage;
+using SowBroadcast.Core.Waiting;
 
 namespace SowBroadcast.Core.Export;
 
@@ -18,7 +19,7 @@ public static class StateDiff
         "t2.name", "t2.score", "t2.color", "t2.logo", "t2.ban", "t2.abbr", "t2.players",
         "general.caster1", "general.caster2", "general.host", "general.logo", "general.first_to", "general.status",
         "waiting.texts", "waiting.timer", "waiting.videos", "waiting.socials",
-        "maps", "standings", "bracket", "matchtext",
+        "maps", "standings", "bracket", "matchtext", "schedule",
     };
 
     private static readonly HashSet<string> MatchTextTriggers =
@@ -62,6 +63,8 @@ public static class StateDiff
         if (previous.CurrentMap != current.CurrentMap || MapsChanged(previous.Maps, current.Maps)) Add("maps");
         if (Section(previous.Standings) != Section(current.Standings)) Add("standings");
         if (Section(previous.Bracket) != Section(current.Bracket)) Add("bracket");
+        // What the waiting screens list (not the whole tournament: a match far in the future changing is no news).
+        if (ScheduleOverlay.BuildJson(previous).ToJsonString() != ScheduleOverlay.BuildJson(current).ToJsonString()) Add("schedule");
 
         if (keys.Any(MatchTextTriggers.Contains)) Add("matchtext");
         return keys;

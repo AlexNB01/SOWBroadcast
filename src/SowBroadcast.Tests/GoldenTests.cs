@@ -158,6 +158,8 @@ public sealed class GoldenTests : IDisposable
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(GoldenRoot, "diff_keys.json")));
         var expected = doc.RootElement.GetProperty("first_update").EnumerateArray().Select(e => e.GetString()!).ToList();
 
+        expected.Add("schedule");   // new in SOW Broadcast 3 (the waiting-screen match schedule); the legacy app had no such key
+
         Assert.Equal(expected, StateDiff.ChangedKeys(null, LoadState("full")));
     }
 

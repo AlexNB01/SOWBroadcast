@@ -138,7 +138,7 @@ public sealed class OverlayPublisher : IOverlayPublisher
     private static bool InScope(PublishScope scope, string key) => scope switch
     {
         PublishScope.General => key.StartsWith("general.", StringComparison.Ordinal),
-        PublishScope.Waiting => key.StartsWith("waiting.", StringComparison.Ordinal) || key == "matchtext",
+        PublishScope.Waiting => key.StartsWith("waiting.", StringComparison.Ordinal) || key == "matchtext" || key == "schedule",
         PublishScope.Standings => key == "standings",
         PublishScope.Bracket => key == "bracket",
         _ => key == "waiting.timer",

@@ -79,7 +79,8 @@ public static class SnapshotParser
             Str(m, "id") ?? "", Str(m, "stageId"), Str(m, "bracket"), Str(m, "groupName"), Int(m, "round") ?? 0, Int(m, "matchNumber") ?? 0,
             Str(m, "team1Id"), Str(m, "team2Id"), Int(m, "score1"), Int(m, "score2"), Str(m, "winnerTeamId"), Str(m, "status") ?? "",
             Long(m, "scheduledAt"), Str(m, "draftMatchId"), Int(m, "bestOf"),
-            Long(m, "startedAt"), Long(m, "completedAt"), NullIfBlank(Str(m, "roundName")), NullIfBlank(Str(m, "statusText")))).ToArray();
+            Long(m, "startedAt"), Long(m, "completedAt"), NullIfBlank(Str(m, "roundName")), NullIfBlank(Str(m, "statusText")),
+            NullIfBlank(Str(m, "streamUrl")), Bool(m, "scheduleAsap"), Long(m, "targetAt"))).ToArray();
 
         var advancement = Array(root, "advancement").Select(a => new AdvancementEntry(
             Str(a, "stageId"), Str(a, "group"), Str(a, "teamId") ?? "", Str(a, "status") ?? ""))
@@ -148,7 +149,9 @@ public static class SnapshotParser
             return new LinkMatch(
                 Str(m, "id") ?? "", stageId, Str(m, "bracket"), Str(m, "group_name"), Int(m, "round") ?? 0, Int(m, "match_number") ?? 0,
                 Str(m, "team1_id"), Str(m, "team2_id"), Int(m, "score1"), Int(m, "score2"), Str(m, "winner_team_id"), Str(m, "status") ?? "",
-                Long(m, "scheduled_at"), Str(m, "draft_match_id"), bestOf);
+                Long(m, "scheduled_at"), Str(m, "draft_match_id"), bestOf,
+                StartedAt: Long(m, "started_at"), CompletedAt: Long(m, "completed_at"), StreamUrl: NullIfBlank(Str(m, "stream_url")),
+                ScheduleAsap: Bool(m, "schedule_asap"), TargetAt: Long(m, "target_at"));
         }).ToArray();
 
         return new TournamentSnapshot

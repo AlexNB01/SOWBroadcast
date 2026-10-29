@@ -14,7 +14,8 @@ public sealed record LinkMatch(
     string Id, string? StageId, string? Bracket, string? GroupName, int Round, int MatchNumber,
     string? Team1Id, string? Team2Id, int? Score1, int? Score2, string? WinnerTeamId, string Status,
     long? ScheduledAt, string? DraftMatchId, int? BestOf,
-    long? StartedAt = null, long? CompletedAt = null, string? RoundName = null, string? StatusText = null);
+    long? StartedAt = null, long? CompletedAt = null, string? RoundName = null, string? StatusText = null,
+    string? StreamUrl = null, bool ScheduleAsap = false, long? TargetAt = null);
 
 /// <summary>A team of a group whose fate is decided: <c>Status</c> is "qualified" or "eliminated" (the broadcast API's <c>advancement</c>).</summary>
 public sealed record AdvancementEntry(string? StageId, string? Group, string TeamId, string Status);

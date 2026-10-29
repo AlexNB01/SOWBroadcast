@@ -79,6 +79,58 @@ public sealed record WaitingSettings
     public IReadOnlyDictionary<string, string> Socials { get; init; } = new Dictionary<string, string>();
     public string TickerOverride { get; init; } = "";
     public bool TickerOverrideEnabled { get; init; }
+
+    // The match schedule shown on the waiting screens (the matches themselves come from the SOWDraft link: AppState.Schedule).
+    public bool ScheduleEnabled { get; init; } = true;
+    /// <summary>How many matches a page of the schedule lists (1..8).</summary>
+    public int ScheduleRows { get; init; } = Defaults.ScheduleRows;
+    /// <summary>How many seconds a page stays on screen before the other one comes (5..120).</summary>
+    public int ScheduleSeconds { get; init; } = Defaults.ScheduleSeconds;
+    /// <summary>How many seconds the video plays alone, uninterrupted, between two rounds of the schedule pages (10..600).</summary>
+    public int ScheduleVideoSeconds { get; init; } = Defaults.ScheduleVideoSeconds;
+    /// <summary>Upcoming matches are listed only when their stream link in SOWDraft contains this text (empty = any link).</summary>
+    public string ScheduleStreamFilter { get; init; } = "";
+    /// <summary>List upcoming matches in which neither team is known yet (a final waiting for its semifinals); off by default.</summary>
+    public bool ScheduleShowUnknown { get; init; }
+}
+
+/// <summary>One match of the linked tournament, as the waiting-screen schedule needs it. Names are empty while a team is not known.</summary>
+public sealed record ScheduleEntry
+{
+    public string Id { get; init; } = "";
+    public string Team1 { get; init; } = "";
+    public string Team2 { get; init; } = "";
+    public int? Score1 { get; init; }
+    public int? Score2 { get; init; }
+    /// <summary>"upcoming", "live" or "completed".</summary>
+    public string Status { get; init; } = ScheduleStatus.Upcoming;
+    /// <summary>Epoch milliseconds, 0 = not scheduled.</summary>
+    public long ScheduledAt { get; init; }
+    public long StartedAt { get; init; }
+    public long CompletedAt { get; init; }
+    public int Round { get; init; }
+    public int MatchNumber { get; init; }
+    /// <summary>"Semifinals", "Round 2" ...</summary>
+    public string RoundName { get; init; } = "";
+    public string Group { get; init; } = "";
+    /// <summary>The stream link set for the match in SOWDraft, or empty.</summary>
+    public string StreamUrl { get; init; } = "";
+    /// <summary>Played "as soon as possible": it has no <see cref="ScheduledAt"/> until it is about to start.</summary>
+    public bool Asap { get; init; }
+    /// <summary>The preferred start time of an ASAP match (epoch ms), 0 = none.</summary>
+    public long TargetAt { get; init; }
+    /// <summary>Position of the match's stage in the tournament (0 = first), so that group matches list before the playoffs.</summary>
+    public int StageOrder { get; init; }
+    /// <summary>Downloaded logo files of the two teams (local paths), or null.</summary>
+    public string? Team1Logo { get; init; }
+    public string? Team2Logo { get; init; }
+}
+
+public static class ScheduleStatus
+{
+    public const string Upcoming = "upcoming";
+    public const string Live = "live";
+    public const string Completed = "completed";
 }
 
 public sealed record StandingsRow
@@ -183,6 +235,8 @@ public sealed record AppState
     public WaitingSettings Waiting { get; init; } = new();
     public StandingsSettings Standings { get; init; } = new();
     public BracketSettings Bracket { get; init; } = new();
+    /// <summary>The matches of the linked tournament (empty when none is linked); the waiting screens list them.</summary>
+    public IReadOnlyList<ScheduleEntry> Schedule { get; init; } = Array.Empty<ScheduleEntry>();
     public string DraftLinkUrl { get; init; } = "";
     public string TournamentLinkUrl { get; init; } = "";
     public LinkSettings Link { get; init; } = new();
@@ -235,4 +289,7 @@ public static class Defaults
 {
     public const string Team1Color = "#55aaff";
     public const string Team2Color = "#ff557f";
+    public const int ScheduleRows = 4;
+    public const int ScheduleSeconds = 12;
+    public const int ScheduleVideoSeconds = 60;
 }

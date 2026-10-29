@@ -2,6 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using SowBroadcast.Core.Model;
+using SowBroadcast.Core.Waiting;
 
 namespace SowBroadcast.Core.Export;
 
@@ -53,6 +54,7 @@ public static class OverlayStateJson
             },
             ["standings"] = exporter.BuildStandingsJson(derived),
             ["bracket"] = exporter.BuildBracketJson(derived),
+            ["schedule"] = ScheduleOverlay.BuildJson(derived, exporter.NormalizeLogoPath),
         };
         return root.ToJsonString(Options);
     }

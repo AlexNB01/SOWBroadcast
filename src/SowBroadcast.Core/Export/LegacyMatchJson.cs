@@ -20,7 +20,12 @@ public static class LegacyMatchJson
         root.Remove("schema_version");
         root.Remove("link"); // the link settings are the app's own (they hold no overlay data)
         root["map_pool"] = new JsonArray();
-        if (root["waiting"] is JsonObject waiting) waiting.Remove("timer_ends_at_ms"); // not part of the legacy shape (the overlay state has its own timer)
+        root.Remove("schedule"); // the waiting screens get the schedule from the overlay state
+        if (root["waiting"] is JsonObject waiting)
+        {
+            waiting.Remove("timer_ends_at_ms"); // not part of the legacy shape (the overlay state has its own timer)
+            foreach (var key in new[] { "schedule_enabled", "schedule_rows", "schedule_seconds", "schedule_video_seconds","schedule_stream_filter", "schedule_show_unknown" }) waiting.Remove(key);
+        }
 
         var general = root["general"]!.AsObject();
         general["first_to"] = derived.General.MapsCount;

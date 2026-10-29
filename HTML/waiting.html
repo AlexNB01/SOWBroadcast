@@ -152,6 +152,82 @@ video{ width:100%; height:100%; background:#000; object-fit:cover; }
 .social-icon{ width:1em; height:1em; flex:0 0 auto; filter: invert(1) brightness(1000%); }
 .social-chip span{ white-space:nowrap; }
 
+/* === Match schedule: lies over the video, comes and goes (Starting Soon: upcoming; Be Right Back: upcoming + results) === */
+.schedule{
+  --k:1;                       /* shrinks everything a little when many rows have to fit (set by schFit) */
+  position:absolute; inset:0; padding:26px 40px 30px;
+  display:flex; flex-direction:column; gap:12px;
+  background: color-mix(in srgb, var(--secondary) 74%, transparent);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  border:2px solid color-mix(in srgb, var(--tertiary) 45%, transparent); border-radius:var(--radius);
+  color:var(--primary);
+  opacity:0; transform:translateY(16px); pointer-events:none;
+  transition: opacity 600ms ease, transform 600ms cubic-bezier(.2,.8,.2,1);
+}
+.schedule.show{ opacity:1; transform:none; }
+.sch-title{
+  flex:0 0 auto; display:flex; align-items:center; gap:26px;
+  font-size:48px; font-weight:900; letter-spacing:3px; text-transform:uppercase; line-height:1.1;
+}
+.sch-title::after{ content:""; flex:1 1 auto; height:6px; border-radius:3px; background:var(--tertiary); }
+.sch-rows{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+
+/* a day header ("Today", "Saturday") above the matches of that day */
+.sch-day{
+  flex:0 0 auto; display:flex; align-items:center; gap:18px;
+  margin:calc(12px * var(--k)) 0 calc(4px * var(--k));
+  font-size:calc(28px * var(--k)); font-weight:900; letter-spacing:3px; text-transform:uppercase; line-height:1;
+  color:var(--tertiary);
+}
+.sch-day::after{ content:""; flex:1 1 auto; height:2px; background: color-mix(in srgb, var(--primary) 22%, transparent); }
+
+.sch-row{
+  flex:0 0 auto; height:calc(104px * var(--k));
+  display:grid; grid-template-columns:calc(250px * var(--k)) minmax(0,1fr); align-items:center; column-gap:28px;
+  padding:0 18px; border-bottom:2px solid color-mix(in srgb, var(--primary) 16%, transparent);
+  animation:schIn 520ms cubic-bezier(.2,.8,.2,1) both; animation-delay:calc(var(--i, 0) * 70ms);
+}
+@keyframes schIn{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
+/* the next match: a little bigger and lit */
+.sch-row.next{
+  height:calc(120px * var(--k)); border-radius:12px; border-bottom-color:transparent;
+  background: color-mix(in srgb, var(--tertiary) 20%, transparent);
+  box-shadow: inset 8px 0 0 var(--tertiary);
+}
+
+.sch-when{ min-width:0; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:4px; }
+.sch-time{ font-size:calc(46px * var(--k)); font-weight:900; color:var(--tertiary); letter-spacing:.6px; line-height:1; white-space:nowrap; }
+.sch-time.tba{ opacity:.45; }
+.sch-label{
+  max-width:100%; font-size:calc(22px * var(--k)); font-weight:700; opacity:.7; letter-spacing:.8px; line-height:1.1;
+  text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.sch-live{
+  display:inline-flex; align-items:center; gap:12px; padding:4px 18px 2px; border-radius:8px;
+  background:#d7263d; color:#fff; font-size:calc(38px * var(--k)); font-weight:900; letter-spacing:2px; line-height:1.2;
+}
+.sch-live::before{ content:""; width:.36em; height:.36em; border-radius:50%; background:#fff; animation:schPulse 1.4s ease-in-out infinite; }
+@keyframes schPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.25; } }
+
+/* the two teams are mirrored around a centre that stays in the same place on every row */
+.sch-main{ min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; column-gap:22px; }
+.sch-team{ min-width:0; display:flex; align-items:center; gap:calc(18px * var(--k)); }
+.sch-team.t1{ justify-content:flex-end; text-align:right; }
+.sch-team.t2{ justify-content:flex-start; text-align:left; }
+.sch-team.lost{ opacity:.55; }
+/* every name has the same size (set by schFit) and may wrap to two lines instead of being cut */
+.sch-name{
+  flex:0 1 auto; min-width:0; font-size:var(--nf, calc(44px * var(--k))); font-weight:900; text-transform:uppercase;
+  line-height:1.05; text-wrap:balance;
+}
+/* the logo always has its place, so the names stay in line whether a team has a logo or not */
+.sch-logo{
+  flex:0 0 auto; width:calc(80px * var(--k)); height:calc(80px * var(--k)); border-radius:calc(14px * var(--k)); overflow:hidden;
+}
+.sch-logo img{ display:block; width:100%; height:100%; object-fit:contain; }
+.sch-mid{ min-width:calc(78px * var(--k)); text-align:center; font-size:calc(30px * var(--k)); font-weight:700; opacity:.7; letter-spacing:2px; }
+.sch-score{ min-width:calc(150px * var(--k)); text-align:center; font-size:calc(60px * var(--k)); font-weight:900; letter-spacing:2px; color:var(--tertiary); white-space:nowrap; }
+
 /* === Scene transition animations === */
 .left-column, .video-wrap, .ticker, #socials {
   will-change: transform, opacity;
@@ -186,6 +262,10 @@ body.leaving       #socials     { transform: translateY(30px);  opacity: 0; }
   <div class="video-wrap">
     <video id="player" autoplay muted playsinline></video>
     <div id="noVideo" class="novideo" style="display:none;">NO VIDEOS CONFIGURED</div>
+    <div id="schedule" class="schedule">
+      <div id="schTitle" class="sch-title"></div>
+      <div id="schRows" class="sch-rows"></div>
+    </div>
   </div>
   <div class="ticker">
     <div id="tickerInner" class="ticker-inner"></div>
@@ -581,12 +661,201 @@ async function upTimer(){
   })();
 
 
+// ---- Match schedule ------------------------------------------------------------------------------------
+// state.schedule = { enabled, rows, seconds, upcoming:[...], results:[...] } (built by the program from the SOWDraft link).
+// The panel cycles: upcoming -> (Be Right Back only) latest results -> video alone -> ..., each for `seconds`.
+// Starting Soon lists only the upcoming matches; the end screen never shows it.
+const SCH = { data:null, key:"", pages:[], current:null, timer:0 };
+
+function schTime(ms){ return new Date(ms).toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit", hour12:false }); }
+
+function schDayKey(ms){ const d = new Date(ms); return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); }
+
+// "Today", "Tomorrow", "Saturday", and for a day further away "Saturday 31 Oct".
+function schDayTitle(ms){
+  const d = new Date(ms), now = new Date();
+  const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+  if (days <= 0) return days === 0 ? "Today" : d.toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"short" });
+  if (days === 1) return "Tomorrow";
+  const weekday = d.toLocaleDateString("en-GB", { weekday:"long" });
+  return days < 7 ? weekday : weekday + " " + d.toLocaleDateString("en-GB", { day:"numeric", month:"short" });
+}
+
+function schEl(tag, cls, text){
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+// A team logo: only files inside the Scoreboard folder can be shown. A team without a logo (or one that does not load),
+// and a team that is not known yet (TBD), gets the Overwatch logo instead.
+const SCH_FALLBACK_LOGO = "assets/ow_logo.png";
+function schLogo(path, name){
+  const slot = schEl("div", "sch-logo");
+  const img = schEl("img");
+  img.alt = "";
+  const fallback = () => { img.onerror = null; img.src = SCH_FALLBACK_LOGO; };
+  const own = path && name !== "TBD" && !/^([a-zA-Z][a-zA-Z0-9+.-]*:|\/|\\)/.test(path);
+  if (own) { img.onerror = fallback; img.src = SB + "/" + path.replace(/\\/g, "/"); }
+  else fallback();
+  slot.appendChild(img);
+  return slot;
+}
+
+function schTeam(side, name, logo, lost){
+  const el = schEl("div", "sch-team " + side + (lost ? " lost" : ""));
+  const label = schEl("div", "sch-name", name);
+  const slot = schLogo(logo, name);
+  if (side === "t1") { el.appendChild(label); el.appendChild(slot); }
+  else               { el.appendChild(slot); el.appendChild(label); }
+  return el;
+}
+
+// The left column of a row: what time it is (or LIVE / ASAP) and which round, or only the round for a result.
+function schWhen(page, m){
+  const when = schEl("div", "sch-when");
+  if (page === "upcoming") {
+    if (m.live) when.appendChild(schEl("span", "sch-live", "LIVE"));
+    else if (m.scheduled_at) when.appendChild(schEl("div", "sch-time", schTime(m.scheduled_at)));
+    else if (m.asap) when.appendChild(schEl("div", "sch-time", "ASAP"));
+    else when.appendChild(schEl("div", "sch-time tba", "TBA"));
+  }
+  if (m.label) when.appendChild(schEl("div", "sch-label", m.label));
+  return when;
+}
+
+function schRow(page, m, index, next){
+  const row = schEl("div", "sch-row" + (next ? " next" : ""));
+  row.style.setProperty("--i", index);
+  const lost1 = page === "results" && m.score1 != null && m.score2 != null && m.score1 < m.score2;
+  const lost2 = page === "results" && m.score1 != null && m.score2 != null && m.score2 < m.score1;
+  const main = schEl("div", "sch-main");
+  main.appendChild(schTeam("t1", m.team1, m.team1_logo, lost1));
+  main.appendChild(page === "results"
+    ? schEl("div", "sch-score", (m.score1 == null ? "-" : m.score1) + " – " + (m.score2 == null ? "-" : m.score2))
+    : schEl("div", "sch-mid", "VS"));
+  main.appendChild(schTeam("t2", m.team2, m.team2_logo, lost2));
+  row.appendChild(schWhen(page, m));
+  row.appendChild(main);
+  return row;
+}
+
+// The upcoming matches with a header above each day (matches without any time follow "Later" once days have been shown).
+function schUpcomingNodes(list){
+  const nodes = [];
+  let group = null, headers = 0, index = 0, nextDone = false;
+  for (const m of list) {
+    const at = m.scheduled_at || m.target_at || 0;
+    const key = m.live ? "live" : at ? schDayKey(at) : "later";
+    if (key !== group) {
+      group = key;
+      if (key !== "live" && (key !== "later" || headers > 0)) {
+        nodes.push(schEl("div", "sch-day", key === "later" ? "Later" : schDayTitle(at)));
+        headers++;
+      }
+    }
+    const next = !m.live && !nextDone;
+    if (!m.live) nextDone = true;
+    nodes.push(schRow("upcoming", m, index++, next));
+  }
+  return nodes;
+}
+
+// The rows fill the panel: start big (few rows) and shrink everything a step at a time until all of it fits under the title.
+// Then one name size for every team: the largest at which each name fits in two lines.
+function schFit(panel, rows){
+  let k = 1.4;
+  panel.style.setProperty("--k", k);
+  while (rows.scrollHeight > rows.clientHeight + 1 && k > 0.5) {
+    k = Math.round((k - 0.05) * 100) / 100;
+    panel.style.setProperty("--k", k);
+  }
+  const names = [...rows.querySelectorAll(".sch-name")];
+  let size = 44 * k;
+  const fits = () => names.every(el => {
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || size * 1.05;
+    return el.scrollWidth <= el.clientWidth + 1 && el.getBoundingClientRect().height <= lh * 2 + 2;
+  });
+  panel.style.setProperty("--nf", size + "px");
+  while (!fits() && size > 22) {
+    size -= 2;
+    panel.style.setProperty("--nf", size + "px");
+  }
+}
+
+function schRender(page){
+  const panel = document.getElementById("schedule");
+  const d = SCH.data;
+  const list = page === "results" ? d.results : d.upcoming;
+  panel.classList.toggle("results", page === "results");
+  document.getElementById("schTitle").textContent = page === "results" ? "Latest results" : "Upcoming matches";
+  const rows = document.getElementById("schRows");
+  rows.replaceChildren(...(page === "results" ? list.map((m, i) => schRow("results", m, i, false)) : schUpcomingNodes(list)));
+  schFit(panel, rows);
+}
+
+function schShow(page){
+  const panel = document.getElementById("schedule");
+  SCH.current = page;
+  if (page) schRender(page);
+  panel.classList.toggle("show", !!page);
+}
+
+function schAdvance(){
+  const pages = SCH.pages;
+  if (!pages.length) { schShow(null); return; }
+  const i = pages.indexOf(SCH.current);
+  schShow(pages[(i + 1) % pages.length]);
+  // the video alone stays as long as it is set to (uninterrupted), a schedule page a shorter time
+  const shown = pages[(i + 1) % pages.length];
+  const seconds = shown ? SCH.data.seconds : SCH.data.video_seconds;
+  SCH.timer = setTimeout(schAdvance, Math.max(5, seconds | 0) * 1000);
+}
+
+function schPages(d){
+  if (!d || !d.enabled || MODE === "end") return [];
+  const pages = [];
+  if (d.upcoming && d.upcoming.length) pages.push("upcoming");
+  if (MODE === "brb" && d.results && d.results.length) pages.push("results");
+  if (pages.length) pages.unshift(null);   // the cycle starts with the video alone
+  return pages;
+}
+
+document.fonts && document.fonts.ready && document.fonts.ready.then(function(){
+  if (SCH.current && SCH.data) schFit(document.getElementById("schedule"), document.getElementById("schRows"));
+});
+
+function upSchedule(){
+  const s = (typeof SOW.state === "function" && SOW.state()) || null;
+  const d = s && s.schedule || null;
+  const key = JSON.stringify(d);
+  if (key === SCH.key) return;
+  SCH.key = key;
+  SCH.data = d;
+  SCH.pages = schPages(d);
+
+  if (!SCH.pages.length) {
+    clearTimeout(SCH.timer); SCH.timer = 0;
+    schShow(null);
+    return;
+  }
+  if (SCH.timer && SCH.pages.includes(SCH.current)) {
+    if (SCH.current) schRender(SCH.current);      // same page, new content: the cycle goes on
+    return;
+  }
+  clearTimeout(SCH.timer);
+  SCH.current = SCH.pages[SCH.pages.length - 1];  // so that the first advance lands on the first page
+  schAdvance();
+}
+
 function startSSE(){
   try{
     const es=SOW.events();
     es.onmessage=async ev=>{
       try{
         const d=JSON.parse(ev.data||"{}"); const ch=Array.isArray(d.changed)?d.changed:[];
+        if(ch.some(k=>k==="schedule")) upSchedule();
         if(ch.some(k=>k==="general.colors")) await applyColors();
 		if(ch.some(k=>k==="waiting.texts")) await upText();
 		if(ch.some(k=>k==="waiting.timer")) await upTimer();
@@ -606,6 +875,7 @@ function startSSE(){
   await applyColors();
   await Promise.all([upText(), upTimer(), loadPlaylist(), upTicker(), upOverlayLogo(), positionOverlayLogo(), upSocials()]);
   fitBigText();
+  upSchedule();
   startSSE();
   setInterval(upTimer, 1000);
 })();
