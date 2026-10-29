@@ -7,7 +7,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <Version>3.1.0</Version>
+    <Version>3.2.0</Version>
     <AssemblyName>SOWBroadcast</AssemblyName>
     <RootNamespace>SowBroadcast.App</RootNamespace>
   </PropertyGroup>
