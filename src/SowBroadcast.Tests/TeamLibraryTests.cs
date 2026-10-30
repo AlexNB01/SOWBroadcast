@@ -217,9 +217,26 @@ public sealed class TeamLibraryTests : IDisposable
         Assert.Equal("Tank", wolves.Players[0].Role);
         Assert.Equal(("Ana", ""), (wolves.Players[0].Hero, wolves.Players[1].Hero));   // the hero set in SOWDraft, as the catalogue spells it
         Assert.Equal("discord-name", wolves.Players[1].Name);
-        Assert.Equal("Flex", wolves.Players[1].Role);             // main role + secondary roles cover all three
+        Assert.Equal("Support", wolves.Players[1].Role);          // the main role; secondary roles covering all three do not make it Flex
         Assert.NotNull(library.LogoPathOf(wolves));
         Assert.Equal("OUL", library.FindByName("Oulu")!.Abbr);
+    }
+
+    [Fact]
+    public void Imported_players_are_listed_tank_damage_support_flex()
+    {
+        var library = Library();
+
+        library.ImportFromLink(new[]
+        {
+            Linked("Order", null, null, null,
+                new LinkPlayer("Flx", null, null, "Flex", Array.Empty<string>()),
+                new LinkPlayer("Sup", null, null, "Support", Array.Empty<string>()),
+                new LinkPlayer("Tnk", null, null, "Tank", Array.Empty<string>()),
+                new LinkPlayer("Dmg", null, null, "DPS", Array.Empty<string>())),
+        }, _ => null);
+
+        Assert.Equal(new[] { "Tnk", "Dmg", "Sup", "Flx" }, library.FindByName("Order")!.Players.Take(4).Select(p => p.Name));
     }
 
     [Fact]

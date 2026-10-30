@@ -10,20 +10,27 @@ public static class LinkNaming
     private static readonly HashSet<string> SupportRoles = new(StringComparer.OrdinalIgnoreCase) { "Support", "Main Support", "Flex Support" };
 
     /// <summary>
-    /// The role shown for a player: Tank, Damage or Support from the main role; "Flex" when the main role and the secondary roles
-    /// together cover all three categories (SOWDraft's own "plays all roles" rule) or the main role is Flex; otherwise empty.
+    /// The role shown for a player: Tank, Damage or Support, or Flex, from the role an organiser set for the player in SOWDraft's
+    /// participants (Edit Participant); otherwise empty. The roles a player picked when registering (main and secondary) are not used.
     /// </summary>
-    public static string RoleOf(string? role, IEnumerable<string>? secondaryRoles)
+    public static string RoleOf(string? role)
     {
-        var all = new[] { role }.Concat(secondaryRoles ?? Array.Empty<string>()).Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r!.Trim()).ToArray();
-        var covers = all.Any(TankRoles.Contains) && all.Any(DamageRoles.Contains) && all.Any(SupportRoles.Contains);
-        if (covers || string.Equals(role?.Trim(), "Flex", StringComparison.OrdinalIgnoreCase)) return "Flex";
+        if (string.Equals(role?.Trim(), "Flex", StringComparison.OrdinalIgnoreCase)) return "Flex";
         var main = role?.Trim() ?? "";
         if (TankRoles.Contains(main)) return "Tank";
         if (DamageRoles.Contains(main)) return "Damage";
         if (SupportRoles.Contains(main)) return "Support";
         return "";
     }
+
+    /// <summary>
+    /// The players of a team in the order the panels list them: Tank, then Damage, then Support, then Flex, then those without a role.
+    /// Players with the same role keep the order SOWDraft gave them.
+    /// </summary>
+    public static IReadOnlyList<LinkPlayer> InRoleOrder(IEnumerable<LinkPlayer> players) =>
+        players.Select((p, i) => (p, i, rank: RoleRank(RoleOf(p.Role)))).OrderBy(x => x.rank).ThenBy(x => x.i).Select(x => x.p).ToArray();
+
+    private static int RoleRank(string role) => role switch { "Tank" => 0, "Damage" => 1, "Support" => 2, "Flex" => 3, _ => 4 };
 
     /// <summary>The name shown for a player: the battletag before "#" (at most 12 characters), else the name, else the Discord name.</summary>
     public static string PlayerName(LinkPlayer player)

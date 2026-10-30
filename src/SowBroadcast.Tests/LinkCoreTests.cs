@@ -7,19 +7,30 @@ namespace SowBroadcast.Tests;
 public sealed class LinkNamingTests
 {
     [Theory]
-    [InlineData("Tank", null, "Tank")]
-    [InlineData("Hitscan", null, "Damage")]
-    [InlineData("Flex DPS", null, "Damage")]
-    [InlineData("DPS", null, "Damage")]
-    [InlineData("Main Support", null, "Support")]
-    [InlineData("Flex Support", null, "Support")]
-    [InlineData("Flex", null, "Flex")]
-    [InlineData("Tank", "Hitscan,Main Support", "Flex")]   // main + secondary cover all three
-    [InlineData("Tank", "Hitscan", "Tank")]
-    [InlineData("Unknown", null, "")]
-    [InlineData(null, null, "")]
-    public void Roles_follow_the_documented_mapping(string? role, string? secondary, string expected) =>
-        Assert.Equal(expected, LinkNaming.RoleOf(role, secondary?.Split(',')));
+    [InlineData("Tank", "Tank")]
+    [InlineData("Hitscan", "Damage")]
+    [InlineData("Flex DPS", "Damage")]
+    [InlineData("DPS", "Damage")]
+    [InlineData("Main Support", "Support")]
+    [InlineData("Flex Support", "Support")]
+    [InlineData("Flex", "Flex")]
+    [InlineData("Unknown", "")]
+    [InlineData(null, "")]
+    public void Roles_follow_the_documented_mapping(string? role, string expected) =>
+        Assert.Equal(expected, LinkNaming.RoleOf(role));
+
+    [Fact]
+    public void Players_are_listed_tank_then_damage_then_support_then_flex_then_those_without_a_role()
+    {
+        LinkPlayer P(string name, string? role) => new(name, null, null, role, Array.Empty<string>());
+        var ordered = LinkNaming.InRoleOrder(new[]
+        {
+            P("none", null), P("flex", "Flex"), P("sup1", "Support"), P("dps1", "DPS"), P("tank1", "Tank"),
+            P("sup2", "Main Support"), P("dps2", "Hitscan"), P("tank2", "Tank"),
+        });
+
+        Assert.Equal(new[] { "tank1", "tank2", "dps1", "dps2", "sup1", "sup2", "flex", "none" }, ordered.Select(p => p.Name));
+    }
 
     [Theory]
     [InlineData("Pelaaja#1234", "Some Name", "d", "Pelaaja")]
@@ -328,6 +339,30 @@ public sealed class MatchLinkMapperTests
         Assert.Equal((1, 2), (first.T1, first.T2));            // Alpha won 2-1; Alpha is the T2 panel now
         Assert.Equal(Picks.Team2, first.Pick);                  // Alpha picked
         Assert.Equal(("Ashe", "Ana"), (first.T1Ban, first.T2Ban));
+    }
+
+    [Fact]
+    public void The_players_of_a_team_are_put_in_the_order_tank_damage_support_flex()
+    {
+        var snap = LinkFixtures.Snapshot();
+        var scrambled = snap with
+        {
+            Teams = snap.Teams.Select(t => t.Id != "a" ? t : t with
+            {
+                Players = new[]
+                {
+                    new LinkPlayer("Sup", null, null, "Support", Array.Empty<string>()),
+                    new LinkPlayer("Flx", null, null, "Flex", Array.Empty<string>()),
+                    new LinkPlayer("Dmg", null, null, "DPS", Array.Empty<string>()),
+                    new LinkPlayer("Tnk", null, null, "Tank", Array.Empty<string>()),
+                },
+            }).ToArray(),
+        };
+
+        var state = MatchLinkMapper.Apply(Blank(), scrambled, "m1", Options(), NoHistory).State;
+
+        var rows = state.Team1.Players.Take(4).Select(p => (p.Name, p.Role)).ToArray();
+        Assert.Equal(new[] { ("Tnk", "Tank"), ("Dmg", "Damage"), ("Sup", "Support"), ("Flx", "Flex") }, rows);
     }
 
     [Fact]

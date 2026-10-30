@@ -107,13 +107,14 @@ public static class MatchLinkMapper
             }
 
             var players = current.Players.ToArray();
+            var sourcePlayers = LinkNaming.InRoleOrder(source.Players);
             for (var i = 0; i < players.Length; i++)
             {
                 var p = players[i];
-                var hasSource = i < source.Players.Count;
-                var name = hasSource ? LinkNaming.PlayerName(source.Players[i]) : "";
-                var role = hasSource ? LinkNaming.RoleOf(source.Players[i].Role, source.Players[i].SecondaryRoles) : "";
-                var hero = hasSource ? PlayerHero(source.Players[i].Hero) : "";
+                var hasSource = i < sourcePlayers.Count;
+                var name = hasSource ? LinkNaming.PlayerName(sourcePlayers[i]) : "";
+                var role = hasSource ? LinkNaming.RoleOf(sourcePlayers[i].Role) : "";
+                var hero = hasSource ? PlayerHero(sourcePlayers[i].Hero) : "";
 
                 if (Changed($"{panel}.p{i}.name", name, out var previousName))
                 {

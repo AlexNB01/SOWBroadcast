@@ -206,8 +206,8 @@ public sealed class TeamLibrary
         {
             if (string.IsNullOrWhiteSpace(linked.Name)) continue;
             var existing = FindByName(linked.Name);
-            var players = linked.Players.Take(Limits.PlayersPerTeam)
-                .Select(p => new Player { Name = LinkNaming.PlayerName(new LinkPlayer(p.Name, p.Battletag, p.Discord, p.Role, p.SecondaryRoles)), Hero = p.Hero is { Length: > 0 } hero ? resolveHero?.Invoke(hero) ?? "" : "", Role = LinkNaming.RoleOf(p.Role, p.SecondaryRoles) })
+            var players = LinkNaming.InRoleOrder(linked.Players).Take(Limits.PlayersPerTeam)
+                .Select(p => new Player { Name = LinkNaming.PlayerName(new LinkPlayer(p.Name, p.Battletag, p.Discord, p.Role, p.SecondaryRoles)), Hero = p.Hero is { Length: > 0 } hero ? resolveHero?.Invoke(hero) ?? "" : "", Role = LinkNaming.RoleOf(p.Role) })
                 .ToArray();
             var team = new Team
             {
