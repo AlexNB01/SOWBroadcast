@@ -352,7 +352,8 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     const scale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
     const hasLower = roundsWrap.classList.contains("has-lower");
     const minScale = hasLower ? 0.7 : 0.65;
-    const clamped = Math.max(minScale, Math.min(scale, 1.4));
+    // A small bracket (two or three rounds) grows to fill the free space instead of sitting small in the middle of it.
+    const clamped = Math.max(minScale, Math.min(scale, 2.5));
     const scaledWidth = contentWidth * clamped;
     const offsetX = Math.max(0, (availableWidth - scaledWidth) / 2);
 
@@ -374,7 +375,12 @@ body.leaving       .frame { transform: translateY(32px); opacity: 0; }
     });
     const topOvershoot = Math.max(0, wrapTop - minTitleTop);
 
-    roundsWrap.style.transform = `translate(${offsetX}px, ${topOvershoot}px) scale(${clamped})`;
+    // What is left of the height is shared above and below, so a bracket that is limited by its width does not hug the top.
+    const paddingTop = parseFloat(getComputedStyle(container).paddingTop) || 0;
+    const freeHeight = availableHeight - paddingTop - contentHeight * clamped - topOvershoot;
+    const offsetY = Math.max(0, freeHeight / 2);
+
+    roundsWrap.style.transform = `translate(${offsetX}px, ${topOvershoot + offsetY}px) scale(${clamped})`;
   }
 
   function render(data){

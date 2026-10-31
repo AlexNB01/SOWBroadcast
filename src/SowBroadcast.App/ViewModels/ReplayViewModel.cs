@@ -218,25 +218,42 @@ public sealed partial class ReplayViewModel : ObservableObject
             Categories.Add(new ReplayCategoryItem(null, all.Count));
             foreach (var c in _library.Categories()) Categories.Add(new ReplayCategoryItem(c));
             SelectedCategory = Categories.FirstOrDefault(c => c.Category?.Label == keepCategory) ?? Categories[0];
-
-            var shown = SelectedCategory.IsAll ? all : _library.ClipsIn(SelectedCategory.Name).OrderByDescending(c => c.AddedAt).ToArray();
-            Clips.Clear();
-            foreach (var clip in shown) Clips.Add(new ReplayClipItem(clip));
-            Selected = Clips.FirstOrDefault(c => c.Id == keepClip);
+            FillClips(all, keepClip);
         }
         finally { _loading = false; }
 
+        AfterClipsFilled(keepClip);
+        Summary = all.Count == 0 ? "No clips yet. Clips OBS saves with the replay buffer appear here." : $"{all.Count} clips";
+    }
+
+    // The clips of the selected category (all of them for "All clips"), keeping the selected clip when it is still there.
+    private void FillClips(IReadOnlyList<ReplayClip> all, string? keepClip)
+    {
+        var category = SelectedCategory ?? Categories[0];
+        var shown = category.IsAll ? all : _library.ClipsIn(category.Name).OrderByDescending(c => c.AddedAt).ToArray();
+        Clips.Clear();
+        foreach (var clip in shown) Clips.Add(new ReplayClipItem(clip));
+        Selected = Clips.FirstOrDefault(c => c.Id == keepClip);
+    }
+
+    private void AfterClipsFilled(string? keepClip)
+    {
         LoadEditor();
         if (Selected?.Id != keepClip) OpenPreview();
         OnPropertyChanged(nameof(HasClips));
         OnPropertyChanged(nameof(CanDeleteCategory));
-        Summary = all.Count == 0 ? "No clips yet. Clips OBS saves with the replay buffer appear here." : $"{all.Count} clips";
     }
 
+    // Choosing a category only changes the clip list. The category list itself is not rebuilt: replacing the items of the drop-down
+    // from inside its own selection change left the box that shows the choice empty.
     partial void OnSelectedCategoryChanged(ReplayCategoryItem? value)
     {
-        if (_loading) return;
-        Refresh();
+        if (_loading || value is null) return;
+        var keepClip = Selected?.Id;
+        _loading = true;
+        try { FillClips(_library.Clips(), keepClip); }
+        finally { _loading = false; }
+        AfterClipsFilled(keepClip);
     }
 
     partial void OnSelectedChanged(ReplayClipItem? value)

@@ -1,10 +1,31 @@
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Avalonia.Threading;
 using LibVLCSharp.Shared;
 
 namespace SowBroadcast.App.Services;
 
-/// <summary>The Replay tab's preview, on LibVLC. When the native library is not there the player says so and does nothing.</summary>
+/// <summary>
+/// The Replay tab's preview, on LibVLC. When the native library is not there the player says so and does nothing.
+/// The picture is not drawn by a native video window: LibVLC hands every frame to <see cref="FrameReady"/> and the view shows it as an
+/// ordinary image, so the clip can only ever appear inside the preview box (a native window could end up as a window of its own).
+/// </summary>
 public sealed class LibVlcClipPlayer : IClipPlayer, IDisposable
 {
+    // The frame size the picture is delivered in (clips come from OBS, always 16:9); LibVLC scales the video to it.
+    private const int FrameWidth = 960;
+    private const int FrameHeight = 540;
+    private const int FramePitch = FrameWidth * 4;
+
+    private readonly IntPtr _frame = Marshal.AllocHGlobal(FramePitch * FrameHeight);
+    private readonly object _frameLock = new();
+    private WriteableBitmap? _bitmap;
+    private int _frameQueued;
+    private volatile bool _disposed;
+
     private readonly LibVLC? _vlc;
     private Media? _media;
     private volatile bool _pauseWhenPlaying;
@@ -24,6 +45,11 @@ public sealed class LibVlcClipPlayer : IClipPlayer, IDisposable
             LibVLCSharp.Shared.Core.Initialize();
             _vlc = new LibVLC("--no-video-title-show", "--no-osd", "--quiet");
             MediaPlayer = new MediaPlayer(_vlc) { Mute = true };
+            MediaPlayer.SetVideoFormat("RV32", FrameWidth, FrameHeight, FramePitch);
+            MediaPlayer.SetVideoCallbacks(
+                (opaque, planes) => { Monitor.Enter(_frameLock); Marshal.WriteIntPtr(planes, _frame); return IntPtr.Zero; },
+                (opaque, picture, planes) => Monitor.Exit(_frameLock),
+                (opaque, picture) => QueueFrame());
             MediaPlayer.Playing += (_, _) =>
             {
                 var seek = Interlocked.Exchange(ref _seekWhenPlaying, -1);
@@ -49,8 +75,35 @@ public sealed class LibVlcClipPlayer : IClipPlayer, IDisposable
         }
     }
 
-    /// <summary>What the view's video surface shows (null when LibVLC could not be loaded).</summary>
+    /// <summary>The player itself (null when LibVLC could not be loaded).</summary>
     public MediaPlayer? MediaPlayer { get; }
+
+    /// <summary>The picture shown now; the same bitmap is updated in place, so a view only has to redraw when <see cref="FrameReady"/> fires.</summary>
+    public WriteableBitmap? Frame => _bitmap;
+
+    /// <summary>A new picture is in <see cref="Frame"/> (raised on the UI thread).</summary>
+    public event Action? FrameReady;
+
+    // Called on LibVLC's thread for every picture: at most one copy to the UI thread is waiting at a time.
+    private void QueueFrame()
+    {
+        if (Interlocked.Exchange(ref _frameQueued, 1) == 1) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            Interlocked.Exchange(ref _frameQueued, 0);
+            if (_disposed) return;
+            _bitmap ??= new WriteableBitmap(new PixelSize(FrameWidth, FrameHeight), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
+            using (var target = _bitmap.Lock())
+            {
+                lock (_frameLock)
+                {
+                    for (var y = 0; y < FrameHeight; y++)
+                        unsafe { Buffer.MemoryCopy((byte*)_frame + y * FramePitch, (byte*)target.Address + y * target.RowBytes, target.RowBytes, FramePitch); }
+                }
+            }
+            FrameReady?.Invoke();
+        }, DispatcherPriority.Render);
+    }
 
     public bool Available { get; }
     public string? Problem { get; }
@@ -162,6 +215,7 @@ public sealed class LibVlcClipPlayer : IClipPlayer, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _pauseWhenPlaying = false;
         try
         {
@@ -169,6 +223,7 @@ public sealed class LibVlcClipPlayer : IClipPlayer, IDisposable
             Release();
             MediaPlayer?.Dispose();
             _vlc?.Dispose();
+            Marshal.FreeHGlobal(_frame);
         }
         catch (Exception ex)
         {

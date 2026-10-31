@@ -17,7 +17,7 @@ public static class TournamentMapper
 
     /// <param name="keepDisplayGroup">
     /// The group the operator chose to show in standings.html (<c>__all__</c> or a group key). Kept when the tournament still has it;
-    /// otherwise, and on the first link, the first group is shown.
+    /// otherwise, and on the first link, all groups are shown.
     /// </param>
     public static StandingsSettings Standings(TournamentSnapshot snapshot, Func<string?, string?> logoOf, string? keepDisplayGroup = null)
     {
@@ -79,7 +79,7 @@ public static class TournamentMapper
             }
         }
 
-        var display = groups.Count > 0 ? groups[0].Key : "";
+        var display = groups.Count > 0 ? "__all__" : "";
         if (!string.IsNullOrEmpty(keepDisplayGroup) && (keepDisplayGroup == "__all__" || groups.Any(g => g.Key == keepDisplayGroup)))
             display = keepDisplayGroup;
         var shown = groups.FirstOrDefault(g => g.Key == display) ?? (groups.Count > 0 ? groups[0] : null);

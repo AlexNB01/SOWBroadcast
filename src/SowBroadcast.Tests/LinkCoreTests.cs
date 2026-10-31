@@ -601,7 +601,7 @@ public sealed class TournamentMapperTests
         Assert.Equal((6, 2, 0, 3, 4, 1), (rows[0].Points, rows[0].Wins, rows[0].Draws + rows[0].Losses, rows[0].MapDiff + 0, rows[0].Sf, rows[0].Sa));
         Assert.Equal(new[] { 1, 2, 3, 4 }, rows.Select(r => r.Rank));
         Assert.Equal("Bravo", rows[^1].TeamName);
-        Assert.Equal(("s1", "Synthetic Cup"), (standings.DisplayGroup, standings.Title));
+        Assert.Equal(("__all__", "Synthetic Cup"), (standings.DisplayGroup, standings.Title));
         Assert.Same(group.Rows, standings.Rows);
     }
 
@@ -669,7 +669,7 @@ public sealed class TournamentMapperTests
         Assert.Equal(new[] { "Group A", "Group B" }, standings.Groups.Select(g => g.Name));
         Assert.Equal(("Alpha", 9, 1, "L:a.png"), (standings.Rows[0].TeamName, standings.Rows[0].Points, standings.Rows[0].Rank, standings.Rows[0].LogoPath));
         Assert.Equal(2, standings.Rows[1].Rank);
-        Assert.Equal("A", standings.DisplayGroup);
+        Assert.Equal("__all__", standings.DisplayGroup);
     }
 
     [Fact]
@@ -692,7 +692,7 @@ public sealed class TournamentMapperTests
         Assert.Equal("B", kept.DisplayGroup);
         Assert.Equal("Bravo", kept.Rows[0].TeamName);
         Assert.Equal("__all__", all.DisplayGroup);
-        Assert.Equal("A", gone.DisplayGroup);
+        Assert.Equal("__all__", gone.DisplayGroup);
     }
 
     [Fact]

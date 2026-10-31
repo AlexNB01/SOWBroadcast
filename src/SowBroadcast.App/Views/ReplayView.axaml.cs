@@ -29,10 +29,30 @@ public partial class ReplayView : UserControl
         (DataContext as ReplayViewModel)?.SeekTo(Seek.Value);
     }
 
+    private LibVlcClipPlayer? _connected;
+
+    // The picture is a bitmap the player updates in place; the image only has to be told to draw it again.
     private void ConnectVideo()
     {
-        if (DataContext is ReplayViewModel { Player: LibVlcClipPlayer { MediaPlayer: { } player } })
-            Video.MediaPlayer = player;
+        if (DataContext is not ReplayViewModel { Player: LibVlcClipPlayer player } || ReferenceEquals(player, _connected)) return;
+        DisconnectVideo();
+        _connected = player;
+        player.FrameReady += ShowFrame;
+        ShowFrame();
+    }
+
+    private void DisconnectVideo()
+    {
+        if (_connected is null) return;
+        _connected.FrameReady -= ShowFrame;
+        _connected = null;
+    }
+
+    private void ShowFrame()
+    {
+        if (_connected?.Frame is not { } frame) return;
+        if (!ReferenceEquals(Video.Source, frame)) Video.Source = frame;
+        Video.InvalidateVisual();
     }
 
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
@@ -50,6 +70,7 @@ public partial class ReplayView : UserControl
     protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
         _timer.Stop();
+        DisconnectVideo();
         if (DataContext is ReplayViewModel { Player: LibVlcClipPlayer player }) player.SurfaceLost();
         base.OnDetachedFromVisualTree(e);
     }

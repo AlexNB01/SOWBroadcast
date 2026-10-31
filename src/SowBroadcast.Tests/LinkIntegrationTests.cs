@@ -101,16 +101,38 @@ public sealed class LinkIntegrationTests : IAsyncLifetime, IDisposable
     {
         await LinkAndSelectAsync();
         await SettledAsync();
-        Assert.Equal("s1", _vm.Standings.SelectedDisplay.Key);                     // the first group to start with
+        Assert.Same(_vm.Standings.AllOption, _vm.Standings.SelectedDisplay);       // all groups to start with
 
-        _vm.Standings.SelectedDisplay = _vm.Standings.AllOption;
+        var first = _vm.Standings.DisplayOptions.First(o => o.Key == "s1");
+        _vm.Standings.SelectedDisplay = first;
         Socket.Fire("update-state", LinkFixtures.DraftRoom);
         await Task.Delay(300);
         _vm.UpdateStandingsCommand.Execute(null);
 
-        Assert.Same(_vm.Standings.AllOption, _vm.Standings.SelectedDisplay);
+        Assert.Equal("s1", _vm.Standings.SelectedDisplay.Key);
         Assert.Equal("Alpha", _vm.Standings.Groups[0].Rows[0].TeamName);           // the table keeps SOWDraft's order
-        Assert.Equal("__all__", _recorder.Parts.Last().State.Standings.DisplayGroup);
+        Assert.Equal("s1", _recorder.Parts.Last().State.Standings.DisplayGroup);
+    }
+
+    [Fact]
+    public async Task Choosing_another_match_leaves_nothing_of_the_previous_one_behind()
+    {
+        await LinkAndSelectAsync();
+        await SettledAsync();
+        Assert.Equal("Ana", _vm.Match.Maps[0].T1Ban);          // the first match has bans, scores and maps
+
+        _vm.Link.SelectedMatch = _vm.Link.Matches.Single(m => m.Id == "m2");   // Charlie vs Delta: no draft room, no maps
+        await Eventually(() => _vm.Match.Team1.Name == "Charlie", "the new match is applied");
+
+        Assert.Equal("Delta", _vm.Match.Team2.Name);
+        Assert.All(_vm.Match.Maps, card =>
+        {
+            Assert.True(string.IsNullOrEmpty(card.Map));
+            Assert.True(string.IsNullOrEmpty(card.T1Ban) && string.IsNullOrEmpty(card.T2Ban));
+            Assert.Equal((0, 0, false), (card.T1, card.T2, card.Completed));
+        });
+        Assert.Equal((0, 0), (_vm.Match.Team1.Score, _vm.Match.Team2.Score));
+        Assert.Null(_vm.Match.Team1.LogoPath is null ? null : _vm.Match.Team1.LogoPath.Contains("a.png") ? "Alpha's logo is still there" : null);
     }
 
     [Fact]

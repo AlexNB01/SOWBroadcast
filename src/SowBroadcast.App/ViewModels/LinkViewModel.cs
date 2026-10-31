@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SowBroadcast.App.Services;
 using SowBroadcast.Core.Link;
+using SowBroadcast.Core.Match;
 using SowBroadcast.Core.Model;
 using SowBroadcast.Core.Storage;
 using SowBroadcast.Integrations.Link;
@@ -249,8 +250,18 @@ public sealed partial class LinkViewModel : ObservableObject
         var toFetch = new List<string>();
         var next = state;
 
-        // Another match means another set of values: write everything again.
-        if (forceWrite || (!update.IsManualDraftRoom && update.SelectedMatchId != link.SelectedMatchId)) received = new Dictionary<string, string>();
+        // Another match (or other sides) means another set of values: write everything again. A value the new match does not have must not
+        // survive from the old one (bans, scores, maps, players), so the panels and map cards start blank first.
+        var rewrite = forceWrite || (!update.IsManualDraftRoom && update.SelectedMatchId != link.SelectedMatchId);
+        if (rewrite)
+        {
+            if (update.SelectedMatchId.Length > 0)
+            {
+                if (received.ContainsKey("general.status")) next = next with { General = next.General with { StatusText = "" } };
+                next = MatchOperations.Reset(next);
+            }
+            received = new Dictionary<string, string>();
+        }
 
         if (update.SelectedMatchId.Length > 0)
         {

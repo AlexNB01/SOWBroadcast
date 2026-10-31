@@ -2,7 +2,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SowBroadcast.App.ViewModels"
              xmlns:ctl="using:SowBroadcast.App.Controls"
-             xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
              x:Class="SowBroadcast.App.Views.ReplayView"
              x:DataType="vm:ReplayViewModel">
 
@@ -98,7 +97,7 @@
               <Border Classes="cardTitle"><TextBlock Classes="h2" Text="PREVIEW" /></Border>
               <Border Background="Black" CornerRadius="4" Height="280" ClipToBounds="True">
                 <Grid>
-                  <vlc:VideoView x:Name="Video" IsVisible="{Binding PreviewAvailable}" />
+                  <Image x:Name="Video" Stretch="Uniform" IsVisible="{Binding PreviewAvailable}" />
                   <TextBlock IsVisible="{Binding !PreviewAvailable}" Text="{Binding PreviewProblem}" TextWrapping="Wrap"
                              Foreground="{DynamicResource SowFrostBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20" />
                   <TextBlock IsVisible="{Binding !HasSelection}" Text="Select a clip to see it here." Foreground="{DynamicResource SowFrostBrush}"
