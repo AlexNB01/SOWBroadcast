@@ -12,8 +12,11 @@ public sealed class AppSettings
         PropertyNameCaseInsensitive = true,
     };
 
-    /// <summary>Look for a newer version when the program starts. Off by default: the program makes no network calls the user did not ask for.</summary>
-    public bool CheckForUpdatesAtStartup { get; set; }
+    /// <summary>
+    /// Look for a newer version when the program starts (one request to GitHub; a window tells the producer when there is one).
+    /// On by default so the producer gets the latest version; it can be switched off in the Help menu.
+    /// </summary>
+    public bool CheckForUpdatesAtStartup { get; set; } = true;
 
     public static AppSettings Load(string path)
     {

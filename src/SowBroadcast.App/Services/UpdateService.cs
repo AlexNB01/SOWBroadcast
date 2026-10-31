@@ -2,7 +2,8 @@
 namespace SowBroadcast.App.Services;
 
 /// <summary>A newer version that can be installed.</summary>
-public sealed record UpdateOffer(string Version, long? SizeBytes, object Handle);
+/// <param name="Notes">The release description written for the version (plain text, may be empty).</param>
+public sealed record UpdateOffer(string Version, long? SizeBytes, object Handle, string Notes = "");
 
 /// <summary>What the program needs from an updater, behind an interface so the check can be tested without GitHub or an installation.</summary>
 public interface IAppUpdater

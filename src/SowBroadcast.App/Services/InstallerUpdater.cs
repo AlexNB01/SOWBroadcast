@@ -8,8 +8,10 @@ namespace SowBroadcast.App.Services;
 public sealed record ReleaseAsset(string Name, string Url, long Size);
 
 /// <summary>What the program needs to know about the latest GitHub release.</summary>
-public sealed record ReleaseInfo(Version Version, string Tag, ReleaseAsset? Installer, ReleaseAsset? Checksum)
+public sealed record ReleaseInfo(Version Version, string Tag, ReleaseAsset? Installer, ReleaseAsset? Checksum, string Notes = "")
 {
+    private const int MaxNotes = 4000;
+
     /// <summary>Reads GitHub's "latest release" answer. The installer is <c>SOWBroadcast-Setup-&lt;version&gt;.exe</c>, its checksum <c>….exe.sha256</c>.</summary>
     /// <exception cref="FormatException">The text is not a release with a usable version tag.</exception>
     public static ReleaseInfo Parse(string json)
@@ -32,7 +34,11 @@ public sealed record ReleaseInfo(Version Version, string Tag, ReleaseAsset? Inst
             else if (name.StartsWith("SOWBroadcast-Setup-", StringComparison.OrdinalIgnoreCase) && name.EndsWith(".exe.sha256", StringComparison.OrdinalIgnoreCase))
                 checksum = new ReleaseAsset(name, url, size);
         }
-        return new ReleaseInfo(version, tag, installer, checksum);
+
+        // What the release says is shown to the operator as plain text; a very long text is cut.
+        var notes = (root["body"] is JsonValue body && body.TryGetValue<string>(out var text) ? text : "").Replace("\r\n", "\n").Trim();
+        if (notes.Length > MaxNotes) notes = notes[..MaxNotes].TrimEnd() + "…";
+        return new ReleaseInfo(version, tag, installer, checksum, notes);
     }
 
     /// <summary>"v3.1.0" or "3.1.0-beta" to 3.1.0 (a pre-release suffix is ignored).</summary>
@@ -85,7 +91,7 @@ public sealed class InstallerUpdater : IAppUpdater
 
         if (release.Version <= _current) return null;
         if (release.Installer is null) throw new InvalidOperationException($"Version {release.Version} has no installer attached.");
-        return new UpdateOffer(release.Version.ToString(), release.Installer.Size, release);
+        return new UpdateOffer(release.Version.ToString(), release.Installer.Size, release, release.Notes);
     }
 
     public async Task DownloadAsync(UpdateOffer offer, Action<int> progress, CancellationToken cancellation)

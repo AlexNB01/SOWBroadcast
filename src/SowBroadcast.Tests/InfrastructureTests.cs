@@ -198,12 +198,21 @@ public sealed class AppSettingsTests : IDisposable
     public void Dispose() { try { Directory.Delete(_dir, true); } catch { /* best effort */ } }
 
     [Fact]
-    public void Nothing_is_checked_without_the_user_asking_and_the_choice_is_kept()
+    public void The_startup_check_is_on_by_default_and_switching_it_off_is_kept()
     {
         var path = Path.Combine(_dir, "app-settings.json");
-        Assert.False(AppSettings.Load(path).CheckForUpdatesAtStartup);
+        Assert.True(AppSettings.Load(path).CheckForUpdatesAtStartup);
 
-        new AppSettings { CheckForUpdatesAtStartup = true }.Save(path);
+        new AppSettings { CheckForUpdatesAtStartup = false }.Save(path);
+
+        Assert.False(AppSettings.Load(path).CheckForUpdatesAtStartup);
+    }
+
+    [Fact]
+    public void A_settings_file_without_the_choice_keeps_the_startup_check_on()
+    {
+        var path = Path.Combine(_dir, "app-settings.json");
+        File.WriteAllText(path, "{ }");
 
         Assert.True(AppSettings.Load(path).CheckForUpdatesAtStartup);
     }
@@ -214,6 +223,6 @@ public sealed class AppSettingsTests : IDisposable
         var path = Path.Combine(_dir, "app-settings.json");
         File.WriteAllText(path, "{ nope");
 
-        Assert.False(AppSettings.Load(path).CheckForUpdatesAtStartup);
+        Assert.True(AppSettings.Load(path).CheckForUpdatesAtStartup);
     }
 }

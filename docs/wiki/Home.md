@@ -19,7 +19,7 @@ Everything the program saves (autosave, settings, logs, generated overlay files,
 
 Your own files have visible folders next to the program too: `Logos\Team Logos`, `Logos\Broadcast Logos` and `Team Files`.
 
-> Updating: Help → **Check for updates…** downloads the newest installer from GitHub and installs it over the old version (the program closes and starts again). Don't update during a broadcast. *Check for updates when the program starts* is optional and off by default.
+> Updating: Help → **Check for updates…** downloads the newest installer from GitHub and installs it over the old version (the program closes and starts again). Don't update during a broadcast. *Check for updates when the program starts* is on by default: when a newer version exists, a window offers to install it now or later (it never opens while OBS is streaming or recording). You can switch it off in the Help menu.
 
 ## Add the overlays to OBS
 1. In SOW Broadcast open **Control → OBS panel…** and press **Export scene collection…**. Save the file.

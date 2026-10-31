@@ -215,21 +215,7 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
             case UpdateCheckStatus.Available when result.Offer is { } offer:
                 if (!await ConfirmAsync("Update available",
                         result.Message + "\n\nThe program closes and starts again in the new version. Do not update during a broadcast. Install now?")) return;
-                _viewModel.Autosave();
-                _viewModel.ArchiveOnClose();
-                _viewModel.StatusText = "Downloading the update… 0 %";
-                var problem = await _updates.InstallAsync(offer, percent => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = $"Downloading the update… {percent} %"));
-                if (problem is not null)
-                {
-                    _viewModel.StatusText = problem;
-                    await ShowErrorAsync("Update", problem);
-                }
-                else
-                {
-                    // The installer is running: close the program so it can replace it (it starts the new version afterwards).
-                    _viewModel.StatusText = "Installing the update…";
-                    Close();
-                }
+                await InstallUpdateAsync(offer);
                 break;
             case UpdateCheckStatus.Failed:
                 await ShowErrorAsync("Update", result.Message);
@@ -240,12 +226,54 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
         }
     }
 
-    // At startup: no dialog, only a line in the status bar (the producer may be busy setting up a show).
+    // Saves the match, downloads the installer and closes the program so the installer can replace it.
+    private async Task InstallUpdateAsync(UpdateOffer offer)
+    {
+        _viewModel.Autosave();
+        _viewModel.ArchiveOnClose();
+        _viewModel.StatusText = "Downloading the update… 0 %";
+        var problem = await _updates.InstallAsync(offer, percent => Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = $"Downloading the update… {percent} %"));
+        if (problem is not null)
+        {
+            _viewModel.StatusText = problem;
+            await ShowErrorAsync("Update", problem);
+        }
+        else
+        {
+            // The installer is running: close the program so it can replace it (it starts the new version afterwards).
+            _viewModel.StatusText = "Installing the update…";
+            Close();
+        }
+    }
+
+    private bool _updatePromptShown;
+
+    // At startup: a window tells the producer that a newer version exists. It never opens while OBS is streaming or recording
+    // (that line in the status bar is all they get then), and only once per run.
     private async Task CheckForUpdatesQuietlyAsync()
     {
         var result = await _updates.CheckAsync();
-        if (result.Status == UpdateCheckStatus.Available)
+        if (result.Status != UpdateCheckStatus.Available || result.Offer is not { } offer) return;
+
+        var onAir = _obsController.IsStreaming || _obsController.IsRecording;
+        if (!UpdatePromptViewModel.ShouldOpenAtStartup(_updatePromptShown, onAir))
+        {
             Avalonia.Threading.Dispatcher.UIThread.Post(() => _viewModel.StatusText = result.Message + " Help > Check for updates installs it.");
+            return;
+        }
+
+        _updatePromptShown = true;
+        await Task.Delay(1500);   // let the main window finish appearing first
+        var choice = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var window = new UpdateAvailableWindow(new UpdatePromptViewModel(offer, AppInfo.Version));
+            await window.ShowDialog(this);
+            return window.Choice;
+        });
+        if (choice == UpdateChoice.InstallNow)
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => InstallUpdateAsync(offer));
+        else
+            _viewModel.StatusText = result.Message + " Help > Check for updates installs it.";
     }
 
     private void OnUpdateStartupToggled(object? sender, RoutedEventArgs e)
@@ -414,6 +442,9 @@ public partial class MainWindow : Window, IFileDialogs, IImagePicker, IMessages,
                 {
                     "heroes" => new AssetManagerWindow(new AssetManagerViewModel(AssetCategory.Heroes, _services.Assets, this, this)),
                     "about" => new AboutWindow(),
+                    "update" => new UpdateAvailableWindow(new UpdatePromptViewModel(
+                        new UpdateOffer("3.4.0", 186 * 1024 * 1024, new object(), "Replay clips can be cut and saved as new clips.\n- The bracket fits its space.\n- A new match clears the old one."),
+                        AppInfo.Version)),
                     "obs" => new ObsWindow(_viewModel.Obs!),
                     "profiles" => new ProfilesWindow(new ProfilesViewModel(_viewModel)),
                     "library" => new TeamLibraryWindow(new TeamLibraryViewModel(_viewModel)),
